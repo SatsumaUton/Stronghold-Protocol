@@ -6786,7 +6786,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_1027_greyy2_wild_12.png",
+          "portraitE2": "/assets/char/skin/char_1027_greyy2_wild_12.png"
         }
       }
     },
@@ -11098,7 +11100,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_1036_fang2_snow_8.png",
+          "portraitE2": "/assets/char/skin/char_1036_fang2_snow_8.png"
         }
       }
     },
@@ -28681,7 +28685,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_185_frncat_marthe_12.png",
+          "portraitE2": "/assets/char/skin/char_185_frncat_marthe_12.png"
         },
         "char_185_frncat_wild_7": {
           "name": "营地炊烟",
@@ -29662,7 +29668,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_194_leto_sightseer_4.png",
+          "portraitE2": "/assets/char/skin/char_194_leto_sightseer_4.png"
         }
       }
     },
@@ -38822,7 +38830,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_219_meteo_summer_22.png",
+          "portraitE2": "/assets/char/skin/char_219_meteo_summer_22.png"
         },
         "char_219_meteo_sweep_1": {
           "name": "石墨",
@@ -51494,7 +51504,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_328_cammou_summer_22.png",
+          "portraitE2": "/assets/char/skin/char_328_cammou_summer_22.png"
         },
         "char_328_cammou_witch_2": {
           "name": "安息处的怪盗",
@@ -83532,7 +83544,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_4165_ctrail_yun_11.png",
+          "portraitE2": "/assets/char/skin/char_4165_ctrail_yun_11.png"
         }
       }
     },
@@ -84361,7 +84375,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_4177_brigid_epoque_53.png",
+          "portraitE2": "/assets/char/skin/char_4177_brigid_epoque_53.png"
         }
       }
     },
@@ -86864,7 +86880,9 @@
               "hits": {},
               "bounds": null
             }
-          }
+          },
+          "portrait": "/assets/char/skin/char_4198_christ_epoque_56.png",
+          "portraitE2": "/assets/char/skin/char_4198_christ_epoque_56.png"
         }
       }
     },

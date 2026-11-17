@@ -6,11 +6,13 @@
 // `ArknightsAssets2 / assets/dyn/arts/charportraits` 同尺寸）。
 //
 // 作者源（按优先级，全部是「作者提供的地址」，不从我们自己的资源站拿）：
-//   1. ArknightsAssets/ArknightsAssets2 @cn  `assets/dyn/arts/charportraits/<skinId>.png`
-//      文件名用官方 skinId（`char_4177_brigid_epoque#53.png`，`#` 要转义成 %23）；
-//      模型名 `<skinId 的 @ → _、# → _>`（`char_4177_brigid_epoque_53`）。
-//   2. fexli/ArknightsResource `charpor/<model>.png`（旧快照，尺寸同样 180×360）。
-//   3. `--shop` 才用 `assets/dyn/arts/shopskinportraits`：那是**商店预览图**（292×552，
+//   1. yuanyan3060/ArknightsGameResource `portrait/<skinId>.png` —— **180×360**，与本服完全一致
+//      （实测 `char_4177_brigid_epoque#53.png` = 180×360 / 111 KB）。它比另外两个镜像新，
+//      之前缺的 9 套就是在这里找到的。
+//   2. ArknightsAssets/ArknightsAssets2 @cn  `assets/dyn/arts/charportraits/<skinId>.png`
+//      同样 180×360，但快照较旧（最大到 `epoque#49`）。
+//   3. fexli/ArknightsResource `charpor/<model>.png`（180×360，旧快照；本机整包里那份也一样）。
+//   4. `--shop` 才用 `assets/dyn/arts/shopskinportraits`：那是**商店预览图**（292×552，
 //      取景与 180×360 不同），默认不碰 —— 宁可回落到本体立绘，也不放一张构图不同的图。
 //
 //   node tools/fetch-skin-portraits.mjs                # 报告还缺哪些（默认 --check 行为）
@@ -32,6 +34,7 @@ const APPLY = process.argv.includes('--apply');
 const SHOP = process.argv.includes('--shop');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const YY = 'https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/portrait/';
 const AA = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/cn/assets/dyn/arts/';
 const FX = 'https://raw.githubusercontent.com/fexli/ArknightsResource/main/charpor/';
 
@@ -68,8 +71,9 @@ const plan = [];
 for (const m of missing) {
   const dst = path.join(ART, `${m.model}.png`);
   if (fs.existsSync(dst) && fs.statSync(dst).size > 1024) { plan.push({ ...m, from: 'local' }); continue; }
-  let buf = await get(AA + 'charportraits/' + encodeURIComponent(`${officialName(m.model)}.png`));
-  let from = 'ArknightsAssets2/charportraits';
+  let buf = await get(YY + encodeURIComponent(`${officialName(m.model)}.png`));
+  let from = 'yuanyan3060/portrait';
+  if (!buf) { buf = await get(AA + 'charportraits/' + encodeURIComponent(`${officialName(m.model)}.png`)); from = 'ArknightsAssets2/charportraits'; }
   if (!buf) { buf = await get(FX + encodeURIComponent(`${m.model}.png`)); from = 'fexli/charpor'; }
   if (!buf && SHOP) { buf = await get(AA + 'shopskinportraits/' + encodeURIComponent(`${officialName(m.model)}.png`)); from = 'shopskinportraits(预览图)'; }
   plan.push({ ...m, buf, from: buf ? from : null });
