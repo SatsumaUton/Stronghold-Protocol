@@ -163,6 +163,26 @@ export function spectateSwitchReason(room, facts, myId) {
 }
 
 /**
+ * Whether a pointerdown should close the 同盟设置 / 模拟设置 popover as a 「click outside」.
+ *
+ * 维护者 2026-11-17（作弊控制台「点了仍然开启」却没生效）的根因就在这里：以前只放行 `.rs-opts`
+ * 与齿轮按钮，于是点确认框（它由 <UiHosts/> 渲染、在屏幕上与面板并列）被当成「点空白处」，
+ * pointerdown 先把面板卸载、弹窗的 resolve 落到已卸载的组件上，选项从未发出去。
+ *
+ * 现在三种都算「不是空白处」：面板自己、齿轮按钮、任何 `.modal`（含命令式弹窗）。
+ * 另外只要有命令式弹窗开着，这一层按下就属于弹窗，一律不动面板。
+ * @param {any} target 事件目标（需要能调用 closest；没有 closest 就当空白处）
+ * @param {boolean} dialogOpen 现在有没有命令式弹窗（components.js 的 anyDialogOpen）
+ * @returns {boolean} true = 应当关闭面板
+ */
+export function panelClosesOn(target, dialogOpen) {
+  if (dialogOpen) return false;
+  const inside = !!target && typeof target.closest === 'function'
+    && !!target.closest('.rs-opts, .rs-pill__gear, .modal');
+  return !inside;
+}
+
+/**
  * The co-op room option 「AI 队友最后选择」 (GitHub #338; room.setAiPicksLast, room.state.aiPicksLast): in the strategy and
  * 机变 drafts every human picks before the AI teammates. null in a solo room (no AI teammates); otherwise its state (off
  * when the server sends none) and whether this player may switch it — the host only, the others see it read-only.
@@ -882,10 +902,7 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     //   · 有命令式弹窗开着 —— 那一层按下属于弹窗，不该连带把面板关掉。
     //   ★ 2026-11-17：以前只看 .rs-opts，于是点「开启作弊控制台」的「仍然开启」时，
     //   pointerdown 先把面板卸载，弹窗的 resolve 落到已卸载的组件上，选项从未发出去。
-    const away = (e) => {
-      if (anyDialogOpen()) return;
-      if (!e.target.closest?.('.rs-opts, .rs-pill__gear, .modal')) onClose();
-    };
+    const away = (e) => { if (panelClosesOn(e.target, anyDialogOpen())) onClose(); };
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
       if (anyDialogOpen()) return;   // 交给弹窗自己关（它有自己的 Esc 处理）

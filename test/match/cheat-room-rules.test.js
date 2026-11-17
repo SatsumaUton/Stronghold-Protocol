@@ -8,6 +8,7 @@ import { Lobby } from '../../server/lobby.js';
 import { SessionRegistry } from '../../server/net.js';
 import { Match } from '../../server/match/Match.js';
 import { DATA } from './harness.js';
+import { panelClosesOn } from '../../public/js/screens/room.js';
 
 process.env.SP_GATE_IGNORE = '1';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -68,17 +69,27 @@ test('关掉作弊控制台后又能公开（不是一次性锁死）', () => {
 });
 
 test('「仍然开启」的确认框不再被当成「点空白处」把设置面板关掉', () => {
-  const room = read('public/js/screens/room.js');
-  const components = read('public/js/ui/components.js');
-  // 面板的关闭判定必须放过弹窗，并在有命令式弹窗时停手
-  assert.match(room, /anyDialogOpen\(\)/, 'room.js 的关闭判定要认命令式弹窗');
-  assert.match(components, /export const anyDialogOpen = \(\) => dialogs\.length > 0;/, 'components.js 要导出 anyDialogOpen');
-  // 确认框挂在 <UiHosts/> 上、不在 .rs-opts 里 —— 关闭判定必须也放过 .modal
-  const awayLine = room.split('\n').find((l) => l.includes("closest?.('.rs-opts"));
-  assert.ok(awayLine, '找不到关闭判定那一行');
-  assert.match(awayLine, /\.modal/, '关闭判定要放过 .modal（确认框就在那里）');
-});
+  // 假事件目标：closest 只认这些选择器
+  const el = (...classes) => ({ closest: (sel) => classes.some((c) => sel.includes(c)) ? {} : null });
+  const panel = el('.rs-opts');
+  const gear = el('.rs-pill__gear');
+  const dialog = el('.modal');
+  const outside = el('.backdrop');
 
+  // 面板自己 / 齿轮 / 任何弹窗：都不关
+  assert.equal(panelClosesOn(panel, false), false, '点面板本身不该关');
+  assert.equal(panelClosesOn(gear, false), false, '点齿轮不该关');
+  assert.equal(panelClosesOn(dialog, false), false, '点弹窗（含确认框）不该关 —— 这就是那个 bug');
+  // 真正的空白处：关
+  assert.equal(panelClosesOn(outside, false), true, '点空白处要关');
+  // 有命令式弹窗开着：无论点哪儿都不关（那一层属于弹窗）
+  for (const t of [panel, gear, dialog, outside, null]) {
+    assert.equal(panelClosesOn(t, true), false, '弹窗开着时不该关面板');
+  }
+  // 没有 closest 的目标（例如合成事件）按空白处处理，且不能抛
+  assert.equal(panelClosesOn(null, false), true);
+  assert.equal(panelClosesOn({}, false), true);
+});
 test('作弊控制台的提示里不再提「深渊回响排行榜」（深潜不支持实验性功能）', () => {
   const room = read('public/js/screens/room.js');
   const cheatBlock = room.slice(room.indexOf('exp-cheat-console'), room.indexOf("${t('作弊控制台')}"));

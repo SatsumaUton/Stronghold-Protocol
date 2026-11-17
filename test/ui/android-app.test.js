@@ -82,4 +82,17 @@ test('按钮真的换掉了：安卓分支渲染下载链接，PWA 分支保留'
   assert.match(dev, /data-testid="pwa-install"/, 'PWA 分支保留');
   const lobby = read('public/js/screens/lobby.js');
   assert.match(lobby, /<\$\{AndroidAppPrompt\}/, '★ 大厅挂上首次提示');
+  // ★ 2026-11-17 安卓真机反馈：玩家第一眼是「登录 / 注册」闸门，而闸门开着时大厅被
+  //   html.sp-gate-open .app-root { visibility: hidden } 整个藏起来 —— 只挂在大厅等于永远问不到。
+  const gate = read('public/js/screens/authGate.js');
+  assert.match(gate, /<\$\{AndroidAppPrompt\}/, '★ 登录闸门也要挂首次提示');
+});
+
+test('软键盘弹起时登录页左下角按钮组收起（不再位移）', () => {
+  const dev = read('public/js/ui/device.js');
+  // 判定：visualViewport 比布局视口矮一大截 → html.sp-kb
+  assert.match(dev, /root\.classList\.toggle\('sp-kb'/, 'device.js 要打 sp-kb');
+  assert.match(dev, /visualViewport/, '要靠 visualViewport 判定键盘');
+  const css = read('public/css/screens/authGate.css');
+  assert.match(css, /html\.sp-kb \.sp-lg-actions \{ display: none; \}/, '★ 键盘弹起时那组按钮要收起');
 });

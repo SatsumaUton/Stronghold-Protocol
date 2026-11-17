@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from '../ui/components.js';
 import { PwaInstallButton } from '../ui/device.js';
+import { AndroidAppPrompt } from '../ui/androidApp.js';
 import { useLang, useLangs, switchLang, langMenuModel } from '../ui/lang.js';
 import { data } from '../data.js';
 import { uiUrl } from '../ui/assetUrls.js';
@@ -157,6 +158,9 @@ export function AuthGate({ onDone, checkError = false }) {
   const onKeyDown = (e) => { if (e.key === 'Enter' && !busy) submitNow(); };
 
   return html`<div class="sp-lg-screen" data-testid="auth-gate" role="dialog" aria-modal="true" aria-label=${t(N_('登录 / 注册'))}>
+    ${/* 安卓浏览器首次进入：登录页就问一次（维护者 2026-11-17：以前只挂在大厅，而玩家第一眼是这一屏，
+         大厅又被 html.sp-gate-open 整个隐藏，等于永远问不到） */ null}
+    <${AndroidAppPrompt} />
     <div class="sp-lg-bg">
       <img class="sp-lg-bg__art" alt="" src=${uiUrl(assets, 'entry/bkg_01') || ''} />
       <div class="sp-lg-bg__shade"></div>

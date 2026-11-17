@@ -312,13 +312,22 @@ export function installDeviceSupport(win = globalThis) {
   }
 
   // visible height (the URL bar of mobile browsers comes and goes): --sp-vh = 1 % of the real visible height
+  //
+  // 维护者 2026-11-17（安卓真机：点输入框弹出软键盘后，登录页左下角的「下载安卓版」按钮位移）：
+  // 软键盘不会改变布局视口，只压小 visualViewport —— 靠「两者差得多」来判定键盘弹起，
+  // 打上 html.sp-kb（css/screens/authGate.css 在这一档把左下角按钮组收起来，避免跳动与误触）。
+  const KB_MIN = 120;
   const setVh = () => {
     const h = win.visualViewport?.height || win.innerHeight || 0;
     if (h > 0) root.style.setProperty('--sp-vh', `${h / 100}px`);
+    const layout = win.innerHeight || 0;
+    const shrunk = !!win.visualViewport && layout > 0 && layout - h > KB_MIN;
+    root.classList.toggle('sp-kb', shrunk);
   };
   setVh();
   on(win, 'resize', setVh, { passive: true });
   on(win.visualViewport, 'resize', setVh, { passive: true });
+  on(win.visualViewport, 'scroll', setVh, { passive: true });
 
   // rotation: the new viewport size settles a few frames late on iOS → one more resize after it settles
   let rotTimer = 0;
