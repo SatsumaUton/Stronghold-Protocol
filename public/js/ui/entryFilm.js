@@ -72,6 +72,22 @@ async function prepareSound(version) {
  * @param {any} [a] the audio manager (tests pass a stand-in)
  * @returns {(() => void) | null} the release
  */
+/**
+ * 开场动画是否正在播（维护者 2026-11-17）。
+ *
+ * 动画是一个 `z-index: 2147483647` 的全屏 <dialog>，playEntryFilm 是异步的（先等 data.load('assets')、
+ * 再预热 1200 ms），所以它随时可能在**页面已经挂载了别的弹窗之后**才盖上来。安卓的「要不要装 APP」
+ * 提示（--z-modal: 80）在动画期间完全看不见 —— 玩家以为没问过。
+ * 提示组件用这个判断「现在是不是该等一等」。
+ * @returns {boolean}
+ */
+export const entryFilmPlaying = () => playing;
+
+// 维护者 2026-11-17：安卓「要不要装 APP」的提示要等开场动画结束才弹（动画是全屏 top-layer dialog，
+// 提示在它下面完全看不见）。把查询挂在 window 上 —— main.js 的 entryFilm 是动态 import 的，
+// 提示组件（可能在动画开始前就挂载）不一定拿得到这个模块。
+try { globalThis.__SP__ = { ...(globalThis.__SP__ || {}), entryFilmState: entryFilmPlaying }; } catch { /* 隐私模式 */ }
+
 export function holdBgm(a = audio) {
   if (!a.ctx || a.bgmSilent || a.lobbyTrack || Object.prototype.hasOwnProperty.call(a, 'playBgm')) return null;
   let asked;

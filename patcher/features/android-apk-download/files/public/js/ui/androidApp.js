@@ -85,8 +85,37 @@ export function downloadApk(win = globalThis, version = '') {
  * 首次进入时的安装提示（安卓浏览器一次）。确认 = 开始下载并记住；取消 = 记住，不再弹。
  * `force` 用来在设置里手动打开（不记「以后再说」）。
  */
+/**
+ * 开场动画是否还在播（无阶循环：entryFilm 模块按需加载，拿不到就当作没在播）。
+ * 动画是全屏 <dialog> + z-index 2147483647，提示（--z-modal: 80）在它下面就完全看不见。
+ */
+function filmPlaying() {
+  try {
+    const m = globalThis.__SP__?.entryFilmState;
+    return typeof m === 'function' ? m() === true : false;
+  } catch { return false; }
+}
+
 export function AndroidAppPrompt({ force = false, onClose = null } = {}) {
-  const [open, setOpen] = useState(() => (force ? true : shouldAsk()));
+  // 维护者 2026-11-17（安卓真机「没有提示是否下载」）：提示原本在挂载那一刻就决定开不开，
+  // 而开场动画可能稍后才盖上来 —— 弹出来也是被盖住的。现在：
+  //   * 该弹但动画在播 → 等动画结束（每 400 ms 检查一次，最多 60 s，超时就放弃这次）；
+  //   * 不该弹（问过了 / 不是安卓 / 在 App 里）→ 什么都不做。
+  const [open, setOpen] = useState(() => (force ? true : shouldAsk() && !filmPlaying()));
+  const [waiting, setWaiting] = useState(() => (force ? false : shouldAsk() && filmPlaying()));
+  useEffect(() => {
+    if (!waiting) return undefined;
+    let tries = 0;
+    const id = setInterval(() => {
+      tries += 1;
+      if (!filmPlaying() || tries > 150) {
+        clearInterval(id);
+        setWaiting(false);
+        setOpen(shouldAsk() || force);
+      }
+    }, 400);
+    return () => clearInterval(id);
+  }, [waiting, force]);
   const [version, setVersion] = useState('');
   useEffect(() => {
     if (!open) return undefined;

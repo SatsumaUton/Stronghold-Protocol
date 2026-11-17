@@ -22,7 +22,7 @@
 
 import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { pwaInstall } from '../pwa.js';
-import { apkUrl, markAsked, shouldOfferApp } from './androidApp.js';
+import { apkUrl, shouldOfferApp } from './androidApp.js';
 import { html, Icon, Button } from './components.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -269,7 +269,7 @@ export function PwaInstallButton({ class: cls = '', size = 'sm', square = false 
     const label = t('下载安卓版');
     return html`<a class=${`btn btn--secondary btn--${size}${square ? ' btn--square' : ''} ${cls}`.trim()}
       href=${apkUrl()} download rel="noopener" title=${label} aria-label=${label}
-      data-testid="apk-install" onClick=${() => markAsked()}>${square ? null : label}</a>`;
+      data-testid="apk-install">${square ? null : label}</a>`;
   }
   if (!available) return null;
   return html`<${Button} variant="secondary" size=${size} icon="homePlus" square=${square} class=${cls}
@@ -389,7 +389,7 @@ export function installDeviceSupport(win = globalThis) {
       // 安卓：同一个按钮改成「下载安卓版」（APK 直链，不再是浏览器的安装提示）
       pwaBtn.hidden = false;
       pwaBtn.textContent = t('下载安卓版');
-      on(pwaBtn, 'click', () => { markAsked(win); win.location.href = apkUrl(); });
+      on(pwaBtn, 'click', () => { win.location.href = apkUrl(); });
     } else {
       offs.push(pwaInstall.subscribe((available) => { pwaBtn.hidden = !available; }));
       on(pwaBtn, 'click', () => { pwaInstall.request(); });

@@ -19,6 +19,7 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -331,6 +332,27 @@ public class MainActivity extends Activity {
       if (req != null && req.isForMainFrame()) {
         String page = act.getString(R.string.offline_html);
         v.loadDataWithBaseURL(null, page, "text/html", "utf-8", null);
+      }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // 自带资源包（维护者 2026-11-17：「把安卓 app 做完整，然后自带完整资源包」）
+    //
+    // 美术 / 音频 / 字体 / 图标 / vendor 库打进 APK（见 AssetBridge 与 build.ps1 的 -A 参数），
+    // 这些请求直接从 APK 读，不再走网络；页面本身、/data、/js、/css 一律照旧走站点 —— 所以站点更新后
+    // App 不用重发版。APK 里没有的文件返回 null，WebView 接着走网络（不会变成 404）。
+    //
+    // 只对 GET 生效：Range 请求（音频拖动）交给网络，避免自己实现分段。
+    // -----------------------------------------------------------------------------------------------------------------
+    @Override
+    public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
+      if (req == null || Build.VERSION.SDK_INT < 21) return null;
+      if (!"GET".equals(req.getMethod())) return null;
+      if (req.getRequestHeaders() != null && req.getRequestHeaders().containsKey("Range")) return null;
+      try {
+        return AssetBridge.serve(act, req.getUrl());
+      } catch (Throwable t) {
+        return null;   // 拦截失败就当没拦，绝不影响页面
       }
     }
   }

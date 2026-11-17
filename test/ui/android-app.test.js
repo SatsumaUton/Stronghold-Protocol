@@ -96,3 +96,27 @@ test('软键盘弹起时登录页左下角按钮组收起（不再位移）', ()
   const css = read('public/css/screens/authGate.css');
   assert.match(css, /html\.sp-kb \.sp-lg-actions \{ display: none; \}/, '★ 键盘弹起时那组按钮要收起');
 });
+
+test('点「下载安卓版」链接不算「回答过弹窗」（否则以后再也不会问）', () => {
+  // 维护者 2026-11-17 安卓真机：没看到询问窗，怀疑是以前点过链接就记成「问过了」。
+  // 链接只是打开下载页，不等于玩家的回答；只有「下载并安装」/「以后再说」才 markAsked。
+  const dev = read('public/js/ui/device.js');
+  const linkLine = dev.split('\n').find((l) => l.includes('data-testid="apk-install"'));
+  assert.ok(linkLine, '找不到下载链接那一行');
+  assert.doesNotMatch(linkLine, /markAsked/, '★ 下载链接的 onClick 不该调 markAsked()');
+  const rotateLine = dev.split('\n').find((l) => l.includes('pwaBtn.textContent = t('));
+  assert.ok(rotateLine, '找不到旋转提示里的那个按钮');
+  const clickLine = dev.split('\n').find((l) => l.includes('win.location.href = apkUrl()'));
+  assert.ok(clickLine, '找不到那个按钮的点击处理');
+  assert.doesNotMatch(clickLine, /markAsked/, '★ 旋转提示里的下载按钮同样不该 markAsked()');
+});
+
+test('提示等开场动画结束再弹（动画是全屏 top-layer，提示会被盖住）', () => {
+  const app = read('public/js/ui/androidApp.js');
+  assert.match(app, /filmPlaying\(\)/, 'androidApp.js 要查开场动画是否在播');
+  assert.match(app, /entryFilmState/, '查询走 window.__SP__.entryFilmState');
+  assert.match(app, /setWaiting\(true\)|waiting/, '要有一个「等一等」的状态');
+  const film = read('public/js/ui/entryFilm.js');
+  assert.match(film, /export const entryFilmPlaying = \(\) => playing;/, 'entryFilm 要暴露 playing');
+  assert.match(film, /entryFilmState/, 'entryFilm 要把查询挂到 window.__SP__ 上');
+});

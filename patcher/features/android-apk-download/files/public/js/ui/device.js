@@ -22,7 +22,7 @@
 
 import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { pwaInstall } from '../pwa.js';
-import { apkUrl, markAsked, shouldOfferApp } from './androidApp.js';
+import { apkUrl, shouldOfferApp } from './androidApp.js';
 import { html, Icon, Button } from './components.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -269,7 +269,7 @@ export function PwaInstallButton({ class: cls = '', size = 'sm', square = false 
     const label = t('下载安卓版');
     return html`<a class=${`btn btn--secondary btn--${size}${square ? ' btn--square' : ''} ${cls}`.trim()}
       href=${apkUrl()} download rel="noopener" title=${label} aria-label=${label}
-      data-testid="apk-install" onClick=${() => markAsked()}>${square ? null : label}</a>`;
+      data-testid="apk-install">${square ? null : label}</a>`;
   }
   if (!available) return null;
   return html`<${Button} variant="secondary" size=${size} icon="homePlus" square=${square} class=${cls}
@@ -312,13 +312,22 @@ export function installDeviceSupport(win = globalThis) {
   }
 
   // visible height (the URL bar of mobile browsers comes and goes): --sp-vh = 1 % of the real visible height
+  //
+  // 维护者 2026-11-17（安卓真机：点输入框弹出软键盘后，登录页左下角的「下载安卓版」按钮位移）：
+  // 软键盘不会改变布局视口，只压小 visualViewport —— 靠「两者差得多」来判定键盘弹起，
+  // 打上 html.sp-kb（css/screens/authGate.css 在这一档把左下角按钮组收起来，避免跳动与误触）。
+  const KB_MIN = 120;
   const setVh = () => {
     const h = win.visualViewport?.height || win.innerHeight || 0;
     if (h > 0) root.style.setProperty('--sp-vh', `${h / 100}px`);
+    const layout = win.innerHeight || 0;
+    const shrunk = !!win.visualViewport && layout > 0 && layout - h > KB_MIN;
+    root.classList.toggle('sp-kb', shrunk);
   };
   setVh();
   on(win, 'resize', setVh, { passive: true });
   on(win.visualViewport, 'resize', setVh, { passive: true });
+  on(win.visualViewport, 'scroll', setVh, { passive: true });
 
   // rotation: the new viewport size settles a few frames late on iOS → one more resize after it settles
   let rotTimer = 0;
@@ -380,7 +389,7 @@ export function installDeviceSupport(win = globalThis) {
       // 安卓：同一个按钮改成「下载安卓版」（APK 直链，不再是浏览器的安装提示）
       pwaBtn.hidden = false;
       pwaBtn.textContent = t('下载安卓版');
-      on(pwaBtn, 'click', () => { markAsked(win); win.location.href = apkUrl(); });
+      on(pwaBtn, 'click', () => { win.location.href = apkUrl(); });
     } else {
       offs.push(pwaInstall.subscribe((available) => { pwaBtn.hidden = !available; }));
       on(pwaBtn, 'click', () => { pwaInstall.request(); });
