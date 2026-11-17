@@ -647,6 +647,41 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
     Promise.resolve().then(() => net.request('room.contentReady', ok ? { cs } : { cs, ok: false }))
       .catch((err) => console.warn('[content] room.contentReady', err?.code || err))
       .finally(() => { if (telling === cs) telling = null; });
+    armResend(cs, ok);
+  };
+
+  /**
+   * 「告诉房间我们这份内容加载完了」的重发（维护者 2026-11-17）。
+   *
+   * 为什么需要：room.contentReady 只在两个时机发出（刚加载完 / 座位从 ready 变回 loading）。
+   * 只要那一次请求丢了（重连瞬间的 OFFLINE、服务端重启时断开的 socket），或者页面比 room.state
+   * 更早拿到版本集，座位就会永远停在 loading —— 房间一直显示「版本数据载入中」，开不了局。
+   * 这里在几秒后检查一次座位：还不是 ready 就重发，同一 cs 最多 5 次，座位 ready 或换了 cs 立刻停。
+   */
+  const RESEND_MS = 4000, RESEND_MAX = 5;
+  let resendTimer = null, resendCount = 0, resendCs = null, resendOk = true;
+  const armResend = (cs, ok) => {
+    if (resendCs !== cs) { resendCs = cs; resendCount = 0; }
+    resendOk = ok;
+    if (resendCount >= RESEND_MAX) return;
+    if (resendTimer != null) return;
+    resendTimer = setTimeout(() => {
+      resendTimer = null;
+      const cur = store.get();
+      const seat = mySeat(cur);
+      // 已经不在这个房间 / 换了内容 / 座位已经就绪：停。
+      // ⚠ 判据用房间 content 的 cs（与 tell 一致）：roomCs() 只认「非官方插件集」
+      //   （content.vanilla === false），版本房的 vanilla 是 true，用它会恒为 null、永远不再重发。
+      if (!seat || cur?.room?.content?.cs !== cs) { resendCount = 0; return; }
+      if (seat.content === (resendOk ? 'ready' : 'failed')) { resendCount = 0; return; }
+      resendCount++;
+      tell(cs, resendOk);
+    }, RESEND_MS);
+    resendTimer?.unref?.();
+  };
+  const stopResend = () => {
+    if (resendTimer != null) { clearTimeout(resendTimer); resendTimer = null; }
+    resendCount = 0; resendCs = null;
   };
   const idle = { cs: null, kind: null, version: null, status: 'idle', loaded: 0, total: 0, error: null, kitted: null };
   const drop = () => {
@@ -761,7 +796,7 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
   const off = store.subscribe((s) => sync(s));
   sync(store.get());
   if (typeof window !== 'undefined') globalThis.__SP_CONTENT__ = contentHooks();
-  return () => { off(); drop(); retryHook = null; };
+  return () => { off(); drop(); stopResend(); retryHook = null; };
 }
 
 /**
