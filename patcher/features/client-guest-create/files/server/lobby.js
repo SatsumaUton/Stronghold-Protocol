@@ -1103,6 +1103,12 @@ export class Lobby {
       if (ps && ps.admin !== wantTool) ps.admin = wantTool;
       // 身份门也要同步（维护者 2026-11-05：管理员无视惩罚机制，判定读的是 ps.adminId）
       if (ps && ps.adminId !== wantBadge) ps.adminId = wantBadge;
+    } else if (typeof room.match?.setAdmin === 'function') {
+      // ★ 2026-11-18（维护者：已兑换验证码却回「没有使用权限」）：宿主房间（规程 / 一期 / 二期 / 插件房）
+      //   的 room.match 是 MatchProxy，**没有 players**，上面那段同步会被整段跳过 —— worker 里的
+      //   ps.admin 永远停在建局那一刻，兑码后仍然过不了 applyTestCommand 的第一道门（TEST_FORBIDDEN），
+      //   而前端 welcome.adminTools 已是 true，面板显示「验码已生效」却点不动。改走这条通知。
+      try { room.match.setAdmin(session.playerId, wantTool, wantBadge); } catch { /* 宿主已结束：忽略 */ }
     }
     // a player seat, or a spectator seat (header): both carry `connected` / `name`
     const seat = room.seatOf(session.playerId) || room.watcherOf(session.playerId);
@@ -2201,7 +2207,10 @@ case 'room.list': return this.roomList(msg);
    * 没装玩法插件（插件房的内容和官方版本不一致，陌生人进来会一脸问号）。
    */
   listable(room) {
+    // ★ 2026-11-17：开用作弊控制台的房间**不进公开同盟列表** —— 陌生人进来就会被作弊影响，
+    //   而且这局本来就不记记录，没有理由挂到公共列表上。
     return room.mode === 'coop' && room.source === 'private' && !room.test
+      && room.experimental?.cheatConsole !== true
       && room.capacity >= ROOM_LIST_MIN_CAPACITY && !room.modded;
   }
 
@@ -3554,6 +3563,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
   // Match wiring
   // ---------------------------------------------------------------------------------------------------
 
+  /** Is this room's match run in a match host (another official version / a content plugin set)? */
+  matchIsHosted(room) {
+    if (!room) return false;
+    if (room.modded) return !!this.hosts;
+    return room.version !== DEFAULT_VERSION && !!this.versionHosts;
+  }
+
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
   /**
    * 开一局。
@@ -3704,6 +3720,14 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         onCheckpoint: (match, reason) => {
           if (ctx.live && room.matchCtx === ctx) this.onCheckpoint?.(room, ctx, match, reason);
         },
+        // 断点续玩（版本宿主）：宿主在安全点把 snapshotMatch 的结果回传，这里转给 persister 存。
+        // 只有本进程开着持久化（persister 设了 onCheckpoint）时才让宿主做快照 ——
+        // 关闭持久化时这两个键都不出现，普通房间的 opts 与以前一模一样。
+        ...(this.onCheckpoint ? { checkpoints: true, onCheckpointDoc: (doc, reason) => {
+          if (ctx.live && room.matchCtx === ctx) this.onHostedCheckpoint?.(room, ctx, ctx.match, doc, reason);
+        } } : {}),
+        // 带存档创建：由宿主在 create 里 restoreMatch（主进程拿不到 Match 本体）
+        ...(restore?.hostedDoc ? { restoreDoc: restore.hostedDoc, restoreReplay: restore.replay === true } : {}),
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
       // version's; every other room here, as always
@@ -3721,7 +3745,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       this.log.info(`[lobby] ${room.code} match #${room.matchCount} ${restore ? 'restored' : 'starting'} (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
       this.broadcastState(room);
       // ★ 恢复走 apply(match)（把存档灌回 Match），正常开局走 match.start()
-      if (restore) restore.apply(match); else match.start();
+      // 版本宿主的恢复例外：存档随 create 一起送进宿主（opts.restoreDoc），start() 就是发那条 create。
+      if (restore) { if (restore.hostedDoc) match.start(); else restore.apply(match); } else match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
       if (room.matchCtx === ctx) {
@@ -3748,6 +3773,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (!store || !m || m.echoVariant !== 'deepecho' || !(m.echoDiveStart > 0)) return;
     // 「深渊回响」：调过参的房间**不进排行榜**（深度只在标准配置下可比）
     if (room.echoCfg) return;
+    // 作弊控制台（2026-11-17）：开着的房间一行成绩都不写（深潜本身禁实验性功能，这里是双保险）
+    if (room.experimental?.cheatConsole === true) return;
     const entry = echoBoardEntry({
       depth: Math.max(0, Math.floor(Number(m.round) || 0) - m.echoDiveStart + 1),
       round: m.round,
@@ -4073,8 +4100,15 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       // 本服：管理员（session.admin，由 net.js 验 adminToken 得出）在**正常房间**里也能用测试指令，
       // 对应「游戏内管理员工具」。普通玩家仍走原来的两道门，判定来源只有服务端这一个。
       const isAdmin = session.admin === true;
-      if (!this.testEnabled && !isAdmin) return fail(ERR.TEST_DISABLED);
-      if (room.test !== true && !isAdmin) return fail(ERR.TEST_FORBIDDEN);
+      // ★ 2026-11-17（维护者）：房间开了「作弊控制台」之后，本局房主不需要管理员身份也不需要 process 级
+      //   测试开关就能下命令。这一局不写对局记录、不进深渊回响排行榜（settle 与 _recordEchoBoard 都会跳过）。
+      // ★ 2026-11-17（维护者：「开了控制台的房间，房内所有玩家都要能用」）：一行原来是
+//   `cheatHost = … && room.hostId === session.playerId`，只放房主。现在放宽到房内**所有真人座位**；
+//   观战 / 隐身观战 / AI 座位仍然不行（下面有专门的 SPECTATOR 拦截）。
+//   作弊房本来就不写对局记录、不进深渊回响排行榜，放宽到全员没有刷榜风险。
+const cheatRoom = room.experimental?.cheatConsole === true && !room.watcherOf(session.playerId);
+      if (!this.testEnabled && !isAdmin && !cheatRoom) return fail(ERR.TEST_DISABLED);
+      if (room.test !== true && !isAdmin && !cheatRoom) return fail(ERR.TEST_FORBIDDEN);
     }
     if (!room.match) return fail(ERR.WRONG_PHASE, 'no running match');
     if (msg.t === 'g.leave') {

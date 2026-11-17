@@ -177,6 +177,12 @@ export class MatchProxy {
     this.opts.hostId = typeof playerId === 'string' ? playerId : null;
     this._notify('setHost', [playerId]);
   }
+  /**
+   * 座位上的管理员标记（server/lobby.js 的 hello 同步）：宿主房间的 match 是代理、没有 `players`，
+   * 主进程只能经这条通知把它推进 worker（见 Match.setAdmin）。
+   * @param {string} playerId @param {boolean} admin @param {boolean} [adminId]
+   */
+  setAdmin(playerId, admin, adminId) { this._notify('setAdmin', [playerId, admin === true, adminId === true]); }
   addSpectator(playerId) { this._notify('addSpectator', [playerId]); }
   removeSpectator(playerId) { this._notify('removeSpectator', [playerId]); }
   /** The match's diagnostics in the worker (tests). @returns {Promise<any>} */

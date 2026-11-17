@@ -225,7 +225,7 @@
 import { PHASE, ERR, modeIdFor } from '../../shared/constants.js';
 import { msg } from '../../shared/i18n.js';
 import { REVIVAL_COST, REVIVAL_MIN_DONOR_LP, REVIVAL_WINDOW_SECONDS, REVIVAL_UNAVAILABLE_REASONS,
-  AFK_REMOVE_ROUNDS } from './match/common.js';
+  AFK_REMOVE_ROUNDS, OK } from './match/common.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { DEFAULT_VERSION, versionById } from '../../shared/versions.js';
 import { Battle } from '../sim/Battle.js';
@@ -886,6 +886,25 @@ export class Match {
   }
 
   /** Helpers of this round's 联防 who cleared their own battle without a counted leak. */
+  /**
+   * 座位上的管理员标记（MATCH INTERFACE；server/lobby.js 的 hello 同步）。
+   *
+   * ★ 2026-11-18（维护者：已兑换验证码却回 TEST_FORBIDDEN）：宿主房间的 `room.match` 是 MatchProxy，
+   *   没有 `players`，于是 lobby 里那段 `room.match.players?.get(...)` 的同步整段被跳过 ——
+   *   worker 里的 ps.admin 永远停在建局那一刻，玩家兑码后仍然过不了 applyTestCommand 的第一道门。
+   *   这个方法让主进程能把标记推进宿主。
+   * @param {string} playerId
+   * @param {boolean} admin 三道门全过（adminId + tools.game + 验证码）—— 能不能改这局数据
+   * @param {boolean} [adminId] 只要身份门（账号是 owner/admin）—— 管理员徽章 / 免惩罚判定
+   */
+  setAdmin(playerId, admin, adminId) {
+    const ps = this.players instanceof Map ? this.players.get(playerId) : null;
+    if (!ps) return OK;   // 已经离开 / 不是这一局的座位：静默（断开时的同步不该报错）
+    if (ps.admin !== (admin === true)) ps.admin = admin === true;
+    if (adminId !== undefined && ps.adminId !== (adminId === true)) ps.adminId = adminId === true;
+    return OK;
+  }
+
   /**
    * 盟约层数上限是否解除 —— 实验房，或「深渊回响」深潜。
    *

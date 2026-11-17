@@ -1103,6 +1103,12 @@ export class Lobby {
       if (ps && ps.admin !== wantTool) ps.admin = wantTool;
       // 身份门也要同步（维护者 2026-11-05：管理员无视惩罚机制，判定读的是 ps.adminId）
       if (ps && ps.adminId !== wantBadge) ps.adminId = wantBadge;
+    } else if (typeof room.match?.setAdmin === 'function') {
+      // ★ 2026-11-18（维护者：已兑换验证码却回「没有使用权限」）：宿主房间（规程 / 一期 / 二期 / 插件房）
+      //   的 room.match 是 MatchProxy，**没有 players**，上面那段同步会被整段跳过 —— worker 里的
+      //   ps.admin 永远停在建局那一刻，兑码后仍然过不了 applyTestCommand 的第一道门（TEST_FORBIDDEN），
+      //   而前端 welcome.adminTools 已是 true，面板显示「验码已生效」却点不动。改走这条通知。
+      try { room.match.setAdmin(session.playerId, wantTool, wantBadge); } catch { /* 宿主已结束：忽略 */ }
     }
     // a player seat, or a spectator seat (header): both carry `connected` / `name`
     const seat = room.seatOf(session.playerId) || room.watcherOf(session.playerId);
