@@ -50,7 +50,7 @@
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
 import {
-  html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, Spinner, confirmDialog, doctorNo, Modal,
+  html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, Spinner, confirmDialog, anyDialogOpen, doctorNo, Modal,
   TextField,
 } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -737,7 +737,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${uniteFirst ? 'is-on' : ''} />${t('AI 联防置后')}
         </button>
       <//>
-      <${Tooltip} text=${t('打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不进深渊回响排行榜')}>
+      <${Tooltip} text=${t('打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中')}>
         <button type="button" role="switch" aria-checked=${cheatConsole ? 'true' : 'false'} data-testid="exp-cheat-console"
             class=${`dpick__opt ailast__opt${cheatConsole ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
             onClick=${() => {
@@ -750,7 +750,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
                   title: t('开启作弊控制台'),
                   text: html`<div>
                     <p>${t('开启后，本局创建者可以在对局中使用控制台：加资金、加层数、加干员、跳回合等。')}</p>
-                    <p>${t('这一局不会记入对局记录，也不进深渊回响排行榜；本房间也不会出现在公开同盟列表里。')}</p>
+                    <p>${t('这一局不会记入对局记录；本房间也不会出现在公开同盟列表里，不会被多人匹配选中。')}</p>
                   </div>`,
                   okText: t('仍然开启'),
                   cancelText: t('取消'),
@@ -869,15 +869,29 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 
 
 function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
-  listed = false, onToggleListed = () => {} }) {
+  listed = false, onToggleListed = () => {}, cheat = false }) {
   // 「深渊回响」：同一个开关，深潜房叫「公开深潜」（列表也是深潜专属的）
   const echoRoom = room.variant === 'deepecho';
   const info = difficultyInfo(room.mode, room.difficulty);
   // 深潜房不叫「同盟设置 / 同盟人数 / 出同盟」——它根本不是同盟（维护者 2026-11-08）
   const title = soloOption ? t('模拟设置') : echoRoom ? t('深潜设置') : t('同盟设置');
   useEffect(() => {
-    const away = (e) => { if (!e.target.closest?.('.rs-opts, .rs-pill__gear')) onClose(); };
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // 点空白处关闭。三种「不算空白处」的情况：
+    //   · .rs-opts / 齿轮按钮 —— 面板自己；
+    //   · .modal —— 任何弹窗（含命令式确认框，它挂在 <UiHosts/> 上、位于屏幕之外）；
+    //   · 有命令式弹窗开着 —— 那一层按下属于弹窗，不该连带把面板关掉。
+    //   ★ 2026-11-17：以前只看 .rs-opts，于是点「开启作弊控制台」的「仍然开启」时，
+    //   pointerdown 先把面板卸载，弹窗的 resolve 落到已卸载的组件上，选项从未发出去。
+    const away = (e) => {
+      if (anyDialogOpen()) return;
+      if (!e.target.closest?.('.rs-opts, .rs-pill__gear, .modal')) onClose();
+    };
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (anyDialogOpen()) return;   // 交给弹窗自己关（它有自己的 Esc 处理）
+      e.stopPropagation();
+      onClose();
+    };
     addEventListener('pointerdown', away);
     addEventListener('keydown', onKey);
     return () => { removeEventListener('pointerdown', away); removeEventListener('keydown', onKey); };
@@ -911,12 +925,14 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     <${AiTakeoverToggle} option=${takeoverOption} busy=${busy} onToggle=${onAiTakeover} />
     ${/* 公开同盟（同盟列表）：挂了以后别的博士能在大厅「公开同盟」里看见这个房间、直接加入。
            开局后服务端会拒（ROOM_STARTED），所以对局中这项显示成不可操作。 */ null}
-    ${soloOption ? null : html`<${Tooltip} text=${listed
-        ? t(echoRoom ? '其他博士可以在「深渊回响 → 公开深潜」里看到这个房间并加入（需要深潜资格）' : '其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
-        : t(echoRoom ? '挂到「深渊回响 → 公开深潜」列表上，让其他博士能找到这个房间' : '挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
+    ${soloOption ? null : html`<${Tooltip} text=${cheat
+        ? t('开了作弊控制台的房间不能公开，也不会被多人匹配选进去')
+        : listed
+          ? t(echoRoom ? '其他博士可以在「深渊回响 → 公开深潜」里看到这个房间并加入（需要深潜资格）' : '其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
+          : t(echoRoom ? '挂到「深渊回响 → 公开深潜」列表上，让其他博士能找到这个房间' : '挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
       <button type="button" role="switch" aria-checked=${listed ? 'true' : 'false'} data-testid="room-opt-listed"
-          class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
-          onClick=${() => { if (isHost && !room.match) onToggleListed(!listed); }}>
+          class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match || cheat}
+          onClick=${() => { if (isHost && !room.match && !cheat) onToggleListed(!listed); }}>
           <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${echoRoom ? (listed ? t('公开深潜：已公开') : t('公开深潜：未公开')) : (listed ? t('公开同盟：已公开') : t('公开同盟：未公开'))}
       </button>
     <//>`}
@@ -1436,7 +1452,7 @@ export function RoomScreen() {
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
             onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onClose=${() => setOpts(false)} version=${versionCtl}
-              listed=${room.listed === true} onToggleListed=${setListed} />` : null}
+              listed=${room.listed === true} onToggleListed=${setListed} cheat=${room.experimental?.cheatConsole === true} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">

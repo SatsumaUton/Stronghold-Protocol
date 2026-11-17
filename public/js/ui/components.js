@@ -548,6 +548,14 @@ export const alertDialog = (opts) => openDialog(opts, 'alert');
  * Dismiss every queued imperative dialog (confirm → false, alert → true) — e.g. the server session was reset and the
  * screen they belonged to is gone.
  */
+/**
+ * Whether an imperative dialog (confirm / alert / confirmCheck) is open right now.
+ * 面板类组件用它判断「这一次按下是点空白处，还是点在弹窗上」—— 维护者 2026-11-17：
+ * 作弊控制台的确认框就渲染在屏幕之外（<UiHosts/>），被「点空白处关闭」当成外部点击，
+ * 于是点了「仍然开启」反而把整个设置面板关掉、选项从来没发出去。
+ */
+export const anyDialogOpen = () => dialogs.length > 0;
+
 export function closeAllDialogs() {
   const all = dialogs;
   if (!all.length) return;
