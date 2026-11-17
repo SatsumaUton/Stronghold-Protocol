@@ -523,7 +523,13 @@ async function roomInfo(code, node) {
       //   真正修的是 lobbyState 现在会存 connected（已分发到 30 个节点）；
       //   等节点陆续重启、Redis 里都有真实值之后，这里和座位一起改成 `=== true` 才有意义。
       .map((s) => ({ name: String(s.name || ''), connected: s.connected !== false }));
-    const round = doc.matchLive ? (Number(doc.liveRound) || 0) : (doc.match && Number.isFinite(Number(doc.match.round)) ? Number(doc.match.round) : null);
+    // ★ 2026-11-17：liveRound 只在有 m.public 广播时才更新（lobby.js matchBroadcast）——
+    //   从存档恢复的对局、或所有玩家都离线（AI 托管）时它是 0，后台就会把跑到深层的深潜房
+    //   显示成「准备中」。doc.match.round 是 persister 每轮 flush 从活着的对局上读的，一直是准的，
+    //   所以 liveRound 有值用它，否则退回它。
+    const liveRound = Number(doc.liveRound) || 0;
+    const snapshotRound = doc.match && Number.isFinite(Number(doc.match.round)) ? Number(doc.match.round) : null;
+    const round = doc.matchLive ? (liveRound || snapshotRound || 0) : snapshotRound;
     const maxSpectators = Number.isInteger(doc.maxSpectators) ? doc.maxSpectators
       : (mode === 'coop' ? Math.max(2, Math.ceil(humans / 2)) : 0);
     // 房间容量：优先 doc.capacity（lobbyState 现在会存）。
