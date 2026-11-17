@@ -306,7 +306,11 @@ function roomFrom(r, sessions, lobby, now) {
     if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
   if (r.seats.length !== room.seats.length) return null;
   const inMatch = !!r.match;
-  room.content = lobby.vanilla;
+  // ★ 2026-11-17：内容集必须按**房间自己的版本**取，不能一律用 lobby.vanilla。
+  //   以前这里写死 lobby.vanilla —— 那是默认版本（第二期下半）的 cs，规程/一期/二期房恢复时
+  //   拿着它去问自己的版本宿主，宿主回「the content set … is not kept by this server」，
+  //   整局被判恢复失败、退回「返回同盟」。版本房现在会真的走恢复流程，这条必须对。
+  room.content = lobby.baseContent(room.version) || lobby.vanilla;
   room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
   // ★ 「深渊回响」断点续玩（维护者 2026-11-06）：variant 必须一起恢复。
   //   丢了它 → persister.restoreLocal 的 startMatch 不带 variant → 新 Match 的构造函数
@@ -358,7 +362,8 @@ function fallbackRoom(r, lobby, now) {
     const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
       typeof r.version === 'string' && r.version ? r.version : undefined);
     room.lobby = lobby;
-    room.content = lobby.vanilla;
+    // 同 roomFrom：内容集按房间版本取（默认版本才是 lobby.vanilla）
+    room.content = lobby.baseContent(room.version) || lobby.vanilla;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
     room.matchCount = Number.isSafeInteger(r.matchCount) ? r.matchCount : 0;
