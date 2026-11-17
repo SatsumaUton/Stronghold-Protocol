@@ -636,10 +636,27 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
   if (!skill) return plan;
   plan.kind = kindOf(opts.rec, skill.rootClass);
   let attach = [];
+  // ★ 2026-11-18（维护者：凛御银灰 S3 的地面范围特效不显示）：技能带的 mode 以前只取它的 `attach` 行，
+  //   **mode 自己的 `attack.cast` 行被整个漏掉** —— svash2 S3（mode 1「S3」）的
+  //   `svash2_skill_03_combat_start_01 / _01_2 / _02` 就在那里（startEvent 2、endEvent 3），
+  //   三个 prefab 在 index 与清单里都存在，却从来没进过 plan，于是永远不播。
+  //   这里把它们按 `cast` 行合进来（只对干员：敌人的 mode 走 enemySkillsOf 的 skillPlan(mode) 路径，
+  //   加在通用处会让敌人重复播放）。
+  const modeCast = [];
   if (Number.isInteger(skill.mode)) {
     plan.mode = skill.mode;
     plan.modeName = unit?.modes?.[skill.mode]?.name ?? null;
     attach = attachUses(unit?.modes?.[skill.mode]);
+    if (unit?.kind === 'char') {
+      const md = unit?.modes?.[skill.mode];
+      for (const row of Array.isArray(md?.attack?.cast) ? md.attack.cast : []) {
+        for (const k of Array.isArray(row?.effects) ? row.effects : []) {
+          const lk = lc(k);
+          if (!lk || !isObj(idx?.prefabs) || !idx.prefabs[lk]) continue;
+          modeCast.push({ role: 'cast', keys: [lk], from: 'mode.attack.cast', node: md.attack.node ?? null });
+        }
+      }
+    }
   }
   if (typeof skill.rootClass === 'string' && skill.rootClass) plan.rootClass = skill.rootClass;
   const projs = isObj(idx.projectiles) ? idx.projectiles : {};
@@ -664,7 +681,7 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     plan.unmapped.push({ key: 'yu_skill3_annex_01', role: 'hit', reason: 'bound', from: 'ProjectileProbElimateBehaviour._effectOnEliminatePos' });
     plan.unmapped.push({ key: 'yu_skill3_annex_02', role: 'trigger', reason: 'conditional', from: 'GlobalAuraAbility._buffs' });
   }
-  planUses(idx, plan, [...uses, ...attach], { ...opts, abilities: skill.abilities });
+  planUses(idx, plan, [...uses, ...attach, ...modeCast], { ...opts, abilities: skill.abilities });
   // EmptyEffect has no particles/loop flag, but FinishEffectViaOwnerBuff holds this controller for yu_s_3[effect].
   if (id === 'skchr_yu_3') for (const role of ['start', 'loop', 'range']) for (const e of plan[role]) {
     if (e.key === 'yu_skill3_range_01_source') { e.hold = 'skill'; e.loop = true; }
