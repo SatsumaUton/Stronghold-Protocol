@@ -66,18 +66,20 @@ const legacyNotOwned = (() => { if (storedOwnership?.v === 2) return null; const
 function readStoredOps() {
   try { return parseStoredOps(storedLoadout); } catch { return {}; }
 }
-function readStoredDiy(version = DEFAULT_VERSION) {
-  const read = (v) => { try { return parseStoredDiy(loadPref(diyPrefKey(v), null)); } catch { return {}; } };
-  const own = read(version);
-  // 维护者 2026-11-16（玩家反馈「规程版本里自选编队看不到自己携带的干员」）：
-  // 自选编队按版本分键存（`sp.pref.diy` = 第二期下半，`sp.pref.diy.<slug>` = 其它版本）。
-  // 玩家通常只在默认版本那一格配过，规程页读到的是空表 → 列表里一个干员都没有。
-  // 这里与服务端 shared/diy.js:pickDiyFor 同口径：本版没配就回退默认版本；都配过则逐槽合并（本版优先）。
+export function readStoredDiy(version = DEFAULT_VERSION) {
+  const read = (v) => { try { return loadPref(diyPrefKey(v), null); } catch { return null; } };
+  const picksOf = (raw) => { try { return parseStoredDiy(raw); } catch { return {}; } };
+  const ownRaw = read(version);
+  const own = picksOf(ownRaw);
+  // 维护者 2026-11-18：「我清理掉了自选干员，但是为什么我一刷新他又出现了」。
+  // 以前这里只看「本版有没有 picks」，空表就等于「没配过」→ 回退默认版本（第二期下半），
+  // 于是清空后一刷新又回来了。现在以**本版那份设置是否存在**为准：配过（哪怕配成空）就不再回退。
+  // 也只有这样，「在规程里清空」才真的持久（第一次清空时 setDiyPicks 会写下 { v, picks: {} }）。
   const v = versionById(version);
   if (!v || v.id === DEFAULT_VERSION) return own;
-  const base = read(DEFAULT_VERSION);
-  if (!Object.keys(own).length) return base;
-  return { ...base, ...own };
+  if (ownRaw != null) return own;
+  const base = picksOf(read(DEFAULT_VERSION));
+  return base;
 }
 
 /**

@@ -280,3 +280,24 @@ test('a write-back changes only what the edit changed: an edit made on an older 
   assert.deepEqual(O.rebaseChars([YAK, ANGEL], ['chess_char_1_02_a'], [], charOf), [ANGEL]);
   assert.deepEqual(O.rebaseChars([ANGEL], [], ['chess_char_1_02_a'], charOf), [ANGEL, YAK].sort());
 });
+
+test('★ 在规程里清空自选后，刷新（重新读设置）也不再回退到第二期下半', () => {
+  // 维护者 2026-11-18：「我清理掉了自选干员，但是为什么我一刷新他又出现了」。
+  // 以前「本版 picks 为空」= 「没配过」→ 回退默认版本，于是清空后一刷新又回来了。
+  // 现在以「本版那份设置是否存在」为准：配过（哪怕配成空）就不再回退。
+  const { loadoutStore, setDiyPicks, readStoredDiy } = S;
+  const SLOT = 'chess_char_5_diy1_a';
+  const pick = { charId: 'char_102_texas' };
+
+  // 第二期下半配一格，规程没配过 → 规程读到回退值（这是 2026-11-16 的合理行为，保留）
+  loadoutStore.set({ diyVersion: 'act2autochess' });
+  setDiyPicks({ [SLOT]: pick });
+  assert.deepEqual(S.readStoredDiy('act3autochess@V3_1'), { [SLOT]: pick }, '没配过的版本仍回退默认版本');
+
+  // 在规程里清空 → 规程那份写成空表
+  loadoutStore.set({ diyVersion: 'act3autochess@V3_1', diy: S.readStoredDiy('act3autochess@V3_1') });
+  setDiyPicks({});
+  assert.deepEqual(S.readStoredDiy('act3autochess@V3_1'), {}, '★ 清空后重新读设置也不能把第二期下半那格带回来');
+  assert.ok(mem.has('sp.pref.diy.act3autochess-v3_1'), '本版要留下「配过」的痕迹（空表也算配过）');
+  loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
+});
