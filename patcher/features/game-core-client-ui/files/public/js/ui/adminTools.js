@@ -54,6 +54,8 @@ const TABS = [
   { id: 'token', label: '召唤' },  // i18n-ignore: 管理员面板（中文专用）
   { id: 'shop', label: '商店' },  // i18n-ignore: 管理员面板（中文专用）
   { id: 'choice', label: '机变' },  // i18n-ignore: 管理员面板（中文专用）
+  // 「深渊回响」专用（维护者 2026-11-17）：祝福 / 诅咒 / 侵蚀词条 / 盟约投影
+  { id: 'echo', label: '深渊回响' },  // i18n-ignore: 管理员面板（中文专用）
 ];
 
 const nameOf = (rec, key) => (rec && (data.localeName?.(rec.name || rec.displayName) || rec.name)) || key;
@@ -96,6 +98,9 @@ export function AdminTools({ open, onClose, anchor = null }) {
   const [q, setQ] = useState('');
   // 盟约的层数（绝对值）。留空 = 老行为「加一层」；填了数字就按这个层数设置。
   const [bondLayers, setBondLayers] = useState('');
+  // 「深渊回响」页签：图鉴（祝福/诅咒/词条/投影的 id + 名字）与当前子分类
+  const [codex, setCodex] = useState(null);
+  const [echoKind, setEchoKind] = useState('blessing');
   const [busy, setBusy] = useState('');
   const [log, setLog] = useState([]);
   // 数值类指令的三个输入（资金 / LP / 回合 / 商店位）
@@ -118,6 +123,11 @@ export function AdminTools({ open, onClose, anchor = null }) {
     } catch { return 0; }
   };
   const [codeAuthed, setCodeAuthed] = useState(() => readLeftMin() > 0);
+  // 本局是不是「深渊回响」（m.public.echo.deepecho，server/match/match/echoPhase.js 的 _echoPublic）。
+  // ★ 2026-11-17（维护者反馈）：深渊页签以前在任何模式都出现，但那些指令只有深潜局才生效
+  //   （服务端每条 echo 指令都以 `echoVariant !== 'deepecho'` 拒绝，回 WRONG_PHASE + detail 'echo'）。
+  //   没有深潜的对局不该把这个页签摆出来。
+  const isEcho = useStore((st) => st.match.public?.echo?.deepecho === true);
   const [codeLeftMin, setCodeLeftMin] = useState(() => readLeftMin());
   // 必须订阅才会真正去加载 data/*.json；否则下面 list() 拿到的永远是空表。
   // 一次订阅全部列表数据集，切页签不会又变回空白。
@@ -400,6 +410,20 @@ export function AdminTools({ open, onClose, anchor = null }) {
   // 面板定位：优先贴在触发它的胶囊正下方；拿不到坐标时退回右侧固定位置。
   // 用 fixed + 计算出的 left/top，并夹在视口内，保证任何屏幕宽度都不会跑出去。
 
+  // 「深渊回响」页签第一次打开时拉一次图鉴（服务端已缓存 5 分钟，体积很小）。
+  useEffect(() => {
+    if (tab !== 'echo' || codex) return undefined;
+    let stop = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/deepecho/codex', { cache: 'no-store' });
+        const body = res.ok ? await res.json() : null;
+        if (!stop && body && Array.isArray(body.sections)) setCodex(body.sections);
+      } catch { /* 拉不到就显示空列表，不打扰 */ }
+    })();
+    return () => { stop = true; };
+  }, [tab, codex]);
+
   const list = () => {
     const tabDef = TABS.find((x) => x.id === tab);
     if (!tabDef || !tabDef.field) return [];
@@ -426,7 +450,7 @@ export function AdminTools({ open, onClose, anchor = null }) {
     </header>
 
     <nav class="admintools__tabs admintools__tabs--wide">
-      ${TABS.map((x) => html`<button key=${x.id} type="button"
+      ${TABS.filter((x) => x.id !== 'echo' || isEcho).map((x) => html`<button key=${x.id} type="button"
         class=${`admintools__tab${tab === x.id ? ' is-on' : ''}`}
         onClick=${() => { setTab(x.id); setQ(''); }}>${t(x.label)}</button>`)}
     </nav>
@@ -476,6 +500,39 @@ export function AdminTools({ open, onClose, anchor = null }) {
           <button type="button" disabled=${!!busy} onClick=${() => send('level', {}, t('升级调度中心'))}>${t('升级调度中心')}</button>
           <button type="button" disabled=${!!busy} onClick=${() => send('round', { round: Number(num1) || 1 }, `${t('跳到回合')} ${num1}`)}>${t('跳到该回合')}</button>
         </div>`
+
+      // 「深渊回响」专用（维护者 2026-11-17）：加祝福 / 加诅咒 / 设侵蚀词条 / 设盟约投影
+      : tab === 'echo' ? (() => {
+        const KINDS = [
+          { id: 'blessing', name: '祝福', cmd: 'echoBlessing', section: 'blessing' },
+          { id: 'curse', name: '诅咒', cmd: 'echoCurse', section: 'curse' },
+          { id: 'word', name: '侵蚀词条', cmd: 'echoWord', section: 'word' },
+          { id: 'projection', name: '盟约投影', cmd: 'echoProjection', section: 'projection' },
+        ];
+        const cur = KINDS.find((k) => k.id === echoKind) || KINDS[0];
+        const section = codex ? codex.find((x) => x.id === cur.section) : null;
+        const items = (section && Array.isArray(section.items) ? section.items : []).filter((it) => it && it.id);
+        return html`
+          <div class="admintools__tabs" style="grid-template-columns: repeat(4, 1fr)">
+            ${KINDS.map((k) => html`<button key=${k.id} type="button"
+              class=${`admintools__tab${echoKind === k.id ? ' is-on' : ''}`}
+              onClick=${() => setEchoKind(k.id)}>${k.name}</button>`)}
+          </div>
+          <div class="admintools__funds">
+            <button type="button" disabled=${!!busy} onClick=${() => send(cur.cmd, { clear: true }, `${cur.name}：全部清除`)}>${t('全部清除')}</button>
+          </div>
+          <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)}
+            placeholder=${t('搜索…')} aria-label=${t('搜索')} />
+          <div class="admintools__list">
+            ${items.length ? items.filter((it) => !q || (`${it.name} ${it.id}`).toLowerCase().includes(q.toLowerCase())).map((it) => html`
+              <button key=${it.id} type="button" class="admintools__row" disabled=${!!busy} title=${it.id}
+                onClick=${() => send(cur.cmd, cur.cmd === 'echoWord' ? { ids: [it.id] } : { id: it.id }, it.name)}>
+                <span class="admintools__name">${it.name}</span>
+                <span class="admintools__tier">${it.tag || ''}</span>
+              </button>`)
+              : html`<div class="admintools__empty">${codex ? t('没有匹配的条目') : t('正在载入深渊图鉴…')}</div>`}
+          </div>`;
+      })()
 
       // 阶段控制
       : tab === 'phase' ? html`

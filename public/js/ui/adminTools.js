@@ -123,6 +123,11 @@ export function AdminTools({ open, onClose, anchor = null }) {
     } catch { return 0; }
   };
   const [codeAuthed, setCodeAuthed] = useState(() => readLeftMin() > 0);
+  // 本局是不是「深渊回响」（m.public.echo.deepecho，server/match/match/echoPhase.js 的 _echoPublic）。
+  // ★ 2026-11-17（维护者反馈）：深渊页签以前在任何模式都出现，但那些指令只有深潜局才生效
+  //   （服务端每条 echo 指令都以 `echoVariant !== 'deepecho'` 拒绝，回 WRONG_PHASE + detail 'echo'）。
+  //   没有深潜的对局不该把这个页签摆出来。
+  const isEcho = useStore((st) => st.match.public?.echo?.deepecho === true);
   const [codeLeftMin, setCodeLeftMin] = useState(() => readLeftMin());
   // 必须订阅才会真正去加载 data/*.json；否则下面 list() 拿到的永远是空表。
   // 一次订阅全部列表数据集，切页签不会又变回空白。
@@ -445,7 +450,7 @@ export function AdminTools({ open, onClose, anchor = null }) {
     </header>
 
     <nav class="admintools__tabs admintools__tabs--wide">
-      ${TABS.map((x) => html`<button key=${x.id} type="button"
+      ${TABS.filter((x) => x.id !== 'echo' || isEcho).map((x) => html`<button key=${x.id} type="button"
         class=${`admintools__tab${tab === x.id ? ' is-on' : ''}`}
         onClick=${() => { setTab(x.id); setQ(''); }}>${t(x.label)}</button>`)}
     </nav>

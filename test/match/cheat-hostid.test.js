@@ -24,8 +24,8 @@ test('wireOptions：hostId 与 test 解耦 —— 作弊房（不是测试房）
   assert.equal(out.test, undefined, '不是测试房，别多写 test 键');
   assert.equal(out.experimental.cheatConsole, true, '作弊键本身早就在转发');
 
-  // 普通房照旧（有 hostId 就带，没 test 就不带 test）
-  assert.equal(wireOptions({ roomCode: 'X', mode: 'coop', hostId: 'p2' }).hostId, 'p2');
+  // 普通房照旧：**不带** hostId（worker payload 与以前逐字相同，test/test-mode.test.js 有这条断言）
+  assert.equal(wireOptions({ roomCode: 'X', mode: 'coop', hostId: 'p2' }).hostId, undefined, '普通房不转发 hostId');
   assert.equal(wireOptions({ roomCode: 'X', mode: 'coop' }).hostId, undefined, '没给 hostId 就别凭空造一个');
 
   // 测试房不受影响
