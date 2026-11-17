@@ -372,7 +372,23 @@ export class FxWiring {
     // talents' and abilities' (render/vfx/talentfx.js, index v3)
     for (const k of this.skills.keys(views)) keys.add(k);
     for (const k of this.talents.keys(views)) keys.add(k);
-    for (const k of this.funnels.keys(views)) keys.add(k);   // the 驭械术士's floating units (render/vfx/funnelfx.js)
+    for (const k of this.funnels.keys(views)) keys.add(k);   // 驭械术士's floating units (render/vfx/funnelfx.js)
+    // ★ 2026-11-18（维护者：穿了皮肤后干员的技能特效不出现）：上面收集的是**基础特效名**，
+    //   而 playOn 播放时会把它们换成皮肤版（`…_summer#1`）。皮肤版没预热就没编译进内存，
+    //   spawn 走 pending 路径，超过 LATE_START（0.6 s）一击性特效直接被丢弃 ——
+    //   技能施放特效（粒子多、体积大）最容易超时，攻击命中特效小往往还来得及，于是表现为
+    //   「皮肤换了、命中特效变了，但技能施放没有特效」。这里把每个单位实际会用的皮肤版一并加入。
+    if (this.skinFx) {
+      // 先取一份快照再遍历：Set 在遍历中新增元素也会被访问到，若映射里出现链式替换会无限增长。
+      const base = [...keys];
+      for (const v of views) {
+        if (!v || !v.info || typeof v.info.skin !== 'string' || !v.info.skin) continue;
+        for (const k of base) {
+          const alt = skinEffectFor(this.skinFx, v.info.skin, k);
+          if (alt) keys.add(alt);
+        }
+      }
+    }
     return [...keys].map(lc).filter((k) => k && this.ofx.lib.has(k));
   }
 
