@@ -291,6 +291,14 @@ export function validateDiyPicks(picks, { data, kitted = null } = { data: null }
 const LEGACY_DIY_SLUG = 'act2autochess';
 
 /**
+ * 分区里的「墓碑」键（维护者 2026-11-18）：某个版本的 bucket 里，`__cleared` 列出玩家**在本版显式清空**的槽位。
+ * 没有它就无法区分「没设过」和「设成了空」，于是清空会回退成默认版本那份 ——
+ * 玩家「清掉了自选，一刷新又回来了」，最后只能把第二期下半那一格也删掉才正常。
+ * 它不是一个槽位 id（槽位都是 `*_diy<N>_a`），`pickDiyFor` 返回前会把它剥掉。
+ */
+export const DIY_CLEARED = '__cleared';
+
+/**
  * 取某个版本的自选编队 picks。
  * `map` 有两种形态：新格式 `{ [slug]: picks }`，或旧格式的平表 picks（只有版本槽位，没有版本键）。
  * @param {any} map @param {string} slug @returns {object|null}
@@ -315,27 +323,44 @@ export function pickDiyFor(map, slug) {
     const v = map[s2];
     return v && typeof v === 'object' ? v : null;
   };
+  // 墓碑：本版显式清空过的槽位（见 DIY_CLEARED）。任何返回给下游的 picks 都不含它。
+  const strip = (m) => {
+    if (!m || typeof m !== 'object') return m;
+    const out = {};
+    for (const [k, v] of Object.entries(m)) if (k !== DIY_CLEARED) out[k] = v;
+    return out;
+  };
   // ★ 旧格式（整张表就是 picks，键是 `5_diy1` 这种槽位）→ 它就是**默认版本**那一份。
   //   必须放在「默认版本直接返回 own」之前：以前顺序反了，老存档读默认版本时 bucketOf('act2autochess')
   //   找不到键就返回 null —— 玩家看到「选择自编」列表是空的、自选干员整局不出现
   //   （玩家反馈 2026-11-16；老格式的 session.diy 会一直留到玩家下次保存）。
   const isFlat = Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
-  if (isFlat) return map;
+  if (isFlat) return strip(map);
   const own = bucketOf(slug);
   const base = bucketOf(LEGACY_DIY_SLUG);
+  const cleared = own && Array.isArray(own[DIY_CLEARED]) ? new Set(own[DIY_CLEARED]) : null;
+  /** 默认版本那份，去掉本版显式清空过的槽位。 */
+  const inherit = () => {
+    const b = strip(base);
+    if (!b || !cleared) return b;
+    for (const id of cleared) delete b[id];
+    return b;
+  };
   if (!base) {
     // 没有默认版本那一格：本版配过就用本版；只**有一个**版本配过时用它
     // （配一次各版本都认；多出来的本版独有槽会被开局 checkDiyPicks 逐槽丢掉，不会整份被拒）。
     // 否则这个玩家会「明明配过却是空列表」（玩家反馈 2026-11-16）。
-    if (own && Object.keys(own).length) return own;
+    const ownPicks = strip(own);
+    if (ownPicks && Object.keys(ownPicks).length) return ownPicks;
+    if (cleared) return ownPicks;                         // 本版配过并清空过 → 就按本版（空）
     const keys = Object.keys(map).filter((k) => map[k] && typeof map[k] === 'object');
-    return keys.length === 1 ? map[keys[0]] : own;
+    return keys.length === 1 ? strip(map[keys[0]]) : ownPicks;
   }
   // 默认版本自己就是回退源
-  if (slug === LEGACY_DIY_SLUG) return base;
-  if (!own) return base;                                  // 这一版还没配过 → 直接用默认版本那份
-  if (!Object.keys(own).length) return base;              // 配过但空 → 同样回退
-  return { ...base, ...own };                             // 逐槽合并：本版本设过的优先
+  if (slug === LEGACY_DIY_SLUG) return strip(base);
+  // ★ 本版「配过」（哪怕配成空）就不再回退 —— 这是「清空要生效」的关键。
+  if (!own) return strip(base);                           // 这一版还没配过 → 直接用默认版本那份
+  return { ...inherit(), ...strip(own) };                 // 逐槽合并：本版本设过的优先，清空的继承槽被剔掉
 }
 
 

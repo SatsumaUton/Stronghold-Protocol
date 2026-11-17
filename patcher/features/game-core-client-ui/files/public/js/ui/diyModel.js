@@ -17,6 +17,7 @@
 // version (`version`, only a non-default one).
 
 import { DIY_LIMITS, checkDiyPicks } from '../../../shared/protocol.js';
+import { DIY_CLEARED } from '../../../shared/diy.js';
 import { diySlotIds, diySlot, diyPool, isPrototypePick, lockedSelection, isDiyModule, diyRecord } from '../../../shared/diy.js';
 import { unitForm } from '../../../shared/standIn.js';
 import { N_ } from '../../../shared/i18n.js';
@@ -57,12 +58,31 @@ export function cleanPicks(raw) {
 }
 
 /** Parse a stored setting (any junk → {}): `{ v, picks }`. @param {any} raw */
+/** 本地设置里同时读出 picks 与墓碑。@param {any} raw */
+export function parseStoredDiyState(raw) {
+  return {
+    picks: isObj(raw) ? cleanPicks(raw.picks) : {},
+    cleared: isObj(raw) && Array.isArray(raw.cleared) ? raw.cleared.filter((x) => typeof x === 'string').slice(0, DIY_LIMITS.slots) : [],
+  };
+}
+
 export function parseStoredDiy(raw) {
   return isObj(raw) ? cleanPicks(raw.picks) : {};
 }
 
 /** Serialised form for localStorage. */
-export const toStoredDiy = (picks) => ({ v: DIY_VERSION, picks: cleanPicks(picks) });
+/**
+ * 序列化本地设置。`cleared` = 本版**显式清空**过的槽位（墓碑，维护者 2026-11-18）：没有它，
+ * 「清空」会被当成「没设过」而回退第二期下半那一份，玩家清完一刷新又回来。
+ * 它同时随 room.diy 上报（`picks[DIY_CLEARED]`），服务端记进该版本的 bucket。
+ * @param {Record<string, any>} picks @param {string[]} [cleared]
+ */
+export const toStoredDiy = (picks, cleared = []) => {
+  const out = { v: DIY_VERSION, picks: cleanPicks(picks) };
+  const list = Array.isArray(cleared) ? [...new Set(cleared.filter((x) => typeof x === 'string'))].slice(0, DIY_LIMITS.slots) : [];
+  if (list.length) out.cleared = list;
+  return out;
+};
 
 /**
  * The localStorage key (store.js prefix `sp.pref.`) of a version's picks: 'diy' for 第二期下半, 'diy.<slug>' else.

@@ -46,7 +46,8 @@ import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, parseStoredOwnershipChars, toStoredOwnership, toStoredOwnershipV1, cleanIds, sanitizeNotOwned,
   notOwnedView, rebaseChars } from './ownershipModel.js';
-import { parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey } from './diyModel.js';
+import { parseStoredDiy, parseStoredDiyState, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey } from './diyModel.js';
+import { DIY_CLEARED } from '../../../shared/diy.js';
 import { skinsStore, SKINS_KEY, SKINS_SYNC_KEY, parseStoredSkins } from './skins.js';
 import { cardStore, CARD_KEY, CARD_SYNC_KEY, cardOperators } from './seatArt.js';
 import { needsContent, serverDefaultVersion } from '../versions.js';
@@ -391,8 +392,15 @@ export function setDiyPicks(picks) {
   const prev = s.diy || {};
   try {
     const ownKey = diyPrefKey(version);
-    savePref(ownKey, toStoredDiy(next));
-    // 本版是回退/合并出来的：被清掉的那些槽位，如果默认版本里还是同一个选择，也一起清掉。
+    // ★ 墓碑（维护者 2026-11-18）：把「这次被清空」的槽位累计进本版的 cleared，一起存下来并随 room.diy 上报。
+    //   没有它，「清空」与「从没设过」不可区分 —— 服务端/客户端都会回退成第二期下半那一份，
+    //   玩家只能把第二期下半也删掉才正常（维护者实测）。
+    const prevState = (() => { try { return parseStoredDiyState(loadPref(ownKey, null)); } catch { return { picks: {}, cleared: [] }; } })();
+    const cleared = new Set(prevState.cleared);
+    for (const slotId of Object.keys(prev)) if (!next[slotId]) cleared.add(slotId);
+    for (const slotId of Object.keys(next)) cleared.delete(slotId);   // 重新填上 = 不再是墓碑
+    savePref(ownKey, toStoredDiy(next, [...cleared]));
+    // 兼容旧客户端：被清掉且与默认版本**同一份**的槽位，也顺手把默认版本那格删掉。
     if (versionById(version) && versionById(version).id !== DEFAULT_VERSION) {
       const baseKey = diyPrefKey(DEFAULT_VERSION);
       if (baseKey !== ownKey) {
@@ -410,6 +418,11 @@ export function setDiyPicks(picks) {
     }
   } catch { /* private mode: the session keeps it */ }
   loadoutStore.set({ diy: next });
+}
+
+/** 本版设置里记下的墓碑（随 room.diy 上报，`picks[DIY_CLEARED]`）。 */
+export function readDiyCleared(version = loadoutStore.get().diyVersion) {
+  try { return parseStoredDiyState(loadPref(diyPrefKey(version), null)).cleared; } catch { return []; }
 }
 
 /**
@@ -787,7 +800,10 @@ export function installDiySync({ net, timers, target = loadoutStore, notify, con
     lockedText: N_('自选编队是局外设置，修改将在下一局生效'),
     async prepare() {
       if (target === loadoutStore) refreshViews(); // the picks of the version on screen
-      return cleanPicks(target.get().diy);
+      const picks = cleanPicks(target.get().diy);
+      // 墓碑随 picks 一起上报（服务端 checkDiyPicks 抽取后记进该版本的 bucket）。
+      const cleared = readDiyCleared();
+      return cleared.length ? { ...picks, [DIY_CLEARED]: cleared } : picks;
     },
   });
   return { flush: sync.flush, dispose() { offKit?.(); offKitContent?.(); sync.dispose(); } };

@@ -264,7 +264,7 @@ import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 // 自选编队按版本分键（维护者 2026-11-16）：读/写某个版本那一格
-import { pickDiyFor, storeDiyFor } from '../shared/diy.js';
+import { pickDiyFor, storeDiyFor, DIY_CLEARED } from '../shared/diy.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
@@ -3342,7 +3342,11 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       }
       return 'act2autochess';
     })();
-    const kept = storeDiyFor(session.diy, diySlug, freezeDiy(res.picks));
+    // 墓碑（维护者 2026-11-18）：本版显式清空过的槽位随 picks 一起存进该版本的 bucket —— 否则
+  // `pickDiyFor` 无法区分「没设过」和「设成了空」，清空会回退成第二期下半那份（玩家只能把那边也删掉才正常）。
+  const cleared = Array.isArray(res.cleared) ? res.cleared : [];
+  const frozen = freezeDiy(res.picks);
+  const kept = storeDiyFor(session.diy, diySlug, cleared.length ? Object.freeze({ ...frozen, [DIY_CLEARED]: Object.freeze(cleared) }) : frozen);
     const cs = this.settingsCs(room, session.playerId);
     session.diy = kept;
     session.diyCs = cs;

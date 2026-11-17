@@ -4,7 +4,7 @@
 import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_SEATS, EMOTES, GEO, REHEARSAL_MAX_CANDIDATES } from './constants.js';
 import { MAX_PLAYER_CAPACITY } from './playerCapacity.js';
 import { isDroppableChess } from './standIn.js';
-import { diySlotIds, validateDiyPicks } from './diy.js';
+import { diySlotIds, validateDiyPicks, DIY_CLEARED } from './diy.js';
 import { cultivatedStats, isPotential, isCultivate, POTENTIAL_DEFAULT, CULTIVATE_DEFAULT, hasPotentialData } from './potential.js';
 import { isContentHash } from './plugins/identity.js';
 import { isPluginId } from './plugins/manifest.js';
@@ -412,8 +412,22 @@ export function checkNotOwned(list, getChess) {
 export const DIY_LIMITS = Object.freeze({ slots: 12 });
 const isDiyPickWire = (p) => p === null || (isPlain(p) && isId(p.charId)
   && nullable((v) => isInt(v, 0, 9))(p.skillIndex) && nullable(isId)(p.uniEquipId));
-/** Structural check of `room.diy.picks`: a map of ≤ 12 slot ids → a pick `{ charId, skillIndex?, uniEquipId? }` or null. */
-export const isDiyPicks = (v) => isMap(v, DIY_LIMITS.slots, isId, isDiyPickWire);
+/**
+ * Structural check of `room.diy.picks`: a map of ≤ 12 slot ids → a pick `{ charId, skillIndex?, uniEquipId? }` or null,
+ * plus the optional `__cleared` tombstone list (维护者 2026-11-18, shared/diy.js DIY_CLEARED): the slots the player
+ * explicitly emptied **in this version**, so that clearing stops falling back to 第二期下半's picks.
+ */
+export const isDiyPicks = (v) => {
+  if (!isPlain(v) || Object.keys(v).length > DIY_LIMITS.slots + 1) return false;
+  for (const [k, pick] of Object.entries(v)) {
+    if (k === DIY_CLEARED) {
+      if (!Array.isArray(pick) || pick.length > DIY_LIMITS.slots || !pick.every(isId)) return false;
+      continue;
+    }
+    if (!isId(k) || !isDiyPickWire(pick)) return false;
+  }
+  return true;
+};
 
 /**
  * Semantic check + normalisation of a 自选 roster against the game data (`{ chess, backups }` or a sim DataSource) and
@@ -429,11 +443,13 @@ export const isDiyPicks = (v) => isMap(v, DIY_LIMITS.slots, isId, isDiyPickWire)
  */
 export function checkDiyPicks(picks, { data, kitted = null } = { data: null }) {
   if (!isDiyPicks(picks)) return { error: 'BAD_MSG', detail: 'bad 自选 picks' };
+  // 墓碑（维护者 2026-11-18）：本版显式清空过的槽位，原样带回，服务端存进该版本的 bucket。
+  const cleared = Array.isArray(picks[DIY_CLEARED]) ? [...new Set(picks[DIY_CLEARED])].slice(0, DIY_LIMITS.slots) : [];
   const slots = diySlotIds(data);
   /** @type {Record<string, { charId: string, skillIndex: number, uniEquipId: string|null }>} */
   const kept = {};
   let dropped = 0;
-  for (const id of Object.keys(picks)) if (picks[id] != null && !slots.includes(id)) dropped++;
+  for (const id of Object.keys(picks)) if (id !== DIY_CLEARED && picks[id] != null && !slots.includes(id)) dropped++;
   for (const slotId of slots) {
     const pick = Object.hasOwn(picks, slotId) ? picks[slotId] : null;
     if (pick == null) continue;
@@ -441,7 +457,7 @@ export function checkDiyPicks(picks, { data, kitted = null } = { data: null }) {
     if ('ok' in res) kept[slotId] = res.picks[slotId];
     else dropped++;
   }
-  return { ok: true, picks: kept, dropped };
+  return { ok: true, picks: kept, cleared, dropped };
 }
 
 // ---- unit stats (user playtest #4 item 7): m.unitStats units and the browser battle's live stats ---------------------
