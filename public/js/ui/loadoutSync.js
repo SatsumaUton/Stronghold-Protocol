@@ -371,10 +371,42 @@ export function applyOwnershipImport(list, lookup) {
   return { applied: clean.length, dropped: Math.max(0, asked - clean.length) };
 }
 
-/** Replace the stored 自选编队 picks of the version on screen (its own key: diyModel.js diyPrefKey; the sync picks the change up). */
+/**
+ * Replace the stored 自选编队 picks of the version on screen (its own key: diyModel.js diyPrefKey; the sync picks the change up).
+ *
+ * ★ 2026-11-18（维护者：「规程里明明没设自选，却还显示自选 1」）：
+ *   非默认版本的自选是「本版没配就回退默认版本、两边都有则逐槽合并」的（readStoredDiy 与
+ *   shared/diy.js:pickDiyFor 同口径）。于是**在本版清空一个槽位会回退成默认版本的值** ——
+ *   玩家在规程里点了清空，徽章还是 1，因为那份来自第二期下半。
+ *   shared/diy.js 的注释里已经写明「要彻底清空，把默认版本那一格也清掉」，这里把它**自动做掉**：
+ *   清空某个槽位时，如果默认版本那一格与它相同，就把默认版本那格也删掉，再各自保存。
+ *   不是「没设过」而是「设成空」的区分需要墓碑字段，那要改协议；先按服务端文档的口径处理。
+ */
 export function setDiyPicks(picks) {
   const next = cleanPicks(picks);
-  try { savePref(diyPrefKey(loadoutStore.get().diyVersion), toStoredDiy(next)); } catch { /* private mode: the session keeps it */ }
+  const s = loadoutStore.get();
+  const version = s.diyVersion;
+  const prev = s.diy || {};
+  try {
+    const ownKey = diyPrefKey(version);
+    savePref(ownKey, toStoredDiy(next));
+    // 本版是回退/合并出来的：被清掉的那些槽位，如果默认版本里还是同一个选择，也一起清掉。
+    if (versionById(version) && versionById(version).id !== DEFAULT_VERSION) {
+      const baseKey = diyPrefKey(DEFAULT_VERSION);
+      if (baseKey !== ownKey) {
+        const base = (() => { try { return parseStoredDiy(loadPref(baseKey, null)); } catch { return {}; } })();
+        let touched = false;
+        for (const slotId of Object.keys(prev)) {
+          if (next[slotId]) continue;                       // 这个槽位没被清空
+          if (!base[slotId]) continue;                      // 默认版本本来就没有
+          if (JSON.stringify(base[slotId]) !== JSON.stringify(prev[slotId])) continue; // 不是同一份
+          delete base[slotId];
+          touched = true;
+        }
+        if (touched) savePref(baseKey, toStoredDiy(base));
+      }
+    }
+  } catch { /* private mode: the session keeps it */ }
   loadoutStore.set({ diy: next });
 }
 

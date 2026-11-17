@@ -147,6 +147,48 @@ test('自选 per version: sp.pref.diy for 第二期下半, sp.pref.diy.<slug> fo
   loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
 });
 
+test('★ 在非默认版本里清空自选：默认版本同一槽位也一起清掉（否则徽章永远显示「自选 1」）', () => {
+  // 维护者 2026-11-18：「规程版本里我明明已经没有设置自选干员了，为什么还显示自选 1」。
+  // 非默认版本的自选是「本版没配就回退默认版本、两边都有则逐槽合并」（readStoredDiy 与
+  // shared/diy.js:pickDiyFor 同口径），于是「在规程里清空」会回退成第二期下半那格 —— 徽章还是 1。
+  // 服务端注释写明「要彻底清空，把默认版本那一格也清掉」；setDiyPicks 现在自动做这件事。
+  const { loadoutStore, setDiyPicks } = S;
+  const SLOT = 'chess_char_5_diy1_a';
+  const pick = { charId: 'char_102_texas' };
+
+  // 第二期下半配一格
+  loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
+  setDiyPicks({ [SLOT]: pick });
+  assert.deepEqual(JSON.parse(mem.get('sp.pref.diy')).picks, { [SLOT]: pick });
+
+  // 规程页读到的是回退值（readStoredDiy 的合并口径），于是徽章显示 1
+  const fallback = D.parseStoredDiy(JSON.parse(mem.get('sp.pref.diy')));
+  loadoutStore.set({ diyVersion: 'act3autochess@V3_1', diy: fallback });
+  assert.deepEqual(loadoutStore.get().diy, { [SLOT]: pick }, '前提：规程回退到第二期下半那一格');
+
+  // 在规程里清空 → 默认版本那格也必须清掉
+  setDiyPicks({});
+  assert.deepEqual(loadoutStore.get().diy, {}, '规程自己清空了');
+  const base = mem.get('sp.pref.diy');
+  assert.ok(base, '默认版本那份还在（只是把这一格删了）');
+  assert.deepEqual(JSON.parse(base).picks, {}, '★ 默认版本的同一槽位也被清掉 —— 徽章才会变 0');
+  assert.equal(D.exportDiy({}, { version: 'act3autochess@V3_1' }).version, 'act3autochess@V3_1', '导出仍标明版本（注册表 id）');
+  loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
+});
+
+test('清空只影响「与当前选择相同」的默认版本槽位，别动别人的配置', () => {
+  const { loadoutStore, setDiyPicks } = S;
+  const A = 'chess_char_5_diy1_a';
+  const B = 'chess_char_6_diy1_a';
+  loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
+  setDiyPicks({ [A]: { charId: 'char_102_texas' } });
+  // 规程里另配一格，然后只清 B（默认版本没有 B）→ 默认版本不受影响
+  loadoutStore.set({ diyVersion: 'act3autochess@V3_1', diy: { [A]: { charId: 'char_102_texas' }, [B]: { charId: 'char_103_angel' } } });
+  setDiyPicks({ [A]: { charId: 'char_102_texas' } });
+  assert.deepEqual(JSON.parse(mem.get('sp.pref.diy')).picks, { [A]: { charId: 'char_102_texas' } }, 'A 还在（没被清）');
+  loadoutStore.set({ diyVersion: 'act2autochess', diy: {} });
+});
+
 test('the sync waits for the data the server checks against (canSendSettings)', () => {
   const app = (room) => ({ get: () => ({ room }) });
   const content = (c) => ({ get: () => ({ cs: null, status: 'idle', kind: null, ...c }) });
