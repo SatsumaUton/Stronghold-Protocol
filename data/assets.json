@@ -131307,6 +131307,40 @@
           "width": 226.011,
           "height": 119.992
         }
+      },
+      "skins": {
+        "char_108_silent_winter_2": {
+          "spineLocal": {
+            "group": "spine/token/token_10000_silent_healrb_winter_2",
+            "skel": "token_10000_silent_healrb_winter_2.skel",
+            "atlas": "token_10000_silent_healrb_winter_2.atlas",
+            "textures": [
+              "token_10000_silent_healrb_winter_2.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Idle",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10002_kalts_mon3tr": {
@@ -131629,6 +131663,72 @@
           "width": 230.759,
           "height": 187.717
         }
+      },
+      "skins": {
+        "char_254_vodfox_witch_2": {
+          "spineLocal": {
+            "group": "spine/token/token_10006_vodfox_doll_witch_2",
+            "skel": "token_10006_vodfox_doll_witch_2.skel",
+            "atlas": "token_10006_vodfox_doll_witch_2.atlas",
+            "textures": [
+              "token_10006_vodfox_doll_witch_2.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_254_vodfox_yun_8": {
+          "spineLocal": {
+            "group": "spine/token/token_10006_vodfox_doll_yun_8",
+            "skel": "token_10006_vodfox_doll_yun_8.skel",
+            "atlas": "token_10006_vodfox_doll_yun_8.atlas",
+            "textures": [
+              "token_10006_vodfox_doll_yun_8.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10007_phatom_twin": {
@@ -131873,6 +131973,80 @@
           "width": 241,
           "height": 395.49
         }
+      },
+      "skins": {
+        "char_344_beewax_epoque_9": {
+          "spineLocal": {
+            "group": "spine/token/token_10011_beewax_oblisk_epoque_9",
+            "skel": "token_10011_beewax_oblisk_epoque_9.skel",
+            "atlas": "token_10011_beewax_oblisk_epoque_9.atlas",
+            "textures": [
+              "token_10011_beewax_oblisk_epoque_9.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_344_beewax_summer_11": {
+          "spineLocal": {
+            "group": "spine/token/token_10011_beewax_oblisk_summer_11",
+            "skel": "token_10011_beewax_oblisk_summer_11.skel",
+            "atlas": "token_10011_beewax_oblisk_summer_11.atlas",
+            "textures": [
+              "token_10011_beewax_oblisk_summer_11.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10012_rosmon_shield": {
@@ -131920,6 +132094,72 @@
           "y": -57.126,
           "width": 267,
           "height": 417.5
+        }
+      },
+      "skins": {
+        "char_391_rosmon_epoque_17": {
+          "spineLocal": {
+            "group": "spine/token/token_10012_rosmon_shield_epoque_17",
+            "skel": "token_10012_rosmon_shield_epoque_17.skel",
+            "atlas": "token_10012_rosmon_shield_epoque_17.atlas",
+            "textures": [
+              "token_10012_rosmon_shield_epoque_17.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_391_rosmon_sale_16": {
+          "spineLocal": {
+            "group": "spine/token/token_10012_rosmon_shield_sale_16",
+            "skel": "token_10012_rosmon_shield_sale_16.skel",
+            "atlas": "token_10012_rosmon_shield_sale_16.atlas",
+            "textures": [
+              "token_10012_rosmon_shield_sale_16.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -131976,6 +132216,78 @@
           ]
         },
         "bounds": null
+      },
+      "skins": {
+        "char_2015_dusk_nian_12": {
+          "spineLocal": {
+            "group": "spine/token/token_10015_dusk_drgn_nian_12",
+            "skel": "token_10015_dusk_drgn_nian_12.skel",
+            "atlas": "token_10015_dusk_drgn_nian_12.atlas",
+            "textures": [
+              "token_10015_dusk_drgn_nian_12.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2015_dusk_nian_7": {
+          "spineLocal": {
+            "group": "spine/token/token_10015_dusk_drgn_nian_7",
+            "skel": "token_10015_dusk_drgn_nian_7.skel",
+            "atlas": "token_10015_dusk_drgn_nian_7.atlas",
+            "textures": [
+              "token_10015_dusk_drgn_nian_7.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10017_skadi2_dedant": {
@@ -132030,6 +132342,39 @@
           "y": -57.41,
           "width": 404.004,
           "height": 369.532
+        }
+      },
+      "skins": {
+        "char_1012_skadi2_boc_4": {
+          "spineLocal": {
+            "group": "spine/token/token_10017_skadi2_dedant_boc_4",
+            "skel": "token_10017_skadi2_dedant_boc_4.skel",
+            "atlas": "token_10017_skadi2_dedant_boc_4.atlas",
+            "textures": [
+              "token_10017_skadi2_dedant_boc_4.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
