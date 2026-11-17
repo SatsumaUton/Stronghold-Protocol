@@ -61,9 +61,15 @@ export class BattleSpawns {
     }
   }
 
-  _routeFor(idx, explicit = null) {
+  _routeFor(idx, explicit = null, def = null) {
     if (explicit) return normalizeRoute(explicit);
-    return this.routes[idx] ?? this.routes[0] ?? this._defaultRoute();
+    const r = this.routes[idx];
+    if (r) return r;
+    // ★ 2026-11-18：下标越界时不再盲目退回 routes[0]（那可能换成另一条出兵口，甚至落到
+    // 「起点→终点」的默认直线，敌人看起来在穿墙）。优先取**同移动方式**的路线，让飞行怪别走地面口、
+    // 地面怪别走飞行口；实在没有同类的才退回 routes[0]。
+    const wantFly = !!(def && def.stats && def.stats.motion === 'FLY');
+    return this.routes.find((x) => (x && x.motion === 'FLY') === wantFly) ?? this.routes[0] ?? this._defaultRoute();
   }
 
   _defaultRoute() {
@@ -139,7 +145,7 @@ export class BattleSpawns {
         rangeRadius: Math.max(0, fin(st.rangeRadius, def.rangeRadius)), massLevel: fin(st.massLevel, def.massLevel),
         lpr: fin(st.lpr, def.lpr), blockCnt: Math.max(1, fin(st.blockCnt, def.blockCnt)) };
     }
-    const route = opts.route ? normalizeRoute(opts.route) : this._routeFor(opts.routeIndex ?? 0);
+    const route = opts.route ? normalizeRoute(opts.route) : this._routeFor(opts.routeIndex ?? 0, null, def);
     let start = opts.pos ?? route?.start ?? [this.rect.r0, this.rect.c1];
     if (!Array.isArray(start) || !Number.isFinite(start[0]) || !Number.isFinite(start[1])) start = route?.start ?? [this.rect.r0, this.rect.c1];
     const R = this.rect; // spawn inside the field (same bounds as _clampPos)
