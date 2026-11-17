@@ -72,12 +72,14 @@ export function wireOptions(opts) {
   if (opts.experimental && typeof opts.experimental === 'object' && !Array.isArray(opts.experimental)) {
     out.experimental = opts.experimental;
   }
-  // A test room must arrive as a test match. Forwarding these only when the flag is set keeps every other
+  // A test room must arrive as a test match. Forwarding the flag only when it is set keeps every other
   // worker payload identical. Dropping the flag fails closed: the worker match refuses g.test.
-  if (opts.test === true) {
-    out.test = true;
-    if (typeof opts.hostId === 'string') out.hostId = opts.hostId;
-  }
+  if (opts.test === true) out.test = true;
+  // ★ 2026-11-17（维护者，玩家反馈「房主开了作弊控制台，仍然提示只有房主可以操作」）：
+  //   hostId 以前**只在 `opts.test === true` 时**才转发。而「作弊控制台」不是测试房（room.test 是另一个开关），
+  //   于是版本宿主 / 内容宿主里的 Match.hostId = null，`applyTestCommand` 的 isHost 判否 → NOT_HOST。
+  //   现在 hostId 与 test 解耦：只要传了就转发（它同时是「机器人演练委托给谁执行」的接收方，本来就不是秘密）。
+  if (typeof opts.hostId === 'string') out.hostId = opts.hostId;
   // Rule switches ride with the content set. A room that declares none keeps today's worker payload.
   if (opts.rules && typeof opts.rules === 'object' && !Array.isArray(opts.rules)) out.rules = opts.rules;
   return out;
