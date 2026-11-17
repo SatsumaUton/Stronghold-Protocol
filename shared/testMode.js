@@ -9,12 +9,15 @@
 // wrong type or out of range is BAD_TARGET. A shape refusal is audited as { rejected: true } so
 // the log does not keep the raw payload.
 
-import { BOND_LAYER_CAP } from './constants.js';
+import { BOND_LAYER_CAP, BOND_LAYER_SAFE_MAX } from './constants.js';
 
 export const TEST_FUNDS_MAX = 99999;
 export const TEST_LP_MAX = 999;
 export const TEST_TEAM_LP_MAX = 9999;
-export const TEST_LAYERS_MAX = BOND_LAYER_CAP;
+// 层数上限取「解除封顶后的安全值」：深潜本来就不封顶（Match.layerCapOff），
+// 以前这里卡在 BOND_LAYER_CAP=999，管理员在深潜里想把层数设到 1000+ 一律 BAD_TARGET。
+// 普通房仍然由 Match._testBond 用它自己的真实上限拒绝（会带 cap|{cur,max} 说明）。
+export const TEST_LAYERS_MAX = BOND_LAYER_SAFE_MAX;
 export const TEST_SHOP_SLOTS_MAX = 12;
 export const TEST_ROUND_MAX = 99;
 export const TEST_RATE_COUNT = 8;
@@ -25,6 +28,8 @@ export const TEST_PUBLIC_LOG = 12;
 export const TEST_COMMANDS = Object.freeze([
   'funds', 'chess', 'item', 'token', 'lp', 'hp', 'teamLp', 'round', 'phase',
   'shop', 'timers', 'bond', 'strategy', 'level', 'bounty', 'choice',
+  // 「深渊回响」专用（维护者 2026-11-17）：祝福 / 诅咒 / 侵蚀词条 / 盟约投影
+  'echoBlessing', 'echoCurse', 'echoWord', 'echoProjection',
 ]);
 
 /** Phase jumps the match can make by calling a phase method it already has. */
@@ -228,6 +233,26 @@ export function parseTestArgs(cmd, args) {
         out.choiceId = r.args.choiceId;
       }
       return { args: out };
+    }
+    // 深渊回响专用：id 或 ids + 可选 clear（清除而不是添加）
+    case 'echoBlessing':
+    case 'echoCurse':
+    case 'echoProjection': {
+      const r = exact(args, ['id', 'clear']);
+      if (r.error) return r;
+      if (r.args.id !== undefined && !isId(r.args.id)) return { error: 'BAD_TARGET' };
+      if (r.args.clear !== undefined && typeof r.args.clear !== 'boolean') return { error: 'BAD_TARGET' };
+      if (r.args.clear !== true && r.args.id === undefined) return { error: 'BAD_TARGET' };
+      return { args: { ...(r.args.id === undefined ? {} : { id: r.args.id }), ...(r.args.clear === undefined ? {} : { clear: r.args.clear }) } };
+    }
+    case 'echoWord': {
+      const r = exact(args, ['ids', 'clear']);
+      if (r.error) return r;
+      if (r.args.clear === true) return { args: { clear: true } };
+      const ids = r.args.ids;
+      if (!Array.isArray(ids) || ids.length > 12) return { error: 'BAD_TARGET' };
+      for (const id of ids) if (!isId(id)) return { error: 'BAD_TARGET' };
+      return { args: { ids: ids.map(String) } };
     }
     default:
       return { error: 'BAD_MSG' };

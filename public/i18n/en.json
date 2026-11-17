@@ -3418,5 +3418,7 @@
   "开启后，本局创建者可以在对局中使用控制台：加资金、加层数、加干员、跳回合等。": "Once enabled, the room creator can use the console in this match: add funds, layers, operators, skip rounds, and so on.",
   "这一局不会记入对局记录，也不进深渊回响排行榜；本房间也不会出现在公开同盟列表里。": "This match is not recorded and does not count for the Abyss leaderboard; the room is not listed publicly either.",
   "仍然开启": "Enable anyway",
-  "作弊控制台": "Cheat console"
+  "作弊控制台": "Cheat console",
+  "全部清除": "Clear all",
+  "正在载入深渊图鉴…": "Loading the Abyss codex…"
 }

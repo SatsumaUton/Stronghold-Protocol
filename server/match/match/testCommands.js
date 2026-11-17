@@ -45,6 +45,12 @@
 import { ERR, PHASE, layerGainRoom, BOND_LAYER_CAP, BOND_LAYER_SAFE_MAX } from '../../../shared/constants.js';
 import { parseTestArgs, isTestCommand, TEST_LOG_CAP, TEST_RATE_COUNT, TEST_RATE_WINDOW_MS } from '../../../shared/testMode.js';
 import { OK, fail } from './common.js';
+import { echoBlessingById } from './echoBlessing.js';
+import { echoCurseById } from './echoCurse.js';
+import { echoWordById } from './echoWords.js';
+import { echoProjectionById } from './echoProjection.js';
+import { ECHO_SAFE_ROUND } from './echo.js';
+import { createRng, deriveSeed } from '../../sim/rng.js';
 
 const BLOCKED = new Set([PHASE.LOBBY, PHASE.COMBAT, PHASE.UNITE, PHASE.FINAL_ASSAULT, PHASE.HIDDEN_CORE, PHASE.RESULT]);
 
@@ -187,6 +193,11 @@ export class MatchTestCommands {
       case 'level': return ps.levelUp();
       case 'bounty': return this._testBounty(ps, args.enemyKey);
       case 'choice': return this._testChoice(ps, args.idx, args.choiceId);
+      // 深渊回响专用（维护者 2026-11-17）
+      case 'echoBlessing': return this._testEchoBlessing(args.id, args.clear === true);
+      case 'echoCurse': return this._testEchoCurse(args.id, args.clear === true);
+      case 'echoWord': return this._testEchoWord(args.ids, args.clear === true);
+      case 'echoProjection': return this._testEchoProjection(ps, args.id, args.clear === true);
       default: return fail(ERR.BAD_MSG);
     }
   }
@@ -276,8 +287,11 @@ export class MatchTestCommands {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
     if (this.phase === PHASE.INFO_CHECK || this.phase === PHASE.BAND_DRAFT || !ps.bandId) return fail(ERR.WRONG_PHASE);
+    // 深潜是无尽模式：跳回合按 ECHO_SAFE_ROUND（999）放行，而不是原版的 lastRound(14/15)。
+    // 普通房仍然是「最末回合 / 隐藏核心回合」这两个原版上限。
     const hidden = this.gd.hiddenRound;
-    const hi = Math.max(this.gd.lastRound || 0, hidden > 0 ? hidden : 0);
+    const base = Math.max(this.gd.lastRound || 0, hidden > 0 ? hidden : 0);
+    const hi = this.echoVariant === 'deepecho' ? Math.max(base, ECHO_SAFE_ROUND) : base;
     if (round > hi) return fail(ERR.BAD_TARGET, `round|${JSON.stringify({ hi })}`);
     this.eliminateBroken();
     if (!this.alivePlayers().length) {
@@ -445,5 +459,85 @@ export class MatchTestCommands {
     if (choiceId !== undefined) return this.pickPersonalChoice(ps, idx, choiceId);
     if (this.phase !== PHASE.SP_DRAFT) return fail(ERR.WRONG_PHASE);
     return this.pickCard(ps, idx);
+  }
+
+  // ── 「深渊回响」专用指令（维护者 2026-11-17）─────────────────────────────
+  // 都只在深潜局生效，都调用对局已有的原语（_echoGrantBlessing / _echoAddCurse /
+  // echoWordsActive / ps.echoProjection + recompute），不新写任何玩法逻辑。
+
+  /** 给全队发一条祝福（与三选一 / 祭坛 / 补给走的同一个发放函数）。`clear` 清空已持有的祝福。 */
+  _testEchoBlessing(id, clear) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE, 'echo');
+    const blocked = this._testQuiet();
+    if (blocked) return blocked;
+    if (clear) {
+      this.echoBlessings = [];
+      this.echoCounterIds = [];
+      this.echoOneShotIds = [];
+      this.markPublic();
+      return OK;
+    }
+    const b = echoBlessingById(id);
+    if (!b) return fail(ERR.BAD_TARGET, 'no-such-blessing');
+    const got = this._echoGrantBlessing(b);
+    // null = 名额满 / 同类已持有（这一条没生效），要明说，否则管理员以为加上了
+    if (got === null) return fail(ERR.BAD_TARGET, 'blessing-full');
+    this.markPublic();
+    return OK;
+  }
+
+  /** 加一条诅咒（与定期挂诅咒走的同一个入口，副作用一起施加）。`clear` 清空全部诅咒。 */
+  _testEchoCurse(id, clear) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE, 'echo');
+    const blocked = this._testQuiet();
+    if (blocked) return blocked;
+    if (clear) {
+      const removed = Array.isArray(this.echoCurseIds) ? this.echoCurseIds.slice() : [];
+      this.echoCurseIds = [];
+      this.echoRoundCurse = null;
+      if (removed.length) this._echoSyncBanCurse(removed);
+      this.markPublic();
+      return OK;
+    }
+    const c = this._echoAddCurse(id, createRng(deriveSeed(this.seed, 'test:curse')));
+    if (!c) return fail(ERR.BAD_TARGET, 'curse-refused');
+    this.markPublic();
+    return OK;
+  }
+
+  /** 指定本回合的侵蚀词条。`ids` 省略或空数组 = 清空。 */
+  _testEchoWord(ids, clear) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE, 'echo');
+    const blocked = this._testQuiet();
+    if (blocked) return blocked;
+    if (clear || !Array.isArray(ids) || !ids.length) {
+      this.echoWordsActive = null;
+      this.markPublic();
+      return OK;
+    }
+    const known = ids.filter((x) => echoWordById(x));
+    if (!known.length) return fail(ERR.BAD_TARGET, 'no-such-word');
+    this.echoWordsActive = known;
+    this.markPublic();
+    return OK;
+  }
+
+  /** 给房主自己设一条盟约投影（走与 g.echoProjection 同一个字段 + recompute）。 */
+  _testEchoProjection(ps, id, clear) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE, 'echo');
+    if (clear) {
+      ps.echoProjection = null;
+      try { ps.recompute(); } catch { /* ignore */ }
+      this.markPrivate(ps);
+      this.markPublic();
+      return OK;
+    }
+    if (!echoProjectionById(id)) return fail(ERR.BAD_TARGET, 'no-such-projection');
+    ps.echoProjection = id;
+    try { ps.recompute(); } catch { /* ignore */ }
+    ps.dirty?.();
+    this.markPrivate(ps);
+    this.markPublic();
+    return OK;
   }
 }

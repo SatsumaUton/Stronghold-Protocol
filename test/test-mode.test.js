@@ -675,6 +675,9 @@ test('strict catalogue rejects every malformed command before mutation, includin
     lp: { value: 1 }, hp: { value: 1 }, teamLp: { value: 1 }, round: { round: 1 }, phase: { name: 'prep' },
     shop: { slots: [{ kind: 'chess', id: 'x' }] }, timers: { on: false }, bond: { id: 'x', layers: 0, count: 3 },
     strategy: { id: 'x' }, level: {}, bounty: { enemyKey: 'x' }, choice: { idx: 0 },
+    // 「深渊回响」专用（维护者 2026-11-17）
+    echoBlessing: { id: 'bigfund' }, echoCurse: { id: 'erosion' }, echoWord: { ids: ['harden'] },
+    echoProjection: { id: 'siracusaShip' },
   };
   for (const cmd of TEST_COMMANDS) {
     assert.ok(parseTestArgs(cmd, valid[cmd]).args, cmd);
@@ -687,6 +690,8 @@ test('strict catalogue rejects every malformed command before mutation, includin
   assert.deepEqual(parseTestArgs('bond', { id: 'x' }), { args: { id: 'x' } });
   assert.deepEqual(parseTestArgs('bond', { id: 'x', count: 3 }), { args: { id: 'x', count: 3 } });
   // 给数字时仍然按绝对值校验，非法值一个都不放过。
+  // TEST_LAYERS_MAX 现在是 BOND_LAYER_SAFE_MAX(1e9)：普通房的 999 上限由 Match._testBond 拒（带 cap detail），
+  // 解析层只拦非法类型与超过安全值的数。
   for (const layers of [-1, 1.5, '2', TEST_LAYERS_MAX + 1]) {
     assert.equal(parseTestArgs('bond', { id: 'x', layers }).error, 'BAD_TARGET', String(layers));
   }

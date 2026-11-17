@@ -1591,6 +1591,8 @@
   background: transparent; border: 1px solid var(--gold-a20); border-radius: 6px; color: var(--text-lo); cursor: pointer; }
 .admintools__x:hover { color: var(--gold); border-color: var(--gold); }
 .admintools__tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+/* 页签变多（干员/装备/盟约/策略/悬赏/数值/阶段/召唤/商店/机变/深渊回响 = 11 个）：保持 4 列、每格最小宽度足够放两个字，面板变窄时自动换行。 */
+.admintools__tabs--wide { grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); }
 .admintools__tab { padding: 5px 0; background: rgba(255,198,0,.05); border: 1px solid var(--gold-a20);
   border-radius: 6px; color: var(--text-lo); cursor: pointer; font-size: 12px; }
 .admintools__tab.is-on { background: var(--gold-a20); border-color: var(--gold); color: var(--gold); font-weight: 600; }
