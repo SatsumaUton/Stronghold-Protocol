@@ -58,7 +58,10 @@ export class MatchTestCommands {
   applyTestCommand(ps, msg) {
     // 本服：持 adminToken 进房的管理员在普通对局里也能用这些命令（游戏内管理员工具）。
     // 放行条件只有一个来源 —— 座位上的 admin 标记，它由 lobby 从已校验的 session.admin 写入。
-    if (this.test !== true && !(ps && ps.admin === true)) return fail(ERR.TEST_FORBIDDEN);
+    // ★ 2026-11-17（维护者）：房间开了「作弊控制台」之后，本局房主不需要管理员身份也能下命令。
+    //   这一局不记入对局记录、不进排行榜（结算时两端都会跳过），所以不存在「刷榜」的风险。
+    const cheat = this.experimental?.cheatConsole === true;
+    if (this.test !== true && !cheat && !(ps && ps.admin === true)) return fail(ERR.TEST_FORBIDDEN);
     if (!ps) return fail(ERR.NOT_HOST);
     // ★ 2026-10-31：按需补一次计量状态。
     //   Match.js 只在**建局那一刻**存在管理员座位时才初始化 _testRate / _testLog / testTimers。

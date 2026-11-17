@@ -2201,7 +2201,10 @@ case 'room.list': return this.roomList(msg);
    * 没装玩法插件（插件房的内容和官方版本不一致，陌生人进来会一脸问号）。
    */
   listable(room) {
+    // ★ 2026-11-17：开用作弊控制台的房间**不进公开同盟列表** —— 陌生人进来就会被作弊影响，
+    //   而且这局本来就不记记录，没有理由挂到公共列表上。
     return room.mode === 'coop' && room.source === 'private' && !room.test
+      && room.experimental?.cheatConsole !== true
       && room.capacity >= ROOM_LIST_MIN_CAPACITY && !room.modded;
   }
 
@@ -3764,6 +3767,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (!store || !m || m.echoVariant !== 'deepecho' || !(m.echoDiveStart > 0)) return;
     // 「深渊回响」：调过参的房间**不进排行榜**（深度只在标准配置下可比）
     if (room.echoCfg) return;
+    // 作弊控制台（2026-11-17）：开着的房间一行成绩都不写（深潜本身禁实验性功能，这里是双保险）
+    if (room.experimental?.cheatConsole === true) return;
     const entry = echoBoardEntry({
       depth: Math.max(0, Math.floor(Number(m.round) || 0) - m.echoDiveStart + 1),
       round: m.round,
@@ -4089,8 +4094,11 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       // 本服：管理员（session.admin，由 net.js 验 adminToken 得出）在**正常房间**里也能用测试指令，
       // 对应「游戏内管理员工具」。普通玩家仍走原来的两道门，判定来源只有服务端这一个。
       const isAdmin = session.admin === true;
-      if (!this.testEnabled && !isAdmin) return fail(ERR.TEST_DISABLED);
-      if (room.test !== true && !isAdmin) return fail(ERR.TEST_FORBIDDEN);
+      // ★ 2026-11-17（维护者）：房间开了「作弊控制台」之后，本局房主不需要管理员身份也不需要 process 级
+      //   测试开关就能下命令。这一局不写对局记录、不进深渊回响排行榜（settle 与 _recordEchoBoard 都会跳过）。
+      const cheatHost = room.experimental?.cheatConsole === true && room.hostId === session.playerId;
+      if (!this.testEnabled && !isAdmin && !cheatHost) return fail(ERR.TEST_DISABLED);
+      if (room.test !== true && !isAdmin && !cheatHost) return fail(ERR.TEST_FORBIDDEN);
     }
     if (!room.match) return fail(ERR.WRONG_PHASE, 'no running match');
     if (msg.t === 'g.leave') {

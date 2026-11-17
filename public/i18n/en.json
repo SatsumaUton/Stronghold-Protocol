@@ -1,5 +1,4 @@
 {
-  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "_meta": {
     "type": "lang",
     "lang": "en",
@@ -15,6 +14,7 @@
     "complete": true
   },
   "_about": "English UI strings: Chinese msgid → English (shared/i18n.js t(); docs/I18N.md). Placeholders {name} and {n|one|other} as in the msgid; a 'context::msgid' key is a tc() variant. Seeded from GitHub PR #70 (branch en-translation) by @YuriRestia, reused with credit (NOTICE.md). Game texts are not here: data/i18n/en.json (tools/build-i18n.mjs).",
+  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "你已在其他同盟中，请先离开当前同盟": "You are already in another Alliance. Leave it first.",
   "你已不在该同盟中": "You are no longer in this Alliance",
   "创建者已离开，同盟已解散": "The host left. The Alliance has been disbanded.",
@@ -3412,5 +3412,11 @@
   "当前版本：{v}": "Current version: {v}",
   "下载并安装": "Download and install",
   "以后再说": "Later",
-  "下载安卓版": "Get the Android app"
+  "下载安卓版": "Get the Android app",
+  "打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不进深渊回响排行榜": "Lets the host use the console in this match. The match is not recorded and does not count for the Abyss leaderboard.",
+  "开启作弊控制台": "Enable the cheat console",
+  "开启后，本局创建者可以在对局中使用控制台：加资金、加层数、加干员、跳回合等。": "Once enabled, the room creator can use the console in this match: add funds, layers, operators, skip rounds, and so on.",
+  "这一局不会记入对局记录，也不进深渊回响排行榜；本房间也不会出现在公开同盟列表里。": "This match is not recorded and does not count for the Abyss leaderboard; the room is not listed publicly either.",
+  "仍然开启": "Enable anyway",
+  "作弊控制台": "Cheat console"
 }

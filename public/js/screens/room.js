@@ -546,6 +546,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const [hitLimitOff, setHitLimitOff] = useState(false);
   // 【AI 联防置后】：联防优先真人，AI 队友 / 托管中的博士排后
   const [uniteFirst, setUniteFirst] = useState(false);
+  // 作弊控制台（维护者 2026-11-17）：开了之后房主在对局里能用测试控制台，且本局不记录、不进排行榜
+  const [cheatConsole, setCheatConsole] = useState(false);
   const [enemyHp, setEnemyHp] = useState(1);
   // 【按回合设置敌人生命倍率】：null = 用单值；数组 = [[起始回合, 倍率], …]（第一段必须从第 1 回合起）
   const [hpPlan, setHpPlan] = useState(null);
@@ -612,6 +614,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setLayerCapOff(exp.disableLayerCap === true);
       setHitLimitOff(exp.disableHitLimit === true);
       setUniteFirst(exp.uniteHumansFirst === true);
+      setCheatConsole(exp.cheatConsole === true);
       setEnemyHp(isEnemyMultiplier(exp.enemyHpMul) ? exp.enemyHpMul : 1);
       setHpPlan(Array.isArray(exp.enemyHpPlan) ? exp.enemyHpPlan.map((s) => [s[0], s[1]]) : null);
       setAtkPlan(Array.isArray(exp.enemyAtkPlan) ? exp.enemyAtkPlan.map((s) => [s[0], s[1]]) : null);
@@ -637,6 +640,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(layerCapOff ? { disableLayerCap: true } : {}),
       ...(hitLimitOff ? { disableHitLimit: true } : {}),
       ...(uniteFirst ? { uniteHumansFirst: true } : {}),
+      ...(cheatConsole ? { cheatConsole: true } : {}),
       ...(hpPlan && hpPlan.length ? { enemyHpPlan: hpPlan } : enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
       ...(atkPlan && atkPlan.length ? { enemyAtkPlan: atkPlan } : enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
       ...(bossHp !== 1 ? { bossHpMul: bossHp } : {}),
@@ -731,6 +735,31 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
             class=${`dpick__opt ailast__opt${uniteFirst ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
             onClick=${() => { setCapOpen(false); canEdit && setUniteFirst(!uniteFirst); }}>
           <${Icon} name="check" class=${uniteFirst ? 'is-on' : ''} />${t('AI 联防置后')}
+        </button>
+      <//>
+      <${Tooltip} text=${t('打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不进深渊回响排行榜')}>
+        <button type="button" role="switch" aria-checked=${cheatConsole ? 'true' : 'false'} data-testid="exp-cheat-console"
+            class=${`dpick__opt ailast__opt${cheatConsole ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
+            onClick=${() => {
+              setCapOpen(false);
+              if (!canEdit) return;
+              // 打开时先确认一次（写清后果）；关闭时直接关，不再弹框
+              if (cheatConsole) { setCheatConsole(false); return; }
+              void (async () => {
+                const yes = await confirmDialog({
+                  title: t('开启作弊控制台'),
+                  text: html`<div>
+                    <p>${t('开启后，本局创建者可以在对局中使用控制台：加资金、加层数、加干员、跳回合等。')}</p>
+                    <p>${t('这一局不会记入对局记录，也不进深渊回响排行榜；本房间也不会出现在公开同盟列表里。')}</p>
+                  </div>`,
+                  okText: t('仍然开启'),
+                  cancelText: t('取消'),
+                  danger: true,
+                });
+                if (yes) setCheatConsole(true);
+              })();
+            }}>
+          <${Icon} name="check" class=${cheatConsole ? 'is-on' : ''} />${t('作弊控制台')}
         </button>
       <//>
       </div>

@@ -14,7 +14,10 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 // 
 // revivalAnyDonor：救援不要求联防（维护者 2026-11-05，默认 true）—— 必须在这里登记，
 // 否则 isExperimental 会把它判成非法键，导致**断点恢复对局失败**（invalid experimental options）。
-const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor', 'uniteHumansFirst']);
+const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor', 'uniteHumansFirst',
+  // 作弊控制台（维护者 2026-11-17）：房间级开关，打开后房主在对局里能用测试控制台（g.test），
+  // 且这一局**不记入对局记录、不进深渊回响排行榜**。只在 coop 房出现（单人房没有「记录」可言，也开不了）。
+  'cheatConsole']);
 /**
  * The enemy multipliers a room can pick (反馈 #47); the first, a standard room's, is never stored: an ordinary room,
  * a saved room and a queue key keep their old shape. Applies to every enemy, the leaders' shared HP included.
@@ -75,6 +78,8 @@ export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
     ...(value.disableHitLimit === true ? { disableHitLimit: true } : {}),
     // 【AI 联防置后】(维护者 2026-11-06)：联防优先真人，AI 队友 / 托管中的博士排后
     ...(value.uniteHumansFirst === true ? { uniteHumansFirst: true } : {}),
+    // 作弊控制台：只有合作房能开（房间文档里显式记 true，客户端据此显示控制台按钮）
+    ...(value.cheatConsole === true ? { cheatConsole: true } : {}),
     ...hpOption(value),
     ...atkOption(value),
     ...bossOptions(value),
@@ -95,6 +100,7 @@ export const experimentalKey = (value) => {
   const hp = enemyMultiplier(value.enemyHpMul), atk = enemyMultiplier(value.enemyAtkMul);
   return `${legacy}${duckLordDisabled(value) ? ':duck' : ''}${repeatAllowed(value) ? ':repeat' : ''}${duckLordStacked(value) ? ':stack' : ''}`
     + `${value.disableLayerCap === true ? ':layers' : ''}${value.disableHitLimit === true ? ':hits' : ''}${value.uniteHumansFirst === true ? ':unitehuman' : ''}`
+    + `${value.cheatConsole === true ? ':cheat' : ''}`
     + `${hpKey(value) ? ':' + hpKey(value) : ''}${bossKey(value)}${atkKey(value) ? ':' + atkKey(value) : ''}`
     + `${value.poolPlan ? `:plan${planKey(value)}` : ''}`;
 };
@@ -107,6 +113,7 @@ export const sameExperimental = (a, b) => !!a && !!b
   && (a.disableLayerCap === true) === (b.disableLayerCap === true)
   && (a.disableHitLimit === true) === (b.disableHitLimit === true)
   && (a.uniteHumansFirst === true) === (b.uniteHumansFirst === true)
+  && (a.cheatConsole === true) === (b.cheatConsole === true)
   && hpKey(a) === hpKey(b) && atkKey(a) === atkKey(b) && bossKey(a) === bossKey(b)
   && enemyMultiplier(a.enemyAtkMul) === enemyMultiplier(b.enemyAtkMul)
   && planKey(a) === planKey(b);

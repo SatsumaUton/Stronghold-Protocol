@@ -175,7 +175,10 @@ export function TestConsole() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
-  if (!pub || pub.test !== true || !myId || myId !== hostId) return null;
+  // 测试房（m.public.test）或「作弊控制台」房间（m.public.experimental.cheatConsole）：
+  // 两者都只给**本局房主**看；作弊房不需要管理员身份，那一局也不进任何记录/排行榜。
+  const cheat = pub?.experimental?.cheatConsole === true;
+  if (!pub || (pub.test !== true && !cheat) || !myId || myId !== hostId) return null;
   const table = { chess: 'chess', item: 'items', token: 'tokens', bond: 'bonds', strategy: 'bands', bounty: 'enemies' }[cmd];
   const owned = [...(mine?.hand || []), ...(mine?.temp || []), ...(mine?.board || []).map((x) => x.piece || x)].filter((x) => x?.kind === 'chess');
   const tokenIds = cmd === 'token' ? ownedTokenIds(owned) : null;
