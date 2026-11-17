@@ -131421,6 +131421,73 @@
           "width": 744.033,
           "height": 561.75
         }
+      },
+      "owner": "char_003_kalts",
+      "skins": {
+        "char_003_kalts_boc_6": {
+          "spineLocal": {
+            "group": "spine/token/token_10002_kalts_mon3tr_boc_6",
+            "skel": "token_10002_kalts_mon3tr_boc_6.skel",
+            "atlas": "token_10002_kalts_mon3tr_boc_6.atlas",
+            "textures": [
+              "token_10002_kalts_mon3tr_boc_6.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_003_kalts_sale_14": {
+          "spineLocal": {
+            "group": "spine/token/token_10002_kalts_mon3tr_sale_14",
+            "skel": "token_10002_kalts_mon3tr_sale_14.skel",
+            "atlas": "token_10002_kalts_mon3tr_sale_14.atlas",
+            "textures": [
+              "token_10002_kalts_mon3tr_sale_14.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10003_cgbird_bird": {
@@ -131467,6 +131534,73 @@
           "y": -25.869,
           "width": 383.475,
           "height": 357
+        }
+      },
+      "owner": "char_179_cgbird",
+      "skins": {
+        "char_179_cgbird_sightseer_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10003_cgbird_bird_sightseer_1",
+            "skel": "token_10003_cgbird_bird_sightseer_1.skel",
+            "atlas": "token_10003_cgbird_bird_sightseer_1.atlas",
+            "textures": [
+              "token_10003_cgbird_bird_sightseer_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_179_cgbird_witch_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10003_cgbird_bird_witch_1",
+            "skel": "token_10003_cgbird_bird_witch_1.skel",
+            "atlas": "token_10003_cgbird_bird_witch_1.atlas",
+            "textures": [
+              "token_10003_cgbird_bird_witch_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -131518,6 +131652,41 @@
           "y": 224.984,
           "width": 202.5,
           "height": 226.25
+        }
+      },
+      "owner": "char_248_mgllan",
+      "skins": {
+        "char_248_mgllan_kitchen_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10005_mgllan_drone1_kitchen_1",
+            "skel": "token_10005_mgllan_drone1_kitchen_1.skel",
+            "atlas": "token_10005_mgllan_drone1_kitchen_1.atlas",
+            "textures": [
+              "token_10005_mgllan_drone1_kitchen_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -131574,6 +131743,40 @@
           "width": 162,
           "height": 178.816
         }
+      },
+      "owner": "char_248_mgllan",
+      "skins": {
+        "char_248_mgllan_kitchen_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10005_mgllan_drone2_kitchen_1",
+            "skel": "token_10005_mgllan_drone2_kitchen_1.skel",
+            "atlas": "token_10005_mgllan_drone2_kitchen_1.atlas",
+            "textures": [
+              "token_10005_mgllan_drone2_kitchen_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10005_mgllan_drone3": {
@@ -131628,6 +131831,40 @@
           "y": 221.906,
           "width": 162,
           "height": 182.115
+        }
+      },
+      "owner": "char_248_mgllan",
+      "skins": {
+        "char_248_mgllan_kitchen_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10005_mgllan_drone3_kitchen_1",
+            "skel": "token_10005_mgllan_drone3_kitchen_1.skel",
+            "atlas": "token_10005_mgllan_drone3_kitchen_1.atlas",
+            "textures": [
+              "token_10005_mgllan_drone3_kitchen_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -131804,6 +132041,83 @@
           ]
         },
         "bounds": null
+      },
+      "owner": "char_250_phatom",
+      "skins": {
+        "char_250_phatom_ghost_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10007_phatom_twin_ghost_1",
+            "skel": "token_10007_phatom_twin_ghost_1.skel",
+            "atlas": "token_10007_phatom_twin_ghost_1.atlas",
+            "textures": [
+              "token_10007_phatom_twin_ghost_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10007_phatom_twin_ghost_1.back.skel",
+              "atlas": "token_10007_phatom_twin_ghost_1.back.atlas",
+              "textures": [
+                "token_10007_phatom_twin_ghost_1.back.png"
+              ]
+            }
+          }
+        },
+        "char_250_phatom_sale_4": {
+          "spineLocal": {
+            "group": "spine/token/token_10007_phatom_twin_sale_4",
+            "skel": "token_10007_phatom_twin_sale_4.skel",
+            "atlas": "token_10007_phatom_twin_sale_4.atlas",
+            "textures": [
+              "token_10007_phatom_twin_sale_4.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10007_phatom_twin_sale_4.back.skel",
+              "atlas": "token_10007_phatom_twin_sale_4.back.atlas",
+              "textures": [
+                "token_10007_phatom_twin_sale_4.back.png"
+              ]
+            }
+          }
+        }
       }
     },
     "token_10008_cqbw_box": {
@@ -131858,6 +132172,40 @@
           "y": -3.048,
           "width": 88.2,
           "height": 92.4
+        }
+      },
+      "owner": "char_113_cqbw",
+      "skins": {
+        "char_113_cqbw_epoque_7": {
+          "spineLocal": {
+            "group": "spine/token/token_10008_cqbw_box_epoque_7",
+            "skel": "token_10008_cqbw_box_epoque_7.skel",
+            "atlas": "token_10008_cqbw_box_epoque_7.atlas",
+            "textures": [
+              "token_10008_cqbw_box_epoque_7.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -131934,6 +132282,91 @@
           "y": -2.412,
           "width": 330.705,
           "height": 229.504
+        }
+      },
+      "owner": "char_400_weedy",
+      "skins": {
+        "char_400_weedy_sightseer_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10009_weedy_cannon_sightseer_1",
+            "skel": "token_10009_weedy_cannon_sightseer_1.skel",
+            "atlas": "token_10009_weedy_cannon_sightseer_1.atlas",
+            "textures": [
+              "token_10009_weedy_cannon_sightseer_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": "Attack_Begin",
+                "loop": "Attack_Loop",
+                "end": "Attack_End"
+              },
+              "attackDown": {
+                "begin": "Attack_Down_Begin",
+                "loop": "Attack_Down_Loop",
+                "end": "Attack_Down_End"
+              },
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10009_weedy_cannon_sightseer_1.back.skel",
+              "atlas": "token_10009_weedy_cannon_sightseer_1.back.atlas",
+              "textures": [
+                "token_10009_weedy_cannon_sightseer_1.back.png"
+              ]
+            }
+          }
+        },
+        "char_400_weedy_snow_2": {
+          "spineLocal": {
+            "group": "spine/token/token_10009_weedy_cannon_snow_2",
+            "skel": "token_10009_weedy_cannon_snow_2.skel",
+            "atlas": "token_10009_weedy_cannon_snow_2.atlas",
+            "textures": [
+              "token_10009_weedy_cannon_snow_2.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": "Attack_Begin",
+                "loop": "Attack_Loop",
+                "end": "Attack_End"
+              },
+              "attackDown": {
+                "begin": "Attack_Down_Begin",
+                "loop": "Attack_Down_Loop",
+                "end": "Attack_Down_End"
+              },
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10009_weedy_cannon_snow_2.back.skel",
+              "atlas": "token_10009_weedy_cannon_snow_2.back.atlas",
+              "textures": [
+                "token_10009_weedy_cannon_snow_2.back.png"
+              ]
+            }
+          }
         }
       }
     },
@@ -132449,6 +132882,73 @@
           "width": 125.303,
           "height": 164.523
         }
+      },
+      "owner": "char_484_robrta",
+      "skins": {
+        "char_484_robrta_ambienceSynesthesia_3": {
+          "spineLocal": {
+            "group": "spine/token/token_10018_robrta_mach_ambienceSynesthesia_3",
+            "skel": "token_10018_robrta_mach_ambienceSynesthesia_3.skel",
+            "atlas": "token_10018_robrta_mach_ambienceSynesthesia_3.atlas",
+            "textures": [
+              "token_10018_robrta_mach_ambienceSynesthesia_3.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_484_robrta_summer_10": {
+          "spineLocal": {
+            "group": "spine/token/token_10018_robrta_mach_summer_10",
+            "skel": "token_10018_robrta_mach_summer_10.skel",
+            "atlas": "token_10018_robrta_mach_summer_10.atlas",
+            "textures": [
+              "token_10018_robrta_mach_summer_10.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10019_nearl2_sword": {
@@ -132592,6 +133092,114 @@
           "width": 342.015,
           "height": 328.516
         }
+      },
+      "owner": "char_2023_ling",
+      "skins": {
+        "char_2023_ling_ncg_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul1_ncg_1",
+            "skel": "token_10020_ling_soul1_ncg_1.skel",
+            "atlas": "token_10020_ling_soul1_ncg_1.atlas",
+            "textures": [
+              "token_10020_ling_soul1_ncg_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_12": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul1_nian_12",
+            "skel": "token_10020_ling_soul1_nian_12.skel",
+            "atlas": "token_10020_ling_soul1_nian_12.atlas",
+            "textures": [
+              "token_10020_ling_soul1_nian_12.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_9": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul1_nian_9",
+            "skel": "token_10020_ling_soul1_nian_9.skel",
+            "atlas": "token_10020_ling_soul1_nian_9.atlas",
+            "textures": [
+              "token_10020_ling_soul1_nian_9.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10020_ling_soul2": {
@@ -132654,6 +133262,111 @@
           "y": -3.156,
           "width": 342.015,
           "height": 328.516
+        }
+      },
+      "owner": "char_2023_ling",
+      "skins": {
+        "char_2023_ling_ncg_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul2_ncg_1",
+            "skel": "token_10020_ling_soul2_ncg_1.skel",
+            "atlas": "token_10020_ling_soul2_ncg_1.atlas",
+            "textures": [
+              "token_10020_ling_soul2_ncg_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_12": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul2_nian_12",
+            "skel": "token_10020_ling_soul2_nian_12.skel",
+            "atlas": "token_10020_ling_soul2_nian_12.atlas",
+            "textures": [
+              "token_10020_ling_soul2_nian_12.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_9": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul2_nian_9",
+            "skel": "token_10020_ling_soul2_nian_9.skel",
+            "atlas": "token_10020_ling_soul2_nian_9.atlas",
+            "textures": [
+              "token_10020_ling_soul2_nian_9.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill",
+                "end": null,
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
         }
       }
     },
@@ -132723,6 +133436,114 @@
           "y": -4.122,
           "width": 2035.691,
           "height": 537.811
+        }
+      },
+      "owner": "char_2023_ling",
+      "skins": {
+        "char_2023_ling_ncg_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul3_ncg_1",
+            "skel": "token_10020_ling_soul3_ncg_1.skel",
+            "atlas": "token_10020_ling_soul3_ncg_1.atlas",
+            "textures": [
+              "token_10020_ling_soul3_ncg_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_12": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul3_nian_12",
+            "skel": "token_10020_ling_soul3_nian_12.skel",
+            "atlas": "token_10020_ling_soul3_nian_12.atlas",
+            "textures": [
+              "token_10020_ling_soul3_nian_12.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_2023_ling_nian_9": {
+          "spineLocal": {
+            "group": "spine/token/token_10020_ling_soul3_nian_9",
+            "skel": "token_10020_ling_soul3_nian_9.skel",
+            "atlas": "token_10020_ling_soul3_nian_9.atlas",
+            "textures": [
+              "token_10020_ling_soul3_nian_9.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
         }
       }
     },
@@ -132878,6 +133699,40 @@
           "width": 400.735,
           "height": 385.999
         }
+      },
+      "owner": "char_4046_ebnhlz",
+      "skins": {
+        "char_4046_ebnhlz_boc_6": {
+          "spineLocal": {
+            "group": "spine/token/token_10024_ebnhlz_rcube_boc_6",
+            "skel": "token_10024_ebnhlz_rcube_boc_6.skel",
+            "atlas": "token_10024_ebnhlz_rcube_boc_6.atlas",
+            "textures": [
+              "token_10024_ebnhlz_rcube_boc_6.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10025_doroth_recttp": {
@@ -132932,6 +133787,40 @@
           "y": -9.425,
           "width": 186.806,
           "height": 147.302
+        }
+      },
+      "owner": "char_4048_doroth",
+      "skins": {
+        "char_4048_doroth_witch_4": {
+          "spineLocal": {
+            "group": "spine/token/token_10025_doroth_recttp_witch_4",
+            "skel": "token_10025_doroth_recttp_witch_4.skel",
+            "atlas": "token_10025_doroth_recttp_witch_4.atlas",
+            "textures": [
+              "token_10025_doroth_recttp_witch_4.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -132998,6 +133887,93 @@
           "width": 362.987,
           "height": 319
         }
+      },
+      "owner": "char_4055_bgsnow",
+      "skins": {
+        "char_4055_bgsnow_wild_7": {
+          "spineLocal": {
+            "group": "spine/token/token_10026_bgsnow_subbow_wild_7",
+            "skel": "token_10026_bgsnow_subbow_wild_7.skel",
+            "atlas": "token_10026_bgsnow_subbow_wild_7.atlas",
+            "textures": [
+              "token_10026_bgsnow_subbow_wild_7.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": {
+                "begin": null,
+                "loop": "Attack_Down",
+                "end": null
+              },
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10026_bgsnow_subbow_wild_7.back.skel",
+              "atlas": "token_10026_bgsnow_subbow_wild_7.back.atlas",
+              "textures": [
+                "token_10026_bgsnow_subbow_wild_7.back.png"
+              ]
+            }
+          }
+        },
+        "char_4055_bgsnow_yun_7": {
+          "spineLocal": {
+            "group": "spine/token/token_10026_bgsnow_subbow_yun_7",
+            "skel": "token_10026_bgsnow_subbow_yun_7.skel",
+            "atlas": "token_10026_bgsnow_subbow_yun_7.atlas",
+            "textures": [
+              "token_10026_bgsnow_subbow_yun_7.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": {
+                "begin": null,
+                "loop": "Attack_Down",
+                "end": null
+              },
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10026_bgsnow_subbow_yun_7.back.skel",
+              "atlas": "token_10026_bgsnow_subbow_yun_7.back.atlas",
+              "textures": [
+                "token_10026_bgsnow_subbow_yun_7.back.png"
+              ]
+            }
+          }
+        }
       }
     },
     "token_10027_ironmn_pile1": {
@@ -133048,6 +134024,73 @@
           "width": 215.5,
           "height": 287
         }
+      },
+      "owner": "char_4072_ironmn",
+      "skins": {
+        "char_4072_ironmn_ambienceSynesthesia_5": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile1_ambienceSynesthesia_5",
+            "skel": "token_10027_ironmn_pile1_ambienceSynesthesia_5.skel",
+            "atlas": "token_10027_ironmn_pile1_ambienceSynesthesia_5.atlas",
+            "textures": [
+              "token_10027_ironmn_pile1_ambienceSynesthesia_5.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_4072_ironmn_summer_11": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile1_summer_11",
+            "skel": "token_10027_ironmn_pile1_summer_11.skel",
+            "atlas": "token_10027_ironmn_pile1_summer_11.atlas",
+            "textures": [
+              "token_10027_ironmn_pile1_summer_11.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10027_ironmn_pile2": {
@@ -133097,6 +134140,73 @@
           "y": -1.127,
           "width": 215.5,
           "height": 287
+        }
+      },
+      "owner": "char_4072_ironmn",
+      "skins": {
+        "char_4072_ironmn_ambienceSynesthesia_5": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile2_ambienceSynesthesia_5",
+            "skel": "token_10027_ironmn_pile2_ambienceSynesthesia_5.skel",
+            "atlas": "token_10027_ironmn_pile2_ambienceSynesthesia_5.atlas",
+            "textures": [
+              "token_10027_ironmn_pile2_ambienceSynesthesia_5.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_4072_ironmn_summer_11": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile2_summer_11",
+            "skel": "token_10027_ironmn_pile2_summer_11.skel",
+            "atlas": "token_10027_ironmn_pile2_summer_11.atlas",
+            "textures": [
+              "token_10027_ironmn_pile2_summer_11.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -133152,6 +134262,85 @@
           "y": -6.815,
           "width": 307.5,
           "height": 358.952
+        }
+      },
+      "owner": "char_4072_ironmn",
+      "skins": {
+        "char_4072_ironmn_ambienceSynesthesia_5": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile3_ambienceSynesthesia_5",
+            "skel": "token_10027_ironmn_pile3_ambienceSynesthesia_5.skel",
+            "atlas": "token_10027_ironmn_pile3_ambienceSynesthesia_5.atlas",
+            "textures": [
+              "token_10027_ironmn_pile3_ambienceSynesthesia_5.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10027_ironmn_pile3_ambienceSynesthesia_5.back.skel",
+              "atlas": "token_10027_ironmn_pile3_ambienceSynesthesia_5.back.atlas",
+              "textures": [
+                "token_10027_ironmn_pile3_ambienceSynesthesia_5.back.png"
+              ]
+            }
+          }
+        },
+        "char_4072_ironmn_summer_11": {
+          "spineLocal": {
+            "group": "spine/token/token_10027_ironmn_pile3_summer_11",
+            "skel": "token_10027_ironmn_pile3_summer_11.skel",
+            "atlas": "token_10027_ironmn_pile3_summer_11.atlas",
+            "textures": [
+              "token_10027_ironmn_pile3_summer_11.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10027_ironmn_pile3_summer_11.back.skel",
+              "atlas": "token_10027_ironmn_pile3_summer_11.back.atlas",
+              "textures": [
+                "token_10027_ironmn_pile3_summer_11.back.png"
+              ]
+            }
+          }
         }
       }
     },
@@ -133301,6 +134490,41 @@
           "y": 32.801,
           "width": 102,
           "height": 241
+        }
+      },
+      "owner": "char_1031_slent2",
+      "skins": {
+        "char_1031_slent2_epoque_32": {
+          "spineLocal": {
+            "group": "spine/token/token_10029_slent2_protrb_epoque_32",
+            "skel": "token_10029_slent2_protrb_epoque_32.skel",
+            "atlas": "token_10029_slent2_protrb_epoque_32.atlas",
+            "textures": [
+              "token_10029_slent2_protrb_epoque_32.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -133679,6 +134903,48 @@
           "width": 372.723,
           "height": 308.75
         }
+      },
+      "owner": "char_1034_jesca2",
+      "skins": {
+        "char_1034_jesca2_cfa_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10032_jesca2_jckshd_cfa_1",
+            "skel": "token_10032_jesca2_jckshd_cfa_1.skel",
+            "atlas": "token_10032_jesca2_jckshd_cfa_1.atlas",
+            "textures": [
+              "token_10032_jesca2_jckshd_cfa_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10032_jesca2_jckshd_cfa_1.back.skel",
+              "atlas": "token_10032_jesca2_jckshd_cfa_1.back.atlas",
+              "textures": [
+                "token_10032_jesca2_jckshd_cfa_1.back.png"
+              ]
+            }
+          }
+        }
       }
     },
     "token_10034_ray_sndbst": {
@@ -133723,6 +134989,73 @@
         ],
         "hits": {},
         "bounds": null
+      },
+      "owner": "char_4117_ray",
+      "skins": {
+        "char_4117_ray_shining_2": {
+          "spineLocal": {
+            "group": "spine/token/token_10034_ray_sndbst_shining_2",
+            "skel": "token_10034_ray_sndbst_shining_2.skel",
+            "atlas": "token_10034_ray_sndbst_shining_2.atlas",
+            "textures": [
+              "token_10034_ray_sndbst_shining_2.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_4117_ray_summer_22": {
+          "spineLocal": {
+            "group": "spine/token/token_10034_ray_sndbst_summer_22",
+            "skel": "token_10034_ray_sndbst_summer_22.skel",
+            "atlas": "token_10034_ray_sndbst_summer_22.atlas",
+            "textures": [
+              "token_10034_ray_sndbst_summer_22.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10035_wisdel_wward": {
@@ -133772,6 +135105,71 @@
           ]
         },
         "bounds": null
+      },
+      "owner": "char_1035_wisdel",
+      "skins": {
+        "char_1035_wisdel_game_9": {
+          "spineLocal": {
+            "group": "spine/token/token_10035_wisdel_wward_game_9",
+            "skel": "token_10035_wisdel_wward_game_9.skel",
+            "atlas": "token_10035_wisdel_wward_game_9.atlas",
+            "textures": [
+              "token_10035_wisdel_wward_game_9.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_1035_wisdel_sale_14": {
+          "spineLocal": {
+            "group": "spine/token/token_10035_wisdel_wward_sale_14",
+            "skel": "token_10035_wisdel_wward_sale_14.skel",
+            "atlas": "token_10035_wisdel_wward_sale_14.atlas",
+            "textures": [
+              "token_10035_wisdel_wward_sale_14.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10037_mitm_trshrb": {
@@ -133832,6 +135230,43 @@
           ]
         },
         "bounds": null
+      },
+      "owner": "char_4147_mitm",
+      "skins": {
+        "char_4147_mitm_breaker_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10037_mitm_trshrb_breaker_1",
+            "skel": "token_10037_mitm_trshrb_breaker_1.skel",
+            "atlas": "token_10037_mitm_trshrb_breaker_1.atlas",
+            "textures": [
+              "token_10037_mitm_trshrb_breaker_1.png"
+            ],
+            "anims": {
+              "idle": "Idle_1",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_Begin",
+                "loop": "Skill_Loop",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun_1",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10039_ulpia_block": {
@@ -134099,6 +135534,91 @@
           "width": 720.496,
           "height": 446.585
         }
+      },
+      "owner": "char_450_necras",
+      "skins": {
+        "char_450_necras_ambienceSynesthesia_7": {
+          "spineLocal": {
+            "group": "spine/token/token_10043_necras_skeltn_ambienceSynesthesia_7",
+            "skel": "token_10043_necras_skeltn_ambienceSynesthesia_7.skel",
+            "atlas": "token_10043_necras_skeltn_ambienceSynesthesia_7.atlas",
+            "textures": [
+              "token_10043_necras_skeltn_ambienceSynesthesia_7.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_Begin",
+                "loop": "Skill_Loop",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            },
+            "back": {
+              "skel": "token_10043_necras_skeltn_ambienceSynesthesia_7.back.skel",
+              "atlas": "token_10043_necras_skeltn_ambienceSynesthesia_7.back.atlas",
+              "textures": [
+                "token_10043_necras_skeltn_ambienceSynesthesia_7.back.png"
+              ]
+            }
+          }
+        },
+        "char_450_necras_summer_20": {
+          "spineLocal": {
+            "group": "spine/token/token_10043_necras_skeltn_summer_20",
+            "skel": "token_10043_necras_skeltn_summer_20.skel",
+            "atlas": "token_10043_necras_skeltn_summer_20.atlas",
+            "textures": [
+              "token_10043_necras_skeltn_summer_20.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_Begin",
+                "loop": "Skill_Loop",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            },
+            "back": {
+              "skel": "token_10043_necras_skeltn_summer_20.back.skel",
+              "atlas": "token_10043_necras_skeltn_summer_20.back.atlas",
+              "textures": [
+                "token_10043_necras_skeltn_summer_20.back.png"
+              ]
+            }
+          }
+        }
       }
     },
     "token_10050_monstr_prosts": {
@@ -134151,6 +135671,40 @@
           ]
         },
         "bounds": null
+      },
+      "owner": "char_4179_monstr",
+      "skins": {
+        "char_4179_monstr_boc_11": {
+          "spineLocal": {
+            "group": "spine/token/token_10050_monstr_prosts_boc_11",
+            "skel": "token_10050_monstr_prosts_boc_11.skel",
+            "atlas": "token_10050_monstr_prosts_boc_11.atlas",
+            "textures": [
+              "token_10050_monstr_prosts_boc_11.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10051_radian_tower1": {
@@ -134201,6 +135755,41 @@
           ]
         },
         "bounds": null
+      },
+      "owner": "char_4195_radian",
+      "skins": {
+        "char_4195_radian_game_8": {
+          "spineLocal": {
+            "group": "spine/token/token_10051_radian_tower1_game_8",
+            "skel": "token_10051_radian_tower1_game_8.skel",
+            "atlas": "token_10051_radian_tower1_game_8.atlas",
+            "textures": [
+              "token_10051_radian_tower1_game_8.png"
+            ],
+            "anims": {
+              "idle": "C_Default",
+              "deploy": "C_Default",
+              "attack": {
+                "begin": null,
+                "loop": "C_Default",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "C_Default",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "C_Skill1_Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10052_radian_tower2": {
@@ -134258,6 +135847,47 @@
           "y": -493.753,
           "width": 599.948,
           "height": 130.995
+        }
+      },
+      "owner": "char_4195_radian",
+      "skins": {
+        "char_4195_radian_game_8": {
+          "spineLocal": {
+            "group": "spine/token/token_10052_radian_tower2_game_8",
+            "skel": "token_10052_radian_tower2_game_8.skel",
+            "atlas": "token_10052_radian_tower2_game_8.atlas",
+            "textures": [
+              "token_10052_radian_tower2_game_8.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill_Idle",
+                "end": null,
+                "index": 0,
+                "idle": "Skill_Idle"
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10052_radian_tower2_game_8.back.skel",
+              "atlas": "token_10052_radian_tower2_game_8.back.atlas",
+              "textures": [
+                "token_10052_radian_tower2_game_8.back.png"
+              ]
+            }
+          }
         }
       }
     },
@@ -134320,6 +135950,46 @@
           "width": 391.513,
           "height": 680.516
         }
+      },
+      "owner": "char_4195_radian",
+      "skins": {
+        "char_4195_radian_game_8": {
+          "spineLocal": {
+            "group": "spine/token/token_10053_radian_tower3_game_8",
+            "skel": "token_10053_radian_tower3_game_8.skel",
+            "atlas": "token_10053_radian_tower3_game_8.atlas",
+            "textures": [
+              "token_10053_radian_tower3_game_8.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_Begin",
+                "loop": "Skill_Loop",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": "Skill_Idle"
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10053_radian_tower3_game_8.back.skel",
+              "atlas": "token_10053_radian_tower3_game_8.back.atlas",
+              "textures": [
+                "token_10053_radian_tower3_game_8.back.png"
+              ]
+            }
+          }
+        }
       }
     },
     "token_10054_phatm2_encdool": {
@@ -134366,9 +136036,46 @@
         ],
         "hits": {},
         "bounds": null
+      },
+      "owner": "char_1042_phatm2",
+      "skins": {
+        "char_1042_phatm2_sightseer_4": {
+          "spineLocal": {
+            "group": "spine/token/token_10054_phatm2_encdool_sightseer_4",
+            "skel": "token_10054_phatm2_encdool_sightseer_4.skel",
+            "atlas": "token_10054_phatm2_encdool_sightseer_4.atlas",
+            "textures": [
+              "token_10054_phatm2_encdool_sightseer_4.png"
+            ],
+            "anims": {
+              "idle": "Default",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Default",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Default",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
-    "token_10055_phatm2_mndclv": {},
+    "token_10055_phatm2_mndclv": {
+      "owner": "char_1042_phatm2"
+    },
     "token_10056_angel2_target": {
       "owner": "char_1041_angel2",
       "avatar": "/assets/token/avatar/token_10056_angel2_target.png",

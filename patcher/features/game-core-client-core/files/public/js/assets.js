@@ -274,14 +274,22 @@ export function spineEntry(m, id, opts) {
     // A summon's own appearance (docs/SKINS.md): `tokens[id].skins[<owner skin id>]`, the official tokenSkinMap, written
     // by a cosmetic plugin. A skin the manifest does not hold (or none asked for) draws the token's own model.
     const wanted = opts && str(opts.skin) ? String(opts.skin) : null;
+    const web = validSpine(tk.spine) ? tk.spine : null;
     if (wanted) {
       const skin = get(get(tk, 'skins'), wanted);
-      if (isObj(skin) && isObj(skin.spine)) {
-        const sp = (opts && opts.back && isObj(skin.spine.back)) ? skin.spine.back : skin.spine.front;
-        if (validSpine(sp)) return sp;
+      if (isObj(skin)) {
+        if (isObj(skin.spine)) {
+          const sp = (opts && opts.back && isObj(skin.spine.back)) ? skin.spine.back : skin.spine.front;
+          if (validSpine(sp)) return sp;
+        }
+        // ★ 2026-11-18（维护者：「切换干员皮肤，召唤物没变」）：召唤物皮肤也有**本地素材包**形态
+        //   （`tokens[id].skins[x].spineLocal`，由 tools/import-token-skins.mjs 写进 data/local-assets.json 的分组）——
+        //   这里以前只查 `skin.spine`（资源站地址），于是本地形态的召唤物皮肤永远用不上：
+        //   白铁的「多功能平台」、凯瑟琳的召唤物都换不了皮。补上这一条，回退仍是召唤物自己的模型。
+        const local = opts && opts.local ? localSpineEntry(skin.spineLocal, opts.local, web) : null;
+        if (local) return local;
       }
     }
-    const web = validSpine(tk.spine) ? tk.spine : null;
     return (opts && opts.local && localSpineEntry(tk.spineLocal, opts.local, web)) || web;
   }
   // 跨版本敌人（深潜的 `act1autochess:enemy_…`）：素材清单按裸 id 索引
