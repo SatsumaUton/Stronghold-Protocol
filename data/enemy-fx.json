@@ -1,0 +1,4068 @@
+{
+ "format": "enemy-fx",
+ "version": 1,
+ "source": {
+  "client": "26-10-20-11-10-38-04170990",
+  "set": "used",
+  "prefabs": 5345
+ },
+ "note": "敌人 → 官方特效 prefab 名（fx/index.json 的键，资源在 assets/local/fx/prefabs/<name>.json）",
+ "stats": {
+  "byName": 162,
+  "byRefs": 151,
+  "none": 30,
+  "effects": 1388
+ },
+ "enemies": {
+  "enemy_1000_gopro_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1001_bigbo": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "bigbo_attack_01_hit",
+    "bigbo_attack_01_start"
+   ]
+  },
+  "enemy_1005_yokai_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1005_yokai_3": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1006_shield": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1006_shield_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1006_shield_3": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1007_slime": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1009_lurker": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1010_demon": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1010_demon_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1017_defdrn": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "defdrn_buff_01_range",
+    "defdrn_buff_01_self"
+   ]
+  },
+  "enemy_1019_jshoot": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1019_jshoot_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1021_bslime": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1023_jmage": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1025_reveng": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "reveng_buff_01_self"
+   ]
+  },
+  "enemy_1041_lazerd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "lazerd_attack_01_start"
+   ]
+  },
+  "enemy_1042_frostd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "firstar_skill_01_buff",
+    "frostd_buff_01_range"
+   ]
+  },
+  "enemy_1043_zomsbr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1045_hammer": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "hammer_attack_01_hit",
+    "hammer_attack_02_start",
+    "hammer_attack_01_start",
+    "hammer_skill_01_buff",
+    "hammer_skill_01_range"
+   ]
+  },
+  "enemy_1045_hammer_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "hammer_attack_01_hit",
+    "hammer_attack_02_start",
+    "hammer_attack_01_start",
+    "hammer_skill_01_buff",
+    "hammer_skill_01_range"
+   ]
+  },
+  "enemy_1046_agent": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1050_lslime": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "lslime_attack_01_start",
+    "lslime_skill_01_buff",
+    "buff_burn",
+    "skulsr_buff_01_start",
+    "lslime_attack_01_hit",
+    "lslime_skill_01_range"
+   ]
+  },
+  "enemy_1061_zomshd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "laxe_attack_01_hit",
+    "laxe_attack_01_start"
+   ]
+  },
+  "enemy_1062_rager_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "buff_violent"
+   ]
+  },
+  "enemy_1064_snsbr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1067_snslime": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1067_snslime_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1069_icebrk_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "icebrk_attack_01_hit",
+    "icebrk_attack_01_start",
+    "icebrk_attack_02_start",
+    "icebrk_attack_03_start"
+   ]
+  },
+  "enemy_1071_dftman": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1072_dlancer": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "dlancer_attack_01_hit",
+    "dlancer_attack_01_start"
+   ]
+  },
+  "enemy_1081_sotisd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "sotisd_buff_01_start"
+   ]
+  },
+  "enemy_1092_mdgint": {
+   "attack": [
+    "enemy_mdgint_attack_01_hit",
+    "enemy_mdgint_attack_01_start",
+    "enemy_mdgint_attack_01_start _02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1103_wdkght_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wdkght_attack_01_hit",
+    "enemy_wdkght_attack_01_start",
+    "enemy_wdkght_skill_01_start",
+    "enemy_wdkght_skill_01_start_02",
+    "enemy_wdkght_skill_01_start_04",
+    "enemy_wdkght_skill_01_buff",
+    "enemy_wdkght_skill_01_start_03"
+   ]
+  },
+  "enemy_1104_lfkght": {
+   "attack": [
+    "enemy_lfkght_attack_01_hit",
+    "enemy_lfkght_attack_01_start",
+    "enemy_lfkght_attack_01_start_02"
+   ],
+   "skill": [
+    "enemy_lfkght_skill_01_hit",
+    "enemy_lfkght_skill_01_start",
+    "enemy_lfkght_skill_02_start",
+    "enemy_lfkght_skill_02_start_02"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "wind_buff_01"
+   ]
+  },
+  "enemy_1104_lfkght_3": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lfkght_attack_01_hit",
+    "enemy_lfkght_attack_01_start",
+    "enemy_lfkght_attack_01_start_02",
+    "enemy_lfkght_skill_01_hit",
+    "enemy_lfkght_skill_01_start",
+    "wind_buff_01",
+    "enemy_lfkght_skill_02_start",
+    "enemy_lfkght_skill_02_start_02"
+   ]
+  },
+  "enemy_1112_emppnt": {
+   "attack": [
+    "enemy_emppnt_attack_01_hit",
+    "enemy_emppnt_attack_01_start",
+    "enemy_emppnt_attack_01_start_02",
+    "enemy_emppnt_attack_01_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_emppnt_scanning_buff",
+    "enemy_emppnt_scanning_buff_02"
+   ]
+  },
+  "enemy_1112_emppnt_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_emppnt_attack_01_start_02",
+    "enemy_emppnt_scanning_buff",
+    "enemy_emppnt_scanning_buff_02"
+   ]
+  },
+  "enemy_1116_liprr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_v015_ liberation_01_start"
+   ]
+  },
+  "enemy_1116_liprr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_v015_ liberation_01_start"
+   ]
+  },
+  "enemy_1118_lidbox_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lidbox_attack_01_hit",
+    "enemy_lidbox_attack_01_start",
+    "common_v015_ liberation_01_start"
+   ]
+  },
+  "enemy_1119_vofsd": {
+   "attack": [
+    "enemy_vofsd_attack_01_buff",
+    "enemy_vofsd_attack_01_hit",
+    "enemy_vofsd_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_vofsd_def_down_01",
+    "common_v015_ liberation_02_start"
+   ]
+  },
+  "enemy_1121_lifbos": {
+   "attack": [
+    "enemy_lifbos_attack_01_hit",
+    "enemy_lifbos_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lifbos_open_start",
+    "common_v015_ liberation_02_start",
+    "enemy_vofsd_def_down_01"
+   ]
+  },
+  "enemy_1121_lifbos_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lifbos_attack_01_hit",
+    "enemy_lifbos_attack_01_start",
+    "common_v015_ liberation_02_start",
+    "enemy_vofsd_def_down_01",
+    "enemy_lifbos_open_start"
+   ]
+  },
+  "enemy_1131_sbeast": {
+   "attack": [],
+   "skill": [
+    "enemy_sbeast_skill_start",
+    "enemy_sbeast_skill_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1131_sbeast_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_sbeast_skill_start"
+   ]
+  },
+  "enemy_1132_sarchn": {
+   "attack": [],
+   "skill": [
+    "enemy_sarchn_skill_start",
+    "enemy_sarchn_skill_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1132_sarchn_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_sarchn_skill_start"
+   ]
+  },
+  "enemy_1133_harchn": {
+   "attack": [
+    "enemy_harchn_attack_start",
+    "enemy_harchn_attack_trail"
+   ],
+   "skill": [
+    "enemy_harchn_skill_01_start",
+    "enemy_harchn_skill_start",
+    "enemy_harchn_skill_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1133_harchn_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_harchn_attack_start",
+    "enemy_harchn_skill_01_start",
+    "enemy_harchn_skill_start"
+   ]
+  },
+  "enemy_1137_plasm": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "plasm_birth_01_start"
+   ]
+  },
+  "enemy_1138_tumor": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "tumor_birth_01_start",
+    "buff_attack_speed_reduction_01"
+   ]
+  },
+  "enemy_1148_dssbr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1148_dssbr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1158_divman": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_divman_2_attack_01_hit",
+    "enemy_divman_2_attack_01_start",
+    "enemy_divman_2_attack_01_start_02",
+    "enemy_divman_2_attack_01_trail",
+    "enemy_divman_2_buff",
+    "common_invisible"
+   ]
+  },
+  "enemy_1160_hvyslr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_hvyslr_2_attack_01_buff",
+    "enemy_hvyslr_2_attack_01_hit",
+    "enemy_hvyslr_2_attack_01_hit_02",
+    "enemy_hvyslr_2_attack_01_start",
+    "enemy_hvyslr_2_buff"
+   ]
+  },
+  "enemy_1160_hvyslr_2": {
+   "attack": [
+    "enemy_hvyslr_2_attack_01_buff",
+    "enemy_hvyslr_2_attack_01_hit",
+    "enemy_hvyslr_2_attack_01_hit_02",
+    "enemy_hvyslr_2_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_hvyslr_2_buff"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1161_tidmag": {
+   "attack": [
+    "enemy_tidmag_attack_01_hit",
+    "enemy_tidmag_attack_01_start_01",
+    "enemy_tidmag_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1161_tidmag_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_tidmag_attack_01_start_01"
+   ]
+  },
+  "enemy_1162_magmot": {
+   "attack": [
+    "enemy_magmot_attack_01_hit",
+    "enemy_magmot_attack_01_start_01",
+    "enemy_magmot_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_magmot_die_01",
+    "enemy_magmot_idle_01",
+    "enemy_magmot_move_01"
+   ]
+  },
+  "enemy_1165_duhond": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_03"
+   ]
+  },
+  "enemy_1165_duhond_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_03"
+   ]
+  },
+  "enemy_1166_dusbr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1166_dusbr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1168_dumage": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dumage_2_attack_01_hit",
+    "enemy_dumage_2_attack_01_stait",
+    "enemy_dumage_2_attack_01_trail",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1168_dumage_2": {
+   "attack": [
+    "enemy_dumage_2_attack_01_hit",
+    "enemy_dumage_2_attack_01_stait",
+    "enemy_dumage_2_attack_01_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1169_duphlx": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duphx_2_attack_01_hit",
+    "enemy_duphx_2_buff",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1169_duphlx_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duphx_2_attack_01_hit",
+    "enemy_duphx_2_buff",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1170_dushld": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1170_dushld_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1172_dugago": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dugago _2_attack_01_hit",
+    "enemy_dugago _2_attack_01_start",
+    "enemy_dugago _2_attack_02_start",
+    "enemy_dushdo_2_buff_01",
+    "enemy_dugago _2_buff_01",
+    "enemy_dugago _2_start_01",
+    "enemy_dugago _2_buff_02"
+   ]
+  },
+  "enemy_1172_dugago_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dugago _2_attack_01_hit",
+    "enemy_dugago _2_attack_01_start",
+    "enemy_dugago _2_attack_02_start",
+    "enemy_dushdo_2_buff_01",
+    "enemy_dugago _2_buff_01",
+    "enemy_dugago _2_start_01",
+    "enemy_dugago _2_buff_02"
+   ]
+  },
+  "enemy_1174_duholy": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_duholy_buff"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_duholy_2_attack_01_hit",
+    "enemy_duholy_2_attack_01_start",
+    "enemy_duholy_2_attack_02_start",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1174_duholy_2": {
+   "attack": [
+    "enemy_duholy_2_attack_01_hit",
+    "enemy_duholy_2_attack_01_start",
+    "enemy_duholy_2_attack_02_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duholy_buff",
+    "enemy_dushdo_2_buff_01"
+   ]
+  },
+  "enemy_1175_dushdo_2": {
+   "attack": [
+    "enemy_dushdo_2_attack_01_hit",
+    "enemy_dushdo_2_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dushdo_2_buff",
+    "enemy_dushdo_2_buff_01",
+    "enemy_dushdo_2_buff_02",
+    "enemy_dushdo_2_buff_03"
+   ],
+   "deploy": [],
+   "other": [
+    "common_invisible"
+   ]
+  },
+  "enemy_1183_mlasrt": {
+   "attack": [
+    "enemy_mlasrt_attack_start_01",
+    "enemy_mlasrt_attack_start_02_01",
+    "enemy_mlasrt_attack_start_02_02",
+    "enemy_mlasrt_attack_start_02_03"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_mlasrt_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1191_krgrg": {
+   "attack": [
+    "enemy_krgrg_attack_01_hit",
+    "enemy_krgrg_attack_01_start",
+    "enemy_krgrg_attack_01_start_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_krgrg_die_hit",
+    "enemy_krgrg_die_start",
+    "enemy_krgrg_die_start_02",
+    "buff_cold",
+    "buff_frozen",
+    "buff_frozen_to_enemy",
+    "weedy_skill_03_buff"
+   ]
+  },
+  "enemy_1191_krgrg_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_krgrg_attack_01_hit",
+    "enemy_krgrg_attack_01_start",
+    "enemy_krgrg_attack_01_start_02",
+    "weedy_skill_03_buff"
+   ]
+  },
+  "enemy_1195_sfyin": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1195_sfyin_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1196_msfyin": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfyin_idle_01",
+    "enemy_msfyin_idle_02"
+   ]
+  },
+  "enemy_1197_sfshu": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1197_sfshu_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1198_msfshu": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfshu_idle_01",
+    "enemy_msfshu_idle_02"
+   ]
+  },
+  "enemy_1199_sfjin": {
+   "attack": [
+    "enemy_sfjin_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_sfjin_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_sfjin_die_01"
+   ]
+  },
+  "enemy_1200_msfjin": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfjin_idle_01",
+    "enemy_msfjin_idle_02"
+   ]
+  },
+  "enemy_1202_msfzhi": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfzhi_idle_01",
+    "enemy_msfzhi_idle_02"
+   ]
+  },
+  "enemy_1203_sfhu": {
+   "attack": [
+    "enemy_sfhu_attack_hit_range_01",
+    "enemy_sfhu_attack_start_01",
+    "enemy_sfhu_attack_start_02",
+    "enemy_sfhu_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sfhu_die_01"
+   ]
+  },
+  "enemy_1203_sfhu_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sfhu_attack_start_01",
+    "enemy_sfhu_attack_start_02"
+   ]
+  },
+  "enemy_1204_msfhu": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfhu_idle_01",
+    "enemy_msfhu_idle_02"
+   ]
+  },
+  "enemy_1207_sfji": {
+   "attack": [
+    "enemy_sfji_attack_01_hit_01",
+    "enemy_sfji_attack_01_start_01",
+    "enemy_sfji_attack_02_hit_01",
+    "enemy_sfji_attack_02_start_01",
+    "enemy_sfji_attack_02_weapon_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_sfji_buff_01",
+    "enemy_sfji_buff_02",
+    "enemy_sfji_buff_03",
+    "enemy_sfji_buff_04",
+    "enemy_sfji_buff_end_01",
+    "enemy_sfji_buff_end_02",
+    "enemy_sfji_buff_end_03",
+    "enemy_sfji_buff_end_04"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_sfji_02_attack_02_hit_02",
+    "enemy_sfji_02_attack_02_start_02",
+    "enemy_sfji_02_attack_02_weapon_02",
+    "enemy_sfji_02_buff_01",
+    "enemy_sfji_02_buff_02",
+    "enemy_sfji_02_buff_03",
+    "enemy_sfji_02_buff_04",
+    "enemy_sfji_02_buff_end_01",
+    "enemy_sfji_02_buff_end_02",
+    "enemy_sfji_02_buff_end_03",
+    "enemy_sfji_02_buff_end_04"
+   ]
+  },
+  "enemy_1207_sfji_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sfji_02_attack_02_hit_02",
+    "enemy_sfji_02_attack_02_start_02",
+    "enemy_sfji_02_attack_02_weapon_02",
+    "enemy_sfji_attack_01_hit_01",
+    "enemy_sfji_attack_01_start_01",
+    "enemy_sfji_02_buff_01",
+    "enemy_sfji_02_buff_02",
+    "enemy_sfji_02_buff_03",
+    "enemy_sfji_02_buff_04"
+   ]
+  },
+  "enemy_1208_msfji": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfji_idle_01",
+    "enemy_msfji_idle_02"
+   ]
+  },
+  "enemy_1209_sfden": {
+   "attack": [
+    "enemy_sfden_attack_hit_01",
+    "enemy_sfden_attack_start_01"
+   ],
+   "skill": [
+    "enemy_sfden_skill_range_01"
+   ],
+   "buff": [
+    "enemy_sfden_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_sfden_02_buff_01",
+    "enemy_sfden_die_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1209_sfden_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sfden_attack_hit_01",
+    "enemy_sfden_attack_start_01",
+    "enemy_sfden_skill_range_01",
+    "enemy_sfden_02_buff_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1210_msfden": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_msfden_idle_01",
+    "enemy_msfden_idle_02"
+   ]
+  },
+  "enemy_1213_mtrsnp": {
+   "attack": [
+    "enemy_mtrsnp_attack_01_hit",
+    "enemy_mtrsnp_attack_01_start",
+    "enemy_mtrsnp_attack_01_trail"
+   ],
+   "skill": [
+    "enemy_mtrsnp_skill_01_hit",
+    "enemy_mtrsnp_skill_01_start",
+    "enemy_mtrsnp_skill_01_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1216_cansld": {
+   "attack": [
+    "enemy_cansld_attack_01_hit",
+    "enemy_cansld_attack_01_start"
+   ],
+   "skill": [
+    "enemy_cansld_skill_01_hit",
+    "enemy_cansld_skill_01_start",
+    "enemy_cansld_skill_01_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1219_mtrbty": {
+   "attack": [
+    "enemy_mtrbty_attack_01_hit",
+    "enemy_mtrbty_attack_01_start"
+   ],
+   "skill": [
+    "enemy_mtrbty_skill_01_hit",
+    "enemy_mtrbty_skill_01_start",
+    "enemy_mtrbty_skill_01_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1220_dzoms": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dzoms_born_01",
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1220_dzoms_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1221_dzomg": {
+   "attack": [
+    "enemy_dzomg_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dzomg_born_01"
+   ]
+  },
+  "enemy_1221_dzomg_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dzomg_attack_hit_01"
+   ]
+  },
+  "enemy_1222_dpvt": {
+   "attack": [
+    "enemy_dpvt_attack_hit_01",
+    "enemy_dpvt_attack_start_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1222_dpvt_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dpvt_attack_hit_01",
+    "enemy_dpvt_attack_start_01"
+   ]
+  },
+  "enemy_1223_dmech": {
+   "attack": [
+    "enemy_dmech_attack_hit_01",
+    "enemy_dmech_attack_weapon_01"
+   ],
+   "skill": [
+    "enemy_dmech_skill_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1223_dmech_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dmech_attack_hit_01",
+    "enemy_dmech_attack_weapon_01",
+    "enemy_dmech_skill_01"
+   ]
+  },
+  "enemy_1224_dsuply": {
+   "attack": [
+    "enemy_dsuply_attack_hit_01",
+    "enemy_dsuply_attack_start_01",
+    "enemy_dsuply_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dsuply_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1224_dsuply_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsuply_attack_start_01",
+    "enemy_dsuply_buff_01"
+   ]
+  },
+  "enemy_1225_dkmage": {
+   "attack": [
+    "enemy_dkmage_attack_hit_01",
+    "enemy_dkmage_attack_line_01",
+    "enemy_dkmage_attack_start_01",
+    "enemy_dkmage_attack_start_02",
+    "enemy_dkmage_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1225_dkmage_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dkmage_attack_start_01",
+    "enemy_dkmage_attack_start_02"
+   ]
+  },
+  "enemy_1226_dklord": {
+   "attack": [
+    "enemy_dklord_attack_hit_01",
+    "enemy_dklord_attack_start_01",
+    "enemy_dklord_attack_start_02"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dklord_buff_01",
+    "enemy_dklord_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1226_dklord_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dklord_attack_hit_01",
+    "enemy_dklord_attack_start_01",
+    "enemy_dklord_attack_start_02",
+    "enemy_dklord_buff_01",
+    "enemy_dklord_buff_02"
+   ]
+  },
+  "enemy_1229_darmy": {
+   "attack": [
+    "enemy_darmy_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1229_darmy_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_darmy_attack_hit_01"
+   ]
+  },
+  "enemy_1234_dsubrl": {
+   "attack": [
+    "enemy_dsubrl_attack_hit"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dsubrl_buff",
+    "enemy_dsubrl_buff_01_01",
+    "enemy_dsubrl_buff_01_02",
+    "enemy_dsubrl_buff_01_03",
+    "enemy_dsubrl_buff_01_04"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1234_dsubrl_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsubrl_buff",
+    "enemy_dsubrl_attack_hit",
+    "enemy_dsubrl_buff_01_01",
+    "enemy_dsubrl_buff_01_02",
+    "enemy_dsubrl_buff_01_03",
+    "enemy_dsubrl_buff_01_04"
+   ]
+  },
+  "enemy_1249_lysdb_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lysdb_attack_hit",
+    "enemy_lysdb_attack_start",
+    "enemy_lysdb_attack_buff"
+   ]
+  },
+  "enemy_1251_lysyta": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lysyta_die",
+    "common_enemy_hit_01"
+   ]
+  },
+  "enemy_1251_lysyta_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_lysyta_die"
+   ]
+  },
+  "enemy_1252_lysytb_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lysytb_attack_start",
+    "enemy_lysytb_die"
+   ]
+  },
+  "enemy_1254_lypa_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lypa_attack_hit",
+    "enemy_lypa_attack_start"
+   ]
+  },
+  "enemy_1267_nhpbr": {
+   "attack": [
+    "enemy_nhpbr_attack_hit",
+    "enemy_nhpbr_attack_range",
+    "enemy_nhpbr_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1267_nhpbr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_nhpbr_attack_hit",
+    "enemy_nhpbr_attack_start"
+   ]
+  },
+  "enemy_1269_nhfly": {
+   "attack": [
+    "enemy_nhfly_attack_hit",
+    "enemy_nhfly_attack_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1270_nhstlk": {
+   "attack": [
+    "enemy_nhstlk_attack_buff_01",
+    "enemy_nhstlk_attack_hit_01",
+    "enemy_nhstlk_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1270_nhstlk_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_nhstlk_attack_hit_01",
+    "enemy_nhstlk_attack_start"
+   ]
+  },
+  "enemy_1272_nhtank": {
+   "attack": [
+    "enemy_nhtank_attack_buff_01",
+    "enemy_nhtank_attack_buff_02",
+    "enemy_nhtank_attack_hit_01",
+    "enemy_nhtank_attack_hit_02",
+    "enemy_nhtank_attack_range",
+    "enemy_nhtank_attack_start_01",
+    "enemy_nhtank_attack_start_02",
+    "enemy_nhtank_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1272_nhtank_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_nhtank_attack_start_01",
+    "enemy_nhtank_attack_hit_02",
+    "enemy_nhtank_attack_start_02",
+    "enemy_nhtank_attack_buff_02",
+    "enemy_nhtank_attack_buff_01"
+   ]
+  },
+  "enemy_1273_stmgun_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_stmgun_attack_start_01",
+    "enemy_stmgun_skill_start_01"
+   ]
+  },
+  "enemy_1275_dwlock_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dwlock_attack_start_01",
+    "enemy_dwlock_skill_hit_01",
+    "enemy_dwlock_skill_start_01"
+   ]
+  },
+  "enemy_1283_sgkill": {
+   "attack": [
+    "enemy_sgkill_attack_01_hit",
+    "enemy_sgkill_attack_01_start",
+    "enemy_sgkill_attack_01_trail"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_sgkill_buff"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_sgkill_eye_01",
+    "enemy_sgkill_eye_02"
+   ]
+  },
+  "enemy_1283_sgkill_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sgkill_attack_01_start",
+    "enemy_sgkill_eye_01",
+    "enemy_sgkill_eye_02",
+    "enemy_sgkill_buff"
+   ]
+  },
+  "enemy_1288_duskls": {
+   "attack": [
+    "enemy_duskls_attack_hit",
+    "enemy_duskls_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duskls_idle_2",
+    "enemy_duskls_revive_2",
+    "enemy_duskls_revive_3",
+    "enemy_duskls_revive_4",
+    "enemy_duskls_weapon_buff",
+    "common_invisible"
+   ]
+  },
+  "enemy_1288_duskls_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duskls_attack_hit",
+    "enemy_duskls_attack_start",
+    "enemy_duskls_revive_2",
+    "common_invisible",
+    "enemy_duskls_revive_3",
+    "enemy_duskls_revive_4",
+    "enemy_duskls_idle_2",
+    "enemy_duskls_weapon_buff"
+   ]
+  },
+  "enemy_1292_duskld": {
+   "attack": [
+    "enemy_duskld_attack_hit",
+    "enemy_duskld_attack_start_01",
+    "enemy_duskld_attack_start_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_duskld_idle_2",
+    "enemy_duskld_revive_1",
+    "enemy_duskld_revive_2",
+    "enemy_duskld_shield",
+    "common_invisible"
+   ]
+  },
+  "enemy_1299_ymkilr": {
+   "attack": [
+    "enemy_ymkilr_attack_hit_01",
+    "enemy_ymkilr_attack_hit_02",
+    "enemy_ymkilr_attack_start_01",
+    "enemy_ymkilr_attack_start_02"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_ymkilr_buff_01",
+    "enemy_ymkilr_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1299_ymkilr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "enemy_ymkilr_attack_hit_02",
+    "enemy_ymkilr_attack_start_02",
+    "enemy_ymkilr_buff_01",
+    "enemy_ymkilr_buff_02"
+   ]
+  },
+  "enemy_1302_ymtro_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ymtro_attack_hit",
+    "enemy_ymtro_attack",
+    "enemy_ymtro_buff_01",
+    "enemy_ymtro_buff_02",
+    "enemy_ymtro_buff_03",
+    "enemy_ymtro_buff_04"
+   ]
+  },
+  "enemy_1305_mhslim": {
+   "attack": [
+    "enemy_mhslim_attack",
+    "enemy_mhslim_attack_hit",
+    "enemy_mhslim_attack_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1305_mhslim_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mhslim_attack"
+   ]
+  },
+  "enemy_1309_mhboar_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mhboar_hit_01",
+    "enemy_mhboar_attack",
+    "enemy_mhboar_hit_02"
+   ]
+  },
+  "enemy_1320_wdrrl_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wdrrl_attack_hit_01",
+    "enemy_wdrrl_attack_start_01",
+    "enemy_wdrrl_skill_hit_01",
+    "enemy_wdrrl_skill_hit_rangre_01",
+    "enemy_wdrrl_skill_start_01",
+    "enemy_wdrrl_skill_start_02",
+    "enemy_wdrrl_buff_01",
+    "enemy_wdrrl_skill_start_weapon_01"
+   ]
+  },
+  "enemy_1321_wdarft": {
+   "attack": [],
+   "skill": [
+    "enemy_wdarft_skill_start_01",
+    "enemy_wdarft_skill_summon"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wdarft_idle_01"
+   ]
+  },
+  "enemy_1325_cbgpro": {
+   "attack": [
+    "enemy_cbgpro_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1325_cbgpro_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cbgpro_attack_hit"
+   ]
+  },
+  "enemy_1328_cbjedi": {
+   "attack": [
+    "enemy_cbjedi_attack_01_hit",
+    "enemy_cbjedi_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_cbjedi_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "weedy_skill_03_buff"
+   ]
+  },
+  "enemy_1329_cbshld": {
+   "attack": [
+    "enemy_cbshld_attack_hit",
+    "enemy_cbshld_attack_start_01",
+    "enemy_cbshld_attack_start_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cbshld_shield_01",
+    "enemy_cbshld_shield_02",
+    "enemy_cbshld_shield_03"
+   ]
+  },
+  "enemy_1329_cbshld_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cbshld_attack_hit",
+    "enemy_cbshld_attack_start_01",
+    "enemy_cbshld_attack_start_02",
+    "enemy_cbshld_shield_01",
+    "enemy_cbshld_shield_02",
+    "enemy_cbshld_shield_03"
+   ]
+  },
+  "enemy_1355_mrfly": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_mrfly_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1355_mrfly_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mrfly_buff_01"
+   ]
+  },
+  "enemy_1360_dfello": {
+   "attack": [
+    "enemy_dfello_attack_hit",
+    "enemy_dfello_attack_start",
+    "enemy_dfello_attack_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dfello_combat_hit",
+    "enemy_dfello_die",
+    "enemy_dfello_idle_02",
+    "enemy_dslime_heal_01"
+   ]
+  },
+  "enemy_1361_dthrow": {
+   "attack": [
+    "enemy_dthrow_attack_fire_explode",
+    "enemy_dthrow_attack_fire_ground",
+    "enemy_dthrow_attack_hit",
+    "enemy_dthrow_attack_start_01",
+    "enemy_dthrow_attack_start_02",
+    "enemy_dthrow_attack_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dthrow_die",
+    "enemy_dthrow_idle"
+   ]
+  },
+  "enemy_1361_dthrow_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dthrow_attack_start_01",
+    "enemy_dthrow_attack_start_02",
+    "enemy_dthrow_idle"
+   ]
+  },
+  "enemy_1362_dfat": {
+   "attack": [
+    "enemy_dfat_attack_hit",
+    "enemy_dfat_attack_start_01",
+    "enemy_dfat_attack_start_02"
+   ],
+   "skill": [
+    "enemy_dfat_skill_hint",
+    "enemy_dfat_skill_hit",
+    "enemy_dfat_skill_start_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1362_dfat_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dfat_attack_hit",
+    "enemy_dfat_attack_start_01",
+    "enemy_dfat_attack_start_02",
+    "enemy_dfat_skill_hint",
+    "enemy_dfat_skill_hit",
+    "enemy_dfat_skill_start_01"
+   ]
+  },
+  "enemy_1363_spnshd_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_spnshd_2_buff_1",
+    "enemy_spnshd_2_buff_2",
+    "enemy_spnshd_2_buff_3"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_spnshd_attack_hit",
+    "enemy_spnshd_attack_start_01",
+    "enemy_spnshd_debuff",
+    "enemy_spnshd_debuff_2"
+   ]
+  },
+  "enemy_1367_dseed": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dseed_idle_02"
+   ]
+  },
+  "enemy_1373_ltnhor": {
+   "attack": [
+    "enemy_ltnhor_attack_ap_start_01",
+    "enemy_ltnhor_attack_ap_trail_01",
+    "enemy_ltnhor_attack_start_01",
+    "enemy_ltnhor_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltnhor_attact_ap_hit_01",
+    "enemy_ltnhor_attact_hit_01",
+    "common_radical_01",
+    "common_radical_02"
+   ]
+  },
+  "enemy_1373_ltnhor_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltnhor_attack_start_01",
+    "enemy_ltnhor_attack_ap_start_01",
+    "common_radical_01",
+    "common_radical_02"
+   ]
+  },
+  "enemy_1375_ltnclr": {
+   "attack": [
+    "enemy_ltnclr_attack_start_01",
+    "enemy_ltnclr_attack_start_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltnclr_attact_hit_01",
+    "common_gloomyl_01",
+    "common_gloomyl_02"
+   ]
+  },
+  "enemy_1375_ltnclr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltnclr_attact_hit_01",
+    "enemy_ltnclr_attack_start_01",
+    "common_gloomyl_01",
+    "common_gloomyl_02",
+    "enemy_ltnclr_attack_start_02"
+   ]
+  },
+  "enemy_1376_ltndru": {
+   "attack": [
+    "enemy_ltndru_attack_ap_start_01",
+    "enemy_ltndru_attack_ap_start_02",
+    "enemy_ltndru_attack_ap_start_03",
+    "enemy_ltndru_attack_ap_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltndru_attact_ap_hit_01",
+    "common_radical_01",
+    "common_radical_02"
+   ]
+  },
+  "enemy_1376_ltndru_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ltndru_attack_ap_start_01",
+    "enemy_ltndru_attack_ap_start_02",
+    "enemy_ltndru_attack_ap_start_03",
+    "common_radical_01",
+    "common_radical_02"
+   ]
+  },
+  "enemy_1381_winman": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_winman_hit_01"
+   ]
+  },
+  "enemy_1381_winman_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_winman_hit_01"
+   ]
+  },
+  "enemy_1385_winbom": {
+   "attack": [
+    "enemy_winbom_attack_01_hit",
+    "enemy_winbom_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_winbom_die_01",
+    "enemy_winbom_die_01_start"
+   ]
+  },
+  "enemy_1385_winbom_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_winbom_attack_01_hit",
+    "enemy_winbom_attack_01_start",
+    "enemy_winbom_die_01_start"
+   ]
+  },
+  "enemy_1387_winshd": {
+   "attack": [
+    "enemy_winshd_attack_01_hit",
+    "enemy_winshd_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_winshd_buff_01",
+    "enemy_winshd_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1388_wingnt": {
+   "attack": [
+    "enemy_wingnt_attack_01_hit",
+    "enemy_wingnt_attack_01_start",
+    "enemy_wingnt_attack_01_trail",
+    "enemy_wingnt_attack_02_hit",
+    "enemy_wingnt_attack_02_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1388_wingnt_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wingnt_attack_01_start",
+    "enemy_wingnt_attack_02_hit",
+    "enemy_wingnt_attack_02_start"
+   ]
+  },
+  "enemy_1389_winbab_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_winbab_attack_01_start",
+    "common_invisible"
+   ]
+  },
+  "enemy_1402_tgshd_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_tgshd_attack_hit",
+    "enemy_tgshd_attack_start_02",
+    "enemy_tgshd_attack_start_01"
+   ]
+  },
+  "enemy_1403_gunsho": {
+   "attack": [
+    "enemy_gunsho_attack_hit"
+   ],
+   "skill": [
+    "enemy_gunsho_skill_hit",
+    "enemy_gunsho_skill_start",
+    "enemy_gunsho_skill_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_hummbd_buff_01"
+   ]
+  },
+  "enemy_1403_gunsho_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_gunsho_attack_hit",
+    "enemy_gunsho_skill_start",
+    "enemy_hummbd_buff_01"
+   ]
+  },
+  "enemy_1404_msnip": {
+   "attack": [
+    "enemy_msnip_attack_hit"
+   ],
+   "skill": [
+    "enemy_msnip_skill_hit",
+    "enemy_msnip_skill_start",
+    "enemy_msnip_skill_taril"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_hummbd_buff_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_1405_boomer_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_boomer_attack_hit",
+    "enemy_boomer_attack_start",
+    "enemy_boomer_skill_start"
+   ]
+  },
+  "enemy_1406_chghmr": {
+   "attack": [
+    "enemy_chghmr_attack_hit",
+    "enemy_chghmr_attack_start_01",
+    "enemy_chghmr_attack_start_02"
+   ],
+   "skill": [
+    "enemy_chghmr_skill_start_01",
+    "enemy_chghmr_skill_start_02"
+   ],
+   "buff": [
+    "enemy_chghmr_buff"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1407_hummbd": {
+   "attack": [
+    "enemy_hummbd_attack_hit",
+    "enemy_hummbd_attack_start",
+    "enemy_hummbd_attack_trail"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_hummbd_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_hummbd_die_01",
+    "enemy_hummbd_die_02"
+   ]
+  },
+  "enemy_1409_bdguad_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_bdguad_attack_hit",
+    "enemy_bdguad_skill_01_start_01",
+    "enemy_bdguad_skill_01_start_02",
+    "enemy_hummbd_buff_01"
+   ]
+  },
+  "enemy_1413_mmstck": {
+   "attack": [
+    "enemy_mmstck_attack_01_hit",
+    "enemy_mmstck_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_mmstck_buff_01_start"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1415_mmkabi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mmkabi_hit_01",
+    "enemy_mmkabi_attack_01"
+   ]
+  },
+  "enemy_1422_lrsldr": {
+   "attack": [
+    "enemy_lrsldr_attack_hit_01",
+    "enemy_lrsldr_attack_start_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_lrsldr_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1422_lrsldr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lrsldr_attack_hit_01",
+    "enemy_lrsldr_attack_start_01",
+    "enemy_lrsldr_buff_01"
+   ]
+  },
+  "enemy_1424_lrboom": {
+   "attack": [
+    "enemy_lrboom_attack_hit_01",
+    "enemy_lrboom_attack_start_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lrboom_die"
+   ]
+  },
+  "enemy_1425_lrcmra": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ircmra_attack_hit_01",
+    "enemy_ircmra_attack_start_01",
+    "enemy_ircmra_skill_start_01",
+    "enemy_ircmra_skill_start_02",
+    "enemy_ircmra_skill_start_03",
+    "enemy_ircmra_skill_start_04",
+    "enemy_lrmm_range_01",
+    "mapeff_v050_toxci_debuff_01"
+   ]
+  },
+  "enemy_1425_lrcmra_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ircmra_attack_hit_01",
+    "enemy_ircmra_attack_start_01",
+    "enemy_ircmra_skill_start_01",
+    "enemy_ircmra_skill_start_02",
+    "enemy_ircmra_skill_start_03",
+    "enemy_ircmra_skill_start_04",
+    "enemy_lrmm_range_01",
+    "mapeff_v050_toxci_debuff_01"
+   ]
+  },
+  "enemy_1427_lrnazg": {
+   "attack": [
+    "enemy_lrnazg_attack_hit_01",
+    "enemy_lrnazg_attack_start_01"
+   ],
+   "skill": [
+    "enemy_lrnazg_skill_taril_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1428_lrsoul": {
+   "attack": [
+    "enemy_lrsoul_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1429_lrwzrd": {
+   "attack": [
+    "enemy_lrwzrd_attack_hit_01",
+    "enemy_lrwzrd_attack_start_01",
+    "enemy_lrwzrd_attack_taril_01"
+   ],
+   "skill": [
+    "enemy_lrwzrd_skill_01_start_01",
+    "enemy_lrwzrd_skill_hit_02",
+    "enemy_lrwzrd_skill_line_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_common_soul_01",
+    "enemy_common_soul_02",
+    "enemy_common_soul_03"
+   ]
+  },
+  "enemy_1429_lrwzrd_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_lrwzrd_attack_start_01",
+    "enemy_lrwzrd_skill_01_start_01",
+    "enemy_common_soul_01",
+    "enemy_common_soul_02",
+    "enemy_common_soul_03"
+   ]
+  },
+  "enemy_1430_lrrook": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_irrook_hit_01",
+    "enemy_irrook_range_01"
+   ]
+  },
+  "enemy_1431_lrmzrd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_irmzrd_attack_hit_01",
+    "enemy_irmzrd_attack_start_01",
+    "enemy_irmzrd_skill_start_01",
+    "enemy_common_soul_01",
+    "enemy_common_soul_02",
+    "enemy_common_soul_03"
+   ]
+  },
+  "enemy_1431_lrmzrd_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_irmzrd_attack_hit_01",
+    "enemy_irmzrd_attack_start_01",
+    "enemy_irmzrd_skill_start_01",
+    "enemy_common_soul_01",
+    "enemy_common_soul_02",
+    "enemy_common_soul_03"
+   ]
+  },
+  "enemy_1433_dsbasi": {
+   "attack": [
+    "enemy_dsbasi_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1433_dsbasi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsbasi_attack_hit"
+   ]
+  },
+  "enemy_1434_dsshel": {
+   "attack": [
+    "enemy_dsshel_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1435_dsflys": {
+   "attack": [
+    "enemy_dsflys_attack_hit_01",
+    "enemy_dsflys_attack_start_01",
+    "enemy_dsflys_attack_start_02",
+    "enemy_dsflys_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1436_dsdivi": {
+   "attack": [
+    "enemy_dsdivi_attack_hit",
+    "enemy_dsdivi_attack_start_01",
+    "enemy_dsdivi_attack_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1436_dsdivi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsdivi_attack_start_01"
+   ]
+  },
+  "enemy_1437_dsfull": {
+   "attack": [
+    "enemy_dsfull_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsfull_die_01"
+   ]
+  },
+  "enemy_1437_dsfull_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dsfull_attack_hit"
+   ]
+  },
+  "enemy_1438_dspred": {
+   "attack": [
+    "enemy_dspred_attack_hit_01",
+    "enemy_dspred_attack_hit_02",
+    "enemy_dspred_attack_start_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dspred_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1439_dslntf": {
+   "attack": [
+    "enemy_dslntf_attack_01_hit",
+    "enemy_dslntf_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_dslntf_buff_02",
+    "enemy_dslntf_buff_03"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1439_dslntf_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dslntf_attack_01_hit",
+    "enemy_dslntf_attack_01_start",
+    "enemy_dslntf_buff_03",
+    "enemy_dslntf_buff_02"
+   ]
+  },
+  "enemy_1500_skulsr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "skulsr_attack_01_hit",
+    "skulsr_attack_01_start",
+    "skulsr_attack_01_end_r",
+    "skulsr_attack_01_end_l",
+    "buff_defdown",
+    "skulsr_buff_01_start"
+   ]
+  },
+  "enemy_1501_demonk": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "demonk_attack_01_hit",
+    "demonk_attack_01_start"
+   ]
+  },
+  "enemy_1502_crowns": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "crowns_attack_01_hit",
+    "crowns_attack_01_start_right",
+    "crowns_attack_01_start_left"
+   ]
+  },
+  "enemy_1504_cqbw": {
+   "attack": [
+    "enemy_cqbw_attack_01_hit",
+    "enemy_cqbw_attack_01_trail"
+   ],
+   "skill": [
+    "enemy_cqbw_skill_01_buff",
+    "enemy_cqbw_skill_02_hit"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cqbw_die_01_start",
+    "skulsr_buff_01_start"
+   ]
+  },
+  "enemy_1509_mousek": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "mousek_attack_01_start",
+    "mousek_skill_01_range",
+    "mousek_skill_01_range_02",
+    "mousek_skill_01_start",
+    "mousek_skill_01_buff",
+    "mousek_skill_02_buff",
+    "mousek_skill_02_range",
+    "mousek_skill_02_start",
+    "mousek_buff_01_start",
+    "mousek_buff_02_start",
+    "mousek_buff_03_start",
+    "skulsr_buff_01_start",
+    "mousek_buff_01_end"
+   ]
+  },
+  "enemy_1511_mdrock": {
+   "attack": [
+    "enemy_mdrock_attack_01_hit",
+    "enemy_mdrock_attack_01_start",
+    "enemy_mdrock_attack_01_start_02",
+    "enemy_mdrock_attack_02_hit",
+    "enemy_mdrock_attack_02_start",
+    "enemy_mdrock_attack_02_start_02",
+    "enemy_mdrock_attack_03_hit",
+    "enemy_mdrock_attack_03_hit_02",
+    "enemy_mdrock_attack_03_start",
+    "enemy_mdrock_attack_03_start_02"
+   ],
+   "skill": [
+    "enemy_mdrock_skill_01_range",
+    "enemy_mdrock_skill_01_start",
+    "enemy_mdrock_skill_buff_01",
+    "enemy_mdrock_skill_buff_02",
+    "enemy_mdrock_skill_buff_03",
+    "enemy_mdrock_skill_buff_04"
+   ],
+   "buff": [
+    "enemy_mdrock_buff_01_start_02",
+    "enemy_mdrock_buff_02_start_02",
+    "enemy_mdrock_buff_03_start_01",
+    "enemy_mdrock_buff_03_start_02"
+   ],
+   "deploy": [],
+   "other": [
+    "tower_idle_02_start"
+   ]
+  },
+  "enemy_1512_mcmstr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "mcmstr_attack_02_start",
+    "mcmstr_attack_02_start_02",
+    "mcmstr_attack_01_hit",
+    "mcmstr_attack_01_start",
+    "mcmstr_buff_04_start",
+    "mcmstr_die_01_range",
+    "mcmstr_die_01_start",
+    "map_tree_brust_02_start",
+    "map_tree_demage_01_buff",
+    "mcmstr_skill_01_hit",
+    "mcmstr_skill_01_start",
+    "mcmstr_buff_03_start",
+    "mcmstr_buff_01_start",
+    "mcmstr_buff_02_start",
+    "mcmstr_buff_02_start_02"
+   ]
+  },
+  "enemy_1513_dekght": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "dekght_attack_01_hit",
+    "dekght_attack_01_range",
+    "dekght_attack_01_start",
+    "dekght_attack_01_start_02",
+    "dekght_skill_01_gather",
+    "dekght_skill_01_gather_02",
+    "dekght_skill_01_hit",
+    "dekght_skill_01_range",
+    "dekght_skill_01_start",
+    "dekght_skill_01_start_02",
+    "dekght_skill_01_start_03",
+    "dekght_buff_04_start",
+    "dekght_buff_01_start"
+   ]
+  },
+  "enemy_1513_dekght_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "dekght_2_attack_01_start",
+    "dekght_2_attack_01_start_02",
+    "dekght_2_skill_01_buff",
+    "dekght_2_skill_01_range",
+    "dekght_2_skill_01_start",
+    "dekght_2_skill_01_start_02",
+    "dekght_2_skill_01_start_03",
+    "dekght_buff_04_start",
+    "dekght_2_buff_01_start"
+   ]
+  },
+  "enemy_1516_jakill": {
+   "attack": [
+    "enemy_jakill_attack_01_hit",
+    "enemy_jakill_attack_01_hit_reborn",
+    "enemy_jakill_attack_01_start",
+    "enemy_jakill_attack_01_start_02",
+    "enemy_jakill_attack_01_start_reborn",
+    "enemy_jakill_attack_01_start_reborn_02",
+    "enemy_jakill_attack_01_trail"
+   ],
+   "skill": [
+    "enemy_jakill_skill_01_hit",
+    "enemy_jakill_skill_01_hit_reborn",
+    "enemy_jakill_skill_01_start",
+    "enemy_jakill_skill_01_start_02",
+    "enemy_jakill_skill_01_start_03",
+    "enemy_jakill_skill_01_start_reborn",
+    "enemy_jakill_skill_01_start_reborn_02",
+    "enemy_jakill_skill_01_start_reborn_03",
+    "enemy_jakill_skill_01_trail"
+   ],
+   "buff": [
+    "enemy_jakill_buff_01_start",
+    "enemy_jakill_buff_02_start",
+    "enemy_jakill_buff_02_start_02",
+    "enemy_jakill_buff_02_start_03"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_jakill_reborn_01_start",
+    "enemy_jakill_reborn_02_start",
+    "enemy_jakill_reborn_03_start",
+    "enemy_lifbos_open_start"
+   ]
+  },
+  "enemy_1517_xi": {
+   "attack": [
+    "enemy_xi_attack_01_hit",
+    "enemy_xi_attack_01_start",
+    "enemy_xi_attack_01_start_02",
+    "enemy_xi_attack_01_trail"
+   ],
+   "skill": [
+    "enemy_xi_skill_01_buff",
+    "enemy_xi_skill_01_buff_02",
+    "enemy_xi_skill_01_buff_03",
+    "enemy_xi_skill_01_buff_03_2",
+    "enemy_xi_skill_01_hit",
+    "enemy_xi_skill_01_start",
+    "enemy_xi_skill_01_start_02",
+    "enemy_xi_skill_02_buff",
+    "enemy_xi_skill_02_buff_01",
+    "enemy_xi_skill_02_buff_02",
+    "enemy_xi_skill_02_buff_03",
+    "enemy_xi_skill_02_buff_04",
+    "enemy_xi_skill_02_buff_hit",
+    "enemy_xi_skill_02_hit"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_invincible_01",
+    "skulsr_buff_01_start"
+   ]
+  },
+  "enemy_1521_dslily": {
+   "attack": [
+    "enemy_dslily_attack_01_hit",
+    "enemy_dslily_attack_01_start",
+    "enemy_dslily_attack_01_start_02",
+    "enemy_dslily_attack_01_start_02_1"
+   ],
+   "skill": [
+    "enemy_dslily_skill_01_hit",
+    "enemy_dslily_skill_01_range",
+    "enemy_dslily_skill_01_start",
+    "enemy_dslily_skill_01_start_02",
+    "enemy_dslily_skill_01_start_02_1",
+    "enemy_dslily_skill_02_hit",
+    "enemy_dslily_skill_02_range",
+    "enemy_dslily_skill_02_start_l",
+    "enemy_dslily_skill_02_start_r",
+    "enemy_dslily_skill_03_start_l",
+    "enemy_dslily_skill_03_start_r",
+    "enemy_dslily_skill_04_range",
+    "enemy_dslily_skill_04_start_02",
+    "enemy_dslily_skill_04_start_l",
+    "enemy_dslily_skill_04_start_r"
+   ],
+   "buff": [
+    "enemy_dslily_buff_01_start",
+    "enemy_dslily_buff_02_start",
+    "enemy_dslily_buff_02_start_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_1525_blkswb": {
+   "attack": [
+    "enemy_blkswb_attack_a_hit_01",
+    "enemy_blkswb_attack_a_start_01",
+    "enemy_blkswb_attack_b_hit_01",
+    "enemy_blkswb_attack_b_start_01",
+    "enemy_blkswb_attack_b_weapon_01",
+    "enemy_blkswb_attack_b_weapon_02"
+   ],
+   "skill": [
+    "enemy_blkswb_skill_01_start_01",
+    "enemy_blkswb_skill_02_a_start_01",
+    "enemy_blkswb_skill_02_a_start_02",
+    "enemy_blkswb_skill_02_a_weapon_01",
+    "enemy_blkswb_skill_02_b_start_01",
+    "enemy_blkswb_skill_02_b_start_02",
+    "enemy_blkswb_skill_02_b_start_03",
+    "enemy_blkswb_skill_02_b_weapon_01",
+    "enemy_blkswb_skill_02_b_weapon_02",
+    "enemy_blkswb_skill_02_hit_01",
+    "enemy_blkswb_skill_03_start_01",
+    "enemy_blkswb_skill_03_start_02"
+   ],
+   "buff": [
+    "enemy_blkswb_buff_01",
+    "enemy_blkswb_buff_02",
+    "enemy_blkswb_buff_03"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_blkswb_reborn_loop_01",
+    "enemy_blkswb_reborn_loop_02",
+    "enemy_blkswb_reborn_start_01",
+    "enemy_blkswb_reborn_weapon_01",
+    "enemy_blkswb_reborn_weapon_02",
+    "common_invincible_01",
+    "common_disarm_icon"
+   ]
+  },
+  "enemy_1535_wlfmster": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wlfmster_a_attack_01_hit",
+    "enemy_wlfmster_a_buff_01",
+    "enemy_wlfmster_a_buff_01_02",
+    "enemy_wlfmster_a_revive_2",
+    "enemy_wlfmster_a_revive_3",
+    "enemy_wlfmster_a_revive_3_03",
+    "enemy_wlfmster_a_skill_end_buff",
+    "enemy_wlfmster_a_skill_end_buff_hit",
+    "enemy_wlfmster_a_skill_end_start",
+    "enemy_wlfmster_a_skill_end_start_02",
+    "enemy_wlfmster_a_skill_end_start_03",
+    "enemy_wlfmster_b_attack_01_hit",
+    "enemy_wlfmster_b_attack_01_hit_02",
+    "enemy_wlfmster_b_attack_01_start",
+    "enemy_wlfmster_b_attack_01_start_02",
+    "enemy_wlfmster_b_buff_01",
+    "enemy_wlfmster_b_buff_01_02",
+    "enemy_wlfmster_b_buff_01_03",
+    "enemy_wlfmster_b_buff_01_04",
+    "enemy_wlfmster_b_buff_01_05",
+    "enemy_wlfmster_b_buff_02",
+    "enemy_wlfmster_b_buff_02_02",
+    "enemy_wlfmster_b_buff_03",
+    "enemy_wlfmster_b_skill_loop_start",
+    "enemy_wlfmster_b_skill_loop_start_02",
+    "common_invincible_01"
+   ]
+  },
+  "enemy_1539_reid": {
+   "attack": [],
+   "skill": [
+    "enemy_reid_skill_01"
+   ],
+   "buff": [
+    "enemy_reid_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_reid_revive_01",
+    "enemy_reid_revive_02",
+    "common_invincible_01"
+   ]
+  },
+  "enemy_2001_duckmi": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "duckmi_buff_02_start",
+    "duckmi_buff_01_start"
+   ]
+  },
+  "enemy_2001_duckmi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "duckmi_buff_02_start",
+    "duckmi_buff_01_start"
+   ]
+  },
+  "enemy_2002_bearmi": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "bearmi_attack_01_hit",
+    "bearmi_attack_01_start_02",
+    "bearmi_attack_01_start",
+    "bearmi_buff_01_start"
+   ]
+  },
+  "enemy_2002_bearmi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "bearmi_attack_01_hit",
+    "bearmi_attack_01_start_02",
+    "bearmi_attack_01_start",
+    "bearmi_buff_01_start"
+   ]
+  },
+  "enemy_2003_rockman": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "rockman_attack_01_hit",
+    "rockman_attack_01_start",
+    "rockman_attack_01_start_02",
+    "rockman_skill_01_start"
+   ]
+  },
+  "enemy_2004_balloon": {
+   "attack": [
+    "enemy_balloon_attack_01_hit",
+    "enemy_balloon_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_balloon_move_02_buff_l",
+    "enemy_balloon_move_02_buff_r"
+   ]
+  },
+  "enemy_2005_axetro": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "axetro_attack_01_start",
+    "axetro_attack_01_start_02",
+    "axetro_attack_01_hit",
+    "axetro_attack_02_start",
+    "axetro_attack_02_start_02",
+    "axetro_buff_01_start"
+   ]
+  },
+  "enemy_2008_flking": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "flking_attack_01_start",
+    "flking_attack_02_hit",
+    "flking_attack_03_start",
+    "flking_attack_03_start_02",
+    "flking_attack_02_start",
+    "flking_attack_02_start_02",
+    "enemy_mdrock_skill_buff_01",
+    "enemy_mdrock_skill_buff_04",
+    "skulsr_buff_01_start",
+    "flking_buff_01_start",
+    "flking_buff_01_start_02",
+    "flking_buff_01_start_03",
+    "flking_buff_01_start_04"
+   ]
+  },
+  "enemy_2009_csaudc": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "csaudc_attack_01_hit"
+   ]
+  },
+  "enemy_2016_csphtm": {
+   "attack": [
+    "enemy_csphtm_attack_01_hit",
+    "enemy_csphtm_attack_01_start"
+   ],
+   "skill": [
+    "enemy_csphtm_skill_01_start",
+    "enemy_csphtm_skill_02_range"
+   ],
+   "buff": [
+    "enemy_csphtm_buff_01_start"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_2017_csphts": {
+   "attack": [
+    "enemy_csphts_attack_01_hit",
+    "enemy_csphts_attack_01_start"
+   ],
+   "skill": [
+    "enemy_csphts_skill_01_start",
+    "enemy_csphts_skill_02_range"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_csphtm_buff_01_start"
+   ]
+  },
+  "enemy_2021_syfish": {
+   "attack": [
+    "enemy_syfish_attack_hit",
+    "enemy_syfish_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_2025_syufo": {
+   "attack": [
+    "enemy_syufo_attack_01_hit",
+    "enemy_syufo_attack_01_start",
+    "enemy_syufo_attack_01_trail",
+    "enemy_syufo_attack_02_hit",
+    "enemy_syufo_attack_02_start_01",
+    "enemy_syufo_attack_02_start_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_syufo_c1_buff_01",
+    "enemy_syufo_c1_buff_02",
+    "enemy_syufo_c2_buff_01"
+   ]
+  },
+  "enemy_2034_sythef": {
+   "attack": [
+    "enemy_sythef_attack_buff_01",
+    "enemy_sythef_attack_buff_02"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible"
+   ]
+  },
+  "enemy_2034_sythef_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_enemy_hit_01",
+    "common_invisible",
+    "enemy_sythef_attack_buff_01"
+   ]
+  },
+  "enemy_2048_smgrd": {
+   "attack": [
+    "enemy_smgrd_attack_01_hit",
+    "enemy_smgrd_attack_01_start",
+    "enemy_smgrd_attack_02_hit",
+    "enemy_smgrd_attack_02_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_smgrd_buff_01",
+    "enemy_smgrd_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_2050_smsha": {
+   "attack": [
+    "enemy_smsha_attack_hit",
+    "enemy_smsha_attack_line",
+    "enemy_smsha_attack_start_01",
+    "enemy_smsha_attack_trail"
+   ],
+   "skill": [
+    "enemy_smsha_skill_hit",
+    "enemy_smsha_skill_line",
+    "enemy_smsha_skill_start_01",
+    "enemy_smsha_skill_trail"
+   ],
+   "buff": [
+    "enemy_smsha_buff",
+    "enemy_smsha_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_smsha_idle_03",
+    "enemy_smsha_idle_1_01",
+    "enemy_smsha_idle_1_02"
+   ]
+  },
+  "enemy_2052_smgia": {
+   "attack": [
+    "enemy_smgia_attack_hit",
+    "enemy_smgia_attack_start"
+   ],
+   "skill": [
+    "enemy_smgia_skill_hit",
+    "enemy_smgia_skill_start"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_smgia_debuff",
+    "enemy_smgia_die",
+    "enemy_smgia_idle"
+   ]
+  },
+  "enemy_2085_skzjxd": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_skzjxd_buff_01",
+    "enemy_skzjxd_buff_02",
+    "enemy_skzjxd_buff_03"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_2085_skzjxd_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_skzjxd_buff_03",
+    "enemy_skzjxd_buff_01",
+    "enemy_skzjxd_buff_02"
+   ]
+  },
+  "enemy_2123_dyjsww": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_dyjsww_c1_skill_01_hit_01",
+    "enemy_dyjsww_c1_skill_01_locked_01",
+    "enemy_dyjsww_c1_skill_01_start_01",
+    "enemy_dyjsww_c1_skill_01_start_02",
+    "enemy_dyjsww_c1_skill_01_trail_01",
+    "enemy_dyjsww_c1_skill_02_die_01",
+    "enemy_dyjsww_c1_skill_02_range_01",
+    "enemy_dyjsww_c1_skill_02_start_01",
+    "enemy_dyjsww_c1_talent_01_screen_01",
+    "enemy_dyjsww_c1_talent_01_screen_02",
+    "enemy_dyjsww_c1_talent_02_buff_01",
+    "enemy_dyjsww_c1_talent_02_buff_02",
+    "enemy_dyjsww_c1_talent_02_range_01",
+    "enemy_dyjsww_c1_talent_03_range_01",
+    "enemy_dyjsww_c1_talent_03_range_01_end",
+    "enemy_dyjsww_die_01",
+    "enemy_dyjsww_invincible_01",
+    "enemy_dyjsww_invincible_01_end",
+    "enemy_dyjsww_move_begin_01",
+    "enemy_dyjsww_move_end_01",
+    "tile_end"
+   ]
+  },
+  "enemy_2124_dyjsfg": {
+   "attack": [],
+   "skill": [
+    "enemy_dyjsfg_skill_01",
+    "enemy_dyjsfg_skill_02_range_01",
+    "enemy_dyjsfg_skill_02_range_02"
+   ],
+   "buff": [
+    "enemy_dyjsfg_buff_01",
+    "enemy_dyjsfg_buff_02",
+    "enemy_dyjsfg_buff_04"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_2135_shkrbt": {
+   "attack": [
+    "enemy_shkrbt_attack_01_hit",
+    "enemy_shkrbt_attack_01_start"
+   ],
+   "skill": [
+    "enemy_shkrbt_skill_01_end",
+    "enemy_shkrbt_skill_01_start"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "tile_end"
+   ]
+  },
+  "enemy_9006_actoxi": {
+   "attack": [
+    "enemy_actoxi_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_actoxi_die_2_hit",
+    "enemy_actoxi_die_2_start",
+    "enemy_actoxi_die_2_trail",
+    "enemy_actoxi_idle",
+    "enemy_actoxi_idle_hit"
+   ]
+  },
+  "enemy_9007_acelem": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_acelem_buff"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_9008_acbunn": {
+   "attack": [
+    "enemy_acbunn_attack_1_hit",
+    "enemy_acbunn_attack_1_start",
+    "enemy_acbunn_attack_1_trail",
+    "enemy_acbunn_attack_2_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_acbunn_buff"
+   ],
+   "deploy": [
+    "enemy_acbunn_switch"
+   ],
+   "other": []
+  },
+  "enemy_9009_acfort": {
+   "attack": [
+    "enemy_acfort_attack_hit",
+    "enemy_acfort_attack_start",
+    "enemy_acfort_attack_trail"
+   ],
+   "skill": [
+    "enemy_acfort_skill_01",
+    "enemy_acfort_skill_01_end",
+    "enemy_acfort_skill_02_hit",
+    "enemy_acfort_skill_02_start",
+    "enemy_acfort_skill_02_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acfort_trapped"
+   ]
+  },
+  "enemy_9010_acpupp": {
+   "attack": [
+    "enemy_acpupp_attack_hit",
+    "enemy_acpupp_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acpupp_henshin",
+    "common_invisible",
+    "enemy_duskls_idle_2"
+   ]
+  },
+  "enemy_9011_acrefr": {
+   "attack": [
+    "enemy_acrefr_attack_a",
+    "enemy_acrefr_attack_a_hit",
+    "enemy_acrefr_attack_b_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acrefr_idle_a",
+    "enemy_dushdo_2_buff_03"
+   ]
+  },
+  "enemy_9012_acloon": {
+   "attack": [
+    "enemy_acloon_attack_hit",
+    "enemy_acloon_attack_start",
+    "enemy_acloon_attack_trail"
+   ],
+   "skill": [
+    "enemy_acloon_skill_hit",
+    "enemy_acloon_skill_hit_range",
+    "enemy_acloon_skill_loop_1_line",
+    "enemy_acloon_skill_loop_2_line"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acloon_line_start"
+   ]
+  },
+  "enemy_9013_acstmk": {
+   "attack": [
+    "enemy_acstmk_attack_hit",
+    "enemy_acstmk_attack_start"
+   ],
+   "skill": [
+    "enemy_acstmk_skill_01_start"
+   ],
+   "buff": [
+    "enemy_acstmk_buff_1"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_acstmk_revive_1"
+   ]
+  },
+  "enemy_9013_acstmk_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acstmk_attack_start",
+    "enemy_acstmk_skill_01_start",
+    "enemy_acstmk_revive_1",
+    "enemy_acstmk_buff_1"
+   ]
+  },
+  "enemy_9014_acstma": {
+   "attack": [
+    "enemy_acstma_attack_hit",
+    "enemy_acstma_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acstma_back_end",
+    "enemy_acstma_dizzy_loop",
+    "enemy_acstma_invincible",
+    "enemy_acstma_launch",
+    "enemy_acstma_revive"
+   ]
+  },
+  "enemy_9015_acstmb": {
+   "attack": [
+    "enemy_acstmb_attack_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acstmb_back_end",
+    "enemy_acstmb_launch",
+    "enemy_acstmb_revive",
+    "enemy_acstma_attack_hit",
+    "enemy_acstma_dizzy_loop",
+    "enemy_acstma_invincible"
+   ]
+  },
+  "enemy_9016_acstmr": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acstmr_explode",
+    "enemy_acstmr_explode_range",
+    "enemy_acstmr_move"
+   ]
+  },
+  "enemy_9017_achunt": {
+   "attack": [
+    "enemy_achunt_attack_hit",
+    "enemy_achunt_attack_start_1",
+    "enemy_achunt_attack_trail"
+   ],
+   "skill": [
+    "enemy_achunt_skill_1",
+    "enemy_achunt_skill_1_hit",
+    "enemy_achunt_skill_2"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_achunt_chain",
+    "enemy_achunt_chain_end",
+    "enemy_achunt_chain_hit",
+    "enemy_achunt_shield"
+   ]
+  },
+  "enemy_9017_achunt_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_achunt_attack_start_1",
+    "enemy_achunt_skill_2",
+    "enemy_achunt_chain_hit",
+    "enemy_achunt_shield",
+    "enemy_achunt_skill_1",
+    "enemy_achunt_skill_1_hit"
+   ]
+  },
+  "enemy_9018_actrpa": {
+   "attack": [
+    "enemy_actrpa_attack_start"
+   ],
+   "skill": [
+    "enemy_actrpa_skill_a",
+    "enemy_actrpa_skill_a_hit"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_actrpa_shield",
+    "enemy_actrpa_shield_hit"
+   ]
+  },
+  "enemy_9019_actrpb": {
+   "attack": [],
+   "skill": [
+    "enemy_actrpb_skill_b_hit",
+    "enemy_actrpb_skill_b_start",
+    "enemy_actrpb_skill_b_trail"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_actrpb_shield",
+    "enemy_actrpa_attack_start"
+   ]
+  },
+  "enemy_9020_actrpc": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_actrpc_shield",
+    "enemy_actrpa_attack_start",
+    "enemy_actrpa_skill_a_hit"
+   ]
+  },
+  "enemy_9021_acduml": {
+   "attack": [
+    "enemy_acduml_attack_hit",
+    "enemy_acduml_attack_start",
+    "enemy_acduml_attack_trail"
+   ],
+   "skill": [
+    "enemy_acduml_skill_start"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acduml_lockon"
+   ]
+  },
+  "enemy_9021_acduml_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acduml_attack_start",
+    "enemy_acduml_skill_start",
+    "enemy_acduml_lockon"
+   ]
+  },
+  "enemy_9022_acdumm": {
+   "attack": [
+    "enemy_acdumm_attack_hit",
+    "enemy_acdumm_attack_start",
+    "enemy_acdumm_attack_trail"
+   ],
+   "skill": [
+    "enemy_acdumm_skill_start_01",
+    "enemy_acdumm_skill_start_02"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_acdumm_invincible"
+   ]
+  },
+  "enemy_9023_acdums": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [
+    "enemy_acdums_switch"
+   ],
+   "other": [
+    "enemy_acdums_a_attack_hit",
+    "enemy_acdums_a_skill_start",
+    "enemy_acdums_a_skill_start_2",
+    "enemy_acdums_b_attack_hit",
+    "enemy_acdums_b_skill_start"
+   ]
+  },
+  "enemy_9032_aclionk": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_vtlionk_attack_start_01",
+    "enemy_vtlionk_attack_start_02",
+    "enemy_vtlionk_skill_01_lock_01",
+    "enemy_vtlionk_skill_01_start_01",
+    "enemy_vtlionk_skill_02_start_01",
+    "enemy_vtlionk_skill_02_trap_die_01",
+    "enemy_vtlionk_skill_02_trap_die_02",
+    "enemy_vtlionk_skill_02_trap_die_03",
+    "enemy_vtlionk_skill_03_start_01",
+    "enemy_vtlionk_skill_03_start_02",
+    "enemy_vtlionk_buff_01",
+    "enemy_vtlionk_buff_02",
+    "enemy_vtlionk_buff_03"
+   ]
+  },
+  "enemy_9033_acdeer": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_smdeer_attack_01_range",
+    "enemy_smdeer_attack_01_start",
+    "enemy_smdeer_die_hit",
+    "enemy_smdeer_skill_01_start",
+    "enemy_smdeer_skill_01_start_02",
+    "enemy_smdeer_skill_01_start_03",
+    "enemy_smdeer_skill_01_start_04",
+    "enemy_smdeer_buff_02",
+    "enemy_smdeer_buff"
+   ]
+  },
+  "enemy_10001_trslim": {
+   "attack": [],
+   "skill": [
+    "enemy_trslim_skill_01",
+    "enemy_trslim_skill_buff_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10003_trwlpl_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_trwlpl_attack_01",
+    "enemy_trcerb_common_die_01",
+    "enemy_trwlpl_end-vomit_01",
+    "enemy_trwlpl_idlebuff_02",
+    "enemy_trwlpl_idlebuff_01"
+   ]
+  },
+  "enemy_10018_sgrobh": {
+   "attack": [
+    "enemy_sgrobh_attack_01",
+    "enemy_sgrobh_attack_02",
+    "enemy_sgrobh_attack_hit_01",
+    "enemy_sgrobh_attack_start_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10027_vtsk": {
+   "attack": [
+    "enemy_vtsk_attack_hit_01",
+    "enemy_vtsk_attack_start_01",
+    "enemy_vtsk_attack_weapon_01"
+   ],
+   "skill": [
+    "enemy_vtsk_skill_01_hit_01",
+    "enemy_vtsk_skill_01_marker_01",
+    "enemy_vtsk_skill_01_trail_01",
+    "enemy_vtsk_skill_02_hit_01",
+    "enemy_vtsk_skill_02_start_01",
+    "enemy_vtsk_skill_02_start_02",
+    "enemy_vtsk_skill_02_start_03"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_vtsk_birth_01",
+    "enemy_vtsk_birth_02"
+   ]
+  },
+  "enemy_10028_vtswd": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_vtswd_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_vtshld_buff_birth_01"
+   ]
+  },
+  "enemy_10029_vtshld": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_vtshld_buff_01",
+    "enemy_vtshld_buff_birth_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10030_vtwand": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_vtwand_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_vtshld_buff_birth_01"
+   ]
+  },
+  "enemy_10031_cnvsld": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_cnvsld_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_cnvsld_hit_01"
+   ]
+  },
+  "enemy_10034_cnvsax": {
+   "attack": [],
+   "skill": [
+    "enemy_cnvsax_skill_line_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cnvsax_hit_01",
+    "enemy_cnvsax_hit_02",
+    "enemy_cnvsax_idlebuff_01",
+    "enemy_cnvsld_buff_01"
+   ]
+  },
+  "enemy_10040_cnvbln": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cnvbln_die_01"
+   ]
+  },
+  "enemy_10042_prtrop": {
+   "attack": [
+    "enemy_prtrop_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "common_invisible"
+   ]
+  },
+  "enemy_10042_prtrop_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_prtrop_attack_hit",
+    "common_invisible"
+   ]
+  },
+  "enemy_10043_sailor": {
+   "attack": [
+    "enemy_sailor_attack_hit_1",
+    "enemy_sailor_attack_hit_2"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_sailor_move"
+   ]
+  },
+  "enemy_10044_wintun": {
+   "attack": [
+    "enemy_wintun_attack_1_hit",
+    "enemy_wintun_attack_1_start",
+    "enemy_wintun_attack_2_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_wintun_move",
+    "enemy_wintun_range",
+    "enemy_wintun_range_buff"
+   ]
+  },
+  "enemy_10045_parrot": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_parrot_land",
+    "enemy_parrot_move_1",
+    "enemy_parrot_move_2",
+    "enemy_parrot_takeoff"
+   ]
+  },
+  "enemy_10054_cjhot": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_cjhot_debuff",
+    "enemy_cjhot_idle_01",
+    "enemy_cjhot_idle_02"
+   ]
+  },
+  "enemy_10065_ftzlc": {
+   "attack": [
+    "enemy_ftzlc_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_ftzlc_buff_01",
+    "enemy_ftzlc_buff_02"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_ftzlc_birth_01",
+    "enemy_ftzlc_boom_01"
+   ]
+  },
+  "enemy_10067_ftsjc": {
+   "attack": [
+    "enemy_ftsjc_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_ftsjc_buff",
+    "enemy_ftsjc_buff_01",
+    "enemy_ftsjc_buff_02",
+    "enemy_ftsjc_buff_03"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10073_mpcar": {
+   "attack": [
+    "enemy_mpcar_attack_01_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10077_mpbarr": {
+   "attack": [
+    "enemy_mpbarr_attack_01_hit",
+    "enemy_mpbarr_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10081_mpplai": {
+   "attack": [
+    "enemy_mpplai_attack_01_hit",
+    "enemy_mpplai_attack_01_start",
+    "enemy_mpplai_attack_01_trail",
+    "enemy_mpplai_attack_02_hit",
+    "enemy_mpplai_attack_02_start"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_mpplai_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_mpplai_brith_01"
+   ]
+  },
+  "enemy_10083_hlbird": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_hlbird_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10084_hlegle": {
+   "attack": [
+    "enemy_hlegle_attack_01_hit",
+    "enemy_hlegle_attack_01_start",
+    "enemy_hlegle_attack_01_trail"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_hlegle_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10085_hllevi_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_hllevi_buff_03",
+    "enemy_hllevi_skill_01_range",
+    "enemy_hllevi_buff_02"
+   ]
+  },
+  "enemy_10087_hlchgr": {
+   "attack": [
+    "enemy_hlchgr_attack_01_hit",
+    "enemy_hlchgr_attack_01_start"
+   ],
+   "skill": [
+    "enemy_hlchgr_skill_01_start"
+   ],
+   "buff": [
+    "enemy_hlchgr_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10094_crstf": {
+   "attack": [
+    "enemy_crstf_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_crstf_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10097_crshd": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_crshd_shield_01",
+    "enemy_crshd_tip_01"
+   ]
+  },
+  "enemy_10098_crhro": {
+   "attack": [],
+   "skill": [],
+   "buff": [
+    "enemy_crhro_buff_01",
+    "enemy_crhro_buff_02"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_crhro_2_attack_hit_01",
+    "enemy_crhro_2_attack_start_01",
+    "enemy_crhro_2_attack_start_02",
+    "enemy_crhro_2_attack_trail_01",
+    "enemy_crhro_2_buff_03",
+    "enemy_crhro_2_revive_loop",
+    "enemy_crhro_2_revive_loop_end",
+    "common_invincible_01",
+    "enemy_sgactr_die_01_end"
+   ]
+  },
+  "enemy_10099_crvln": {
+   "attack": [
+    "enemy_crvln_attack_hit_01",
+    "enemy_crvln_attack_start_01",
+    "enemy_crvln_attack_trail_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_crvln_buff_01",
+    "enemy_crvln_buff_02"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10112_ymgds": {
+   "attack": [
+    "enemy_ymgds_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_ymgds_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10116_ymgtop": {
+   "attack": [
+    "enemy_ymgtop_attack_hit_01",
+    "enemy_ymgtop_attack_start_01"
+   ],
+   "skill": [
+    "enemy_ymgtop_skill_01_buff_01"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10118_ymgprc": {
+   "attack": [
+    "enemy_ymgprc_attack_hit_01",
+    "enemy_ymgprc_attack_start_01",
+    "enemy_ymgprc_attack_start_02"
+   ],
+   "skill": [
+    "enemy_ymgprc_skill_hit_01",
+    "enemy_ymgprc_skill_start_01",
+    "enemy_ymgprc_skill_start_02"
+   ],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10122_uacann_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_uacann_attack_start_01",
+    "enemy_uacann_buff_01"
+   ]
+  },
+  "enemy_10123_uareap": {
+   "attack": [
+    "enemy_uareap_attack_hit_01",
+    "enemy_uareap_attack_start_01",
+    "enemy_uareap_attack_trail_01"
+   ],
+   "skill": [
+    "enemy_uareap_skill_hit_01",
+    "enemy_uareap_skill_start_01"
+   ],
+   "buff": [
+    "enemy_uareap_buff_01"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_uareap_combat_hit_01",
+    "enemy_uareap_combat_start_01"
+   ]
+  },
+  "enemy_10124_uashld_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_uashld_attack_hit_b_01",
+    "enemy_uashld_attack_start_b_01",
+    "enemy_uashld_attack_hit_a_01",
+    "enemy_uashld_attack_start_a_01",
+    "enemy_uashld_buff_01"
+   ]
+  },
+  "enemy_10127_rkmbst_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_rkmbst_attack_hit_01",
+    "enemy_rkmbst_attack_start_01",
+    "enemy_rkmbst_buff_01"
+   ]
+  },
+  "enemy_10138_xdsnow": {
+   "attack": [
+    "enemy_xdsnow_attack_hit_01"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_xdsnow_die_01"
+   ]
+  },
+  "enemy_10141_xdpeng_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_xdpeng_die_01"
+   ]
+  },
+  "enemy_10146_nscola": {
+   "attack": [
+    "enemy_nscola_attack_01_hit"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_nscola_buff_01"
+   ],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10147_nsbomb": {
+   "attack": [
+    "enemy_nsbomb_attack_01_hit_01",
+    "enemy_nsbomb_attack_01_hit_02",
+    "enemy_nsbomb_attack_01_trail"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": []
+  },
+  "enemy_10156_mncrer": {
+   "attack": [
+    "enemy_mncrer_attack_hit"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mncrer_die_start"
+   ]
+  },
+  "enemy_10162_mnctpt": {
+   "attack": [
+    "enemy_mnctpt_attack_hit",
+    "enemy_mnctpt_attack_start",
+    "enemy_mnctpt_attack_trail"
+   ],
+   "skill": [],
+   "buff": [
+    "enemy_mnctpt_buff"
+   ],
+   "deploy": [],
+   "other": [
+    "enemy_mnctpt_lockon_1",
+    "enemy_mnctpt_lockon_2",
+    "common_v069_buff"
+   ]
+  },
+  "enemy_10163_mnctur_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_mnctur_attack_hit",
+    "enemy_mnctur_stun",
+    "enemy_mnctur_stun_hit",
+    "enemy_mnctur_move_1",
+    "enemy_mnctur_rush_hit"
+   ]
+  },
+  "enemy_10196_ubba": {
+   "attack": [
+    "enemy_ubba_attack_01_hit",
+    "enemy_ubba_attack_01_start"
+   ],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ubba_range_01"
+   ]
+  },
+  "enemy_10196_ubba_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_ubba_attack_01_hit",
+    "enemy_ubba_attack_01_start",
+    "enemy_ubba_range_01"
+   ]
+  },
+  "enemy_10229_agactr_2": {
+   "attack": [],
+   "skill": [],
+   "buff": [],
+   "deploy": [],
+   "other": [
+    "enemy_agactr_attack_hit_01",
+    "enemy_agactr_attack_start_01",
+    "enemy_agactr_range_02"
+   ]
+  }
+ }
+}
