@@ -3712,11 +3712,11 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
           if (ctx.live && room.matchCtx === ctx) this.onCheckpoint?.(room, ctx, match, reason);
         },
         // 断点续玩（版本宿主）：宿主在安全点把 snapshotMatch 的结果回传，这里转给 persister 存。
-        // 只有本进程开着持久化（persister 设了 onCheckpoint）时才让宿主做快照。
-        ...(this.onCheckpoint ? { checkpoints: true } : {}),
-        onCheckpointDoc: (doc, reason) => {
+        // 只有本进程开着持久化（persister 设了 onCheckpoint）时才让宿主做快照 ——
+        // 关闭持久化时这两个键都不出现，普通房间的 opts 与以前一模一样。
+        ...(this.onCheckpoint ? { checkpoints: true, onCheckpointDoc: (doc, reason) => {
           if (ctx.live && room.matchCtx === ctx) this.onHostedCheckpoint?.(room, ctx, ctx.match, doc, reason);
-        },
+        } } : {}),
         // 带存档创建：由宿主在 create 里 restoreMatch（主进程拿不到 Match 本体）
         ...(restore?.hostedDoc ? { restoreDoc: restore.hostedDoc, restoreReplay: restore.replay === true } : {}),
       };

@@ -81,6 +81,10 @@ function harness({ versions = versionStub(), versionHosts = null, plugins = null
   const frames = new Map();
   const player = (name) => {
     const s = registry.create(name);
+    // 本服规则：游客不能建房（server/lobby.js create）。这个 harness 造的都是「已登录」玩家，
+    // 否则每条建房用例都只会拿到「游客不能创建同盟模拟房间，请先登录」。
+    s.guest = false;
+    s.accountId = `acc_${s.playerId}`;
     s.connected = true;
     s.disconnectedAt = null;
     const box = [];
@@ -427,6 +431,7 @@ test('room.create: unknown or disabled → VERSION_UNKNOWN; a version without th
   // a lobby without the service knows 第二期下半 alone
   const bare = new Lobby({ registry: new SessionRegistry(), log: quiet, MatchClass: Rec, getData });
   const s = bare.registry.create('X');
+  s.guest = false; s.accountId = `acc_${s.playerId}`;
   s.connected = true;
   refused(bare.create(s, { mode: 'solo', version: 'act1autochess' }), ERR.VERSION_UNKNOWN);
   ok(bare.create(s, { mode: 'solo', version: DEFAULT_VERSION }));
@@ -513,6 +518,10 @@ test('gameplay plugins: refused in a version room and for a proposal while on; c
   h.clock.t += 1000;
   const g = h.player('Guest');
   room.mode = 'coop'; // (a second human for a vote)
+  // 本服容量与座位数组都是建房时算好的（Room 构造：new Array(capacity)）；只改 mode 不会扩容，
+  // 于是 freeSeat() 仍是 -1 → join 回 ROOM_FULL。这里把两者一起扩到 4。
+  room.capacity = 4;
+  room.seats = [...room.seats, null, null, null];
   ok(h.lobby.join(g, { code: room.code }));
   ok(h.lobby.proposeVersion(p, { version: 'act1autochess' }));
   plugins.resolve = (ids, opts) => (opts.version !== DEFAULT_VERSION ? { error: ERR.PLUGIN_BLOCKED } : resolve(ids, opts));
@@ -665,10 +674,16 @@ test('startMatch: a version room plays in its version host (version + requireCs)
   ok(h.lobby.start(q));
   assert.equal(hosted.length, 1);
   const keys = Object.keys(Rec.last).sort();
-  assert.deepEqual(keys, ['aiPicksLast', 'broadcast', 'cs', 'data', 'difficulty', 'hostId', 'log', 'matchNo', 'mode', 'modeId', 'now', 'onEnd', 'roomCode', 'seats', 'seed', 'send', 'spectators']);
+  // hiddenSpectators：本服的隐身观战（room.state 的 players/spectators 之外的那一类座位），一直在这个 opts 里
+  // 本服新增的三个键（线上一直在传，属既有行为）：
+  //   hiddenSpectators —— 隐身观战；
+  //   onIdleKick       —— 挂机移出（2026-10-31 接上，之前是空操作）；
+  //   onCheckpoint     —— 断点续玩的安全点（选人开始 / 备战结束 / 选秀开始）。
+  assert.deepEqual(keys, ['aiPicksLast', 'broadcast', 'cs', 'data', 'difficulty', 'hiddenSpectators', 'hostId', 'log', 'matchNo', 'mode', 'modeId', 'now', 'onCheckpoint', 'onEnd', 'onIdleKick', 'roomCode', 'seats', 'seed', 'send', 'spectators']);
   // a version room without a version host, and the real Match class: never in this process
   const lone = new Lobby({ registry: new SessionRegistry(), log: quiet, content: { cs: VANILLA }, getData, versions: versionStub() });
   const s = lone.registry.create('C');
+  s.guest = false; s.accountId = `acc_${s.playerId}`;
   s.connected = true;
   ok(lone.create(s, { mode: 'solo', version: 'act1autochess' }));
   ok(lone.contentReady(s, { cs: CS.act1autochess }));
@@ -684,6 +699,7 @@ test('the real version service: a room of 第一期上半 names its real cs and 
   const registry = new SessionRegistry();
   const lobby = new Lobby({ registry, log: quiet, MatchClass: Rec, content: { cs: vanilla.cs }, getData, versions });
   const s = registry.create('A');
+  s.guest = false; s.accountId = `acc_${s.playerId}`;
   s.connected = true;
   ok(lobby.create(s, { mode: 'coop', difficulty: 'ABYSS', version: 'act1autochess@V1_1' }));
   const room = lobby.getRoom(s.roomCode);

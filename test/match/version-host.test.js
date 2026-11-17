@@ -235,6 +235,9 @@ test('a test room of a version plays in its host: test commands through the prox
   const lobby = new Lobby({ registry, log: quiet, content: { cs: vanilla.cs }, getData, versions, versionHosts, options: { testMode: '1', testHost: '127.0.0.1' } });
   try {
     const s = registry.create('Tester');
+  // 本服规则：游客不能建房 —— 这个用例的「Tester」是已登录玩家。
+  s.guest = false;
+  s.accountId = `acc_${s.playerId}`;
     s.connected = true;
     s.disconnectedAt = null;
     s.ws = { readyState: 1, bufferedAmount: 0, send() {}, terminate() {} };

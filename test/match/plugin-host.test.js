@@ -31,6 +31,7 @@ import { createMatchHosts, HostError } from '../../server/match/host/index.js';
 import { DataSource } from '../../server/sim/simdata.js';
 import { EMOTES, ERR } from '../../shared/constants.js';
 import { TestClient } from '../helpers/wsClient.js';
+import { accountToken } from '../helpers/accountToken.js';
 import { writePlugin } from '../helpers/pluginFixtures.js';
 import { attachWsSimClient } from './simClient.js';
 
@@ -176,7 +177,13 @@ describe('match hosts (P1c): a content set\'s matches in a match host of its own
   });
 });
 
-describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () => {
+// 本服规则「游客不能建房」：走真实 WebSocket 的用例必须带登录身份令牌。
+// 公开克隆 / CI 没有 .secrets/watch-secret，签不出令牌 —— 整组跳过而不是变红。
+// 每个名字一个独立 uid：同一个 uid 的两台会被服务端当成「同账号第二台」，后者接管前者的座位。
+const tokenFor = (name) => accountToken(900000 + [...String(name)].reduce((n, ch) => n * 31 + ch.charCodeAt(0) % 9973, 0) % 90000);
+const CAN_LOGIN = !!accountToken(900001);
+
+describe('match hosts in rooms (P1c): verification, the watchdog, crashes', { skip: CAN_LOGIN ? false : 'no .secrets/watch-secret in this checkout (public clone or CI)' }, () => {
   const open = [];
   const servers = [];
   after(async () => {
@@ -186,7 +193,7 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
   const player = async (srv, name) => {
     const c = await TestClient.connect(srv.url.replace('http', 'ws') + '/ws');
     open.push(c);
-    const w = await c.hello(name);
+    const w = await c.hello(name, undefined, { accountToken: tokenFor(name), guest: false });
     c.id = w.playerId;
     return c;
   };
