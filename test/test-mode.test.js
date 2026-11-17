@@ -118,6 +118,11 @@ function openLobby(t, extra = {}) {
   const player = (name) => {
     const s = registry.create(name);
     s.connected = true;
+    // 本服规则（比上游晚加的）：游客不能建房 / 开始，所以测试会话要带账号身份。
+    // 不加这两行，`lobby.create` 会先撞上游客门（BAD_MSG「游客不能创建同盟模拟房间」），
+    // 这 5 条用例就永远测不到 test-mode 自己的门 —— 与 test-mode 本身无关。
+    s.accountId = `acc_${s.playerId}`;
+    s.guest = false;
     s.messages = [];
     s.ws = { readyState: 1, bufferedAmount: 0, send: (txt) => s.messages.push(JSON.parse(txt)) };
     return s;
