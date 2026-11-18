@@ -46,9 +46,31 @@ const ALIGN = { 0: 'view', 1: 'world', 2: 'local', 3: 'facing', 4: 'velocity' };
 /** ParticleEffect spawn locations on the ground (ranges, decals). */
 export const GROUND_SPAWNS = new Set([5, 7, 17, 26, 35]);
 
+/** Unity 内置网格的名字（可能带实例后缀，如 Plane003-965b3636）。 */
+// 名称里可能带点（plane.025）、数字后缀（cone001）和实例哈希（-ffd6f02c）。
+// Unity 自带的内置网格（Quad/Plane/Cube/Sphere/Capsule/Cylinder）裸名或带实例后缀都算；
+// 其他形状（cone/pyramid/hemisphere/geosphere/disc/circle）必须带数字后缀才是内置，
+// 免得把合成名（测试里的 'cone'）误判。
+const BUILTIN_MESH = /^(?:(quad|plane|cube|sphere|capsule|cylinder)(?:[._]?\d+(?:-[0-9a-f]+)?)?|(cone|pyramid|hemisphere|geosphere|disc|circle)[._]?\d+(?:-[0-9a-f]+)?)$/i;
+
 /** A mesh reference ({ mesh: key }, { builtin: 'Quad' } or 'builtin:Quad') as a library key. */
 export function meshRef(v) {
-  if (typeof v === 'string') return v || null;
+  if (typeof v === 'string') {
+    if (!v) return null;
+    if (v.startsWith('builtin:')) return v;
+    // 2026-11-18：Unity 内置网格被提取成带实例后缀的普通名字，清单里没有 →
+    // draw() 里 kind==='mesh' 的条目每帧被跳过。归一到 builtin:<Type>，由 library.js 生成。
+    const bm = BUILTIN_MESH.exec(v);
+    if (bm) {
+      const n = (bm[1] || bm[2] || '').toLowerCase();
+      // 2026-11-18：内置 Plane 是 10×10 单位，用在粒子上会大得离谱；
+      // 缺网格时一律用 1×1 的 Quad 兜底（与 billboard 粒子的观感一致），
+      // 只有 cube / sphere 才用同形体的内置网格。
+      const type = n === 'cube' ? 'Cube' : (n === 'sphere' || n === 'geosphere' || n === 'hemisphere') ? 'Sphere' : 'Quad';
+      return 'builtin:' + type;
+    }
+    return v;
+  }
   if (v && typeof v.mesh === 'string') return v.mesh;
   if (v && typeof v.builtin === 'string') return 'builtin:' + v.builtin;
   return null;

@@ -109,8 +109,15 @@ export function compileMaterial(m, opts = {}) {
   for (const [name, t] of Object.entries(isObj(m?.textures) ? m.textures : {})) {
     const s = Array.isArray(t?.st) ? t.st : [1, 1, 0, 0];
     vecs[name + '_ST'] = [num(s[0], 1), num(s[1], 1), num(s[2], 0), num(s[3], 0)];
-    const key = typeof t?.tex === 'string' && !t.tex.startsWith('builtin:') ? t.tex : null;
-    textures.push({ name, key, def: typeof t?.default === 'string' ? t.default : (/Distur|Disturb|Add|Mask/.test(name) ? 'black' : 'white') });
+    const rawKey = typeof t?.tex === 'string' && !t.tex.startsWith('builtin:') ? t.tex : null;
+    // 2026-11-18：Unity 内置贴图（Default-Particle / Default-ParticleSystem / Default-Line …）
+    // 被提取成了带实例后缀的普通名字，清单里没有 → lib.texture() 永久返回 null →
+    // draw() 里该粒子系统每帧被跳过（items 有、tris 无）。内置贴图本身就是白色圆点，
+    // 走 key: null 的白色兜底即可（Default-Particle 是白色软圆，视觉等价）。
+    const key = rawKey && !/^default-/.test(rawKey) ? rawKey : null;
+        // 被归一成 null 的内置贴图：白色兜底（Default-Particle 是白色圆点）
+    const isBuiltin = !!rawKey && key === null;
+    textures.push({ name, key, def: typeof t?.default === 'string' ? t.default : (isBuiltin ? 'white' : (/Distur|Disturb|Add|Mask/.test(name) ? 'black' : 'white')) });
   }
   const p = Array.isArray(m?.passes) && m.passes.length ? m.passes[0] : {};
   const b = Array.isArray(p.blend) ? p.blend : ['SrcAlpha', 'OneMinusSrcAlpha', 'Zero', 'OneMinusSrcAlpha'];

@@ -1430,6 +1430,17 @@ const binding = (o) => Object.freeze({
   ...(o.hits ? { hits: Object.freeze(o.hits) } : {}),
 });
 export const FX_BINDINGS = Object.freeze({
+  // 塔露拉 S3 日冕重烈（op-oxi.js volley）：每次齐射发一次 heatwave { x, y, dir, n, id, skill }，
+  // 官方没有「簇火」本体的 prefab —— oxi_ 前缀 21 个资源里只有起手 oxi_skill_03_start_01 与
+  // 光环 oxi_skill_03_buff_01，没有飞行体。维护者决定（方案 A）用最接近的官方资源顶上：
+  //   enemy_actoxi_die_2_trail  敌方塔露拉的投射物拖尾（维护者点名）—— 但它 live=0，靠运动拖尾，
+  //                             静态播放时一个粒子都不会出现；
+  //   oxi_attack_hit_01         她自己的火焰爆发（16 个粒子系统 / 57 活粒子）—— 保证齐射有可见的火焰。
+  // [ASSUMED] 用「齐射点上的一次爆发」代表沿车道飞行的簇火：我们的技能数据里没有任何投射物引用，
+  // 无法还原逐颗飞行；这条只保证「放 S3 时能看见火」，不是官方原貌。
+  skchr_oxi_3: Object.freeze({
+    heatwave: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['enemy_actoxi_die_2_trail', 'oxi_attack_hit_01'] }),
+  }),
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it
