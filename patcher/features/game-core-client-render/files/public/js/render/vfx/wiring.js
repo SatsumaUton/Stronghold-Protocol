@@ -601,6 +601,27 @@ export class FxWiring {
         k = alt;
       }
     }
+    // ★ 2026-11-18（玩家：凛御银灰每个皮肤的呈现效果不一样）：
+    //   范围框这类特效有朝向变体（`_up_` / `_down_` / `_left_` 插在皮肤后缀之前），
+    //   我们以前永远只播不带朝向的那一个。这里按单位朝向挑朝向变体。
+    const dir = String((v && v.info && v.info.dir) || '').toLowerCase();
+    if (dir && dir !== 'right' && k) {
+      const iHash = k.indexOf('#');
+      if (iHash >= 0) {
+        // base_sale#20 → base_<dir>_sale#20
+        const head = k.slice(0, iHash);
+        const tail = k.slice(iHash);
+        const pieces = head.split('_');
+        if (pieces.length >= 2) {
+          const skinTag = pieces.pop();
+          const cand = `${pieces.join('_')}_${dir}_${skinTag}${tail}`;
+          if (this.ofx.lib.has(cand)) k = cand;
+        }
+      } else {
+        const cand = `${k}_${dir}`;
+        if (this.ofx.lib.has(cand)) k = cand;
+      }
+    }
     if (k === YU_WALL_SOURCE) {
       const wall = new YuWall(this, v);
       this.walls.add(wall);
