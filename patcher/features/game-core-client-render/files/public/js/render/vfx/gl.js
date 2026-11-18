@@ -146,6 +146,8 @@ export class FxGL {
    */
   _plan(rec, mat) {
     let p = rec.plans.get(mat);
+    // boost 开关会改变解析出的值：切换时让所有 program 的 plan 缓存失效。
+    if (p && p.boost !== !!this._boost) p = null;
     if (p) return p;
     const gl = this.gl;
     p = { tex: [], f: [], v: [] };
@@ -155,9 +157,22 @@ export class FxGL {
       if (u.unit >= 0) {
         const t = mat.textures.find((x) => x.name === nm);
         p.tex.push({ loc: u.loc, unit: u.unit, key: t && t.key ? t.key : null, fallback: this.defaults[t?.def || 'white'] || this.defaults.white, glTex: null });
-      } else if (u.type === gl.FLOAT) p.f.push({ loc: u.loc, name: nm, value: mat.floats[nm] ?? UNIFORM_DEFAULTS[nm] ?? 0 });
-      else if (u.type === gl.FLOAT_VEC4) p.v.push({ loc: u.loc, name: nm, value: mat.vecs[nm] || (nm.endsWith('_ST') ? ST1 : nm.startsWith('_Rotation') ? ROT1 : V0) });
+      } else if (u.type === gl.FLOAT) {
+        // 2026-11-18 诊断：boost 模式下把「会把 alpha 压成 0」的几个标量拉回安全值。
+        let val = mat.floats[nm] ?? UNIFORM_DEFAULTS[nm] ?? 0;
+        if (this._boost) {
+          if (nm === '_Amount') val = 0;
+          else if (nm === '_Opacity') val = 1;
+          else if (nm === '_BorderWidth') val = 1;
+        }
+        p.f.push({ loc: u.loc, name: nm, value: val });
+      } else if (u.type === gl.FLOAT_VEC4) {
+        let val = mat.vecs[nm] || (nm.endsWith('_ST') ? ST1 : nm.startsWith('_Rotation') ? ROT1 : V0);
+        if (this._boost && (nm === '_MainColor' || nm === '_TintColor' || nm === '_Color')) val = BOOST_COLOR;
+        p.v.push({ loc: u.loc, name: nm, value: val });
+      }
     }
+    p.boost = !!this._boost;
     rec.plans.set(mat, p);
     return p;
   }
@@ -448,7 +463,7 @@ export class FxGL {
         this.stats.probe = {
           sampled, changed, pct: Math.round((changed / sampled) * 1000) / 10,
           maxDelta: maxD, avgDelta: Math.round(sumD / sampled),
-          size: [w, h], items: items.length, tris: this.stats.tris, filter: this._probeFilter || null,
+          size: [w, h], items: items.length, tris: this.stats.tris, filter: this._probeFilter || null, boost: !!this._boost,
         };
       } catch (e) { this.stats.probe = { error: 'after:' + String(e && e.message || e) }; }
     }
@@ -520,6 +535,9 @@ function GL_BLEND(gl, b) {
     default: return gl.ONE;
   }
 }
+
+/** boost 诊断模式下的不透明色。 */
+const BOOST_COLOR = [1, 1, 1, 1];
 
 function DEPTH_FUNC(gl, z) {
   switch (z) {

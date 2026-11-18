@@ -413,13 +413,14 @@ export class FxWiring {
   _installDebug() {
     if (typeof globalThis === 'undefined' || globalThis.__SP_FX_DEBUG__) return;
     // 一次性像素探针：调用后下一帧 draw 前后各读一次画布，结果见 fxPasses().probe。
-    globalThis.__SP_FX_PROBE__ = (filter) => {
+    globalThis.__SP_FX_PROBE__ = (filter, opts) => {
       const g = this.ofx && this.ofx.glr;
       if (!g) return { error: (this.ofx ? '无 glr' : '无 ofx') + '：特效层没起来' };
       g.stats.probe = null;
       g._probeFilter = typeof filter === 'string' && filter ? filter : null;
+      g._boost = !!(opts && opts.boost);
       g._probeArmed = 1;
-      return '已置位（filter=' + (g._probeFilter || '全部') + '），等下一帧或两帧后看 __SP_FX_DEBUG__().fxPasses.probe';
+      return '已置位（filter=' + (g._probeFilter || '全部') + (g._boost ? '，材质增强' : '') + '），等下一帧或两帧后看 __SP_FX_DEBUG__().fxPasses.probe';
     };
     globalThis.__SP_FX_DEBUG__ = () => {
       const ofx = this.ofx;
