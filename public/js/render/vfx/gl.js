@@ -297,7 +297,15 @@ export class FxGL {
    */
   draw(items, frame) {
     const gl = this.gl;
-    // a mask up the Pixi tree may have scissor / stencil on: kept as they are (the effects layers are never masked)
+    // ★ 2026-11-18（玩家：官方技能特效全都看不到，只有我们的程序化泡泡能看见）：
+    //   泡泡走 Pixi/Spine，官方特效走这里这套 raw GL。之前这里只写了 gl.enable(BLEND) 就直接画，
+    //   而 Pixi 在画过带遮罩 / 圆角的元素之后会把 **SCISSOR_TEST** 留在开启状态、并把 scissor 矩形
+    //   设成那个元素 —— 我们的三角形于是被裁到那个小矩形里，等于「画了但看不见」。
+    //   同理 STENCIL_TEST 与 viewport 也可能被上一个 pass 留下。这套特效层永远不被遮罩，
+    //   所以在这里显式关掉 scissor / stencil，并把 viewport 摆成整个画布。
+    gl.disable(gl.SCISSOR_TEST);
+    gl.disable(gl.STENCIL_TEST);
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.enable(gl.BLEND);
     gl.frontFace(gl.CW);
     let lastProg = null, lastState = null;

@@ -98,6 +98,11 @@ export function heightfield(heightAt, rows = 19, cols = 21, bias = 0.02) {
  * global uniforms while our program is still bound (WebGL INVALID_OPERATION).
  */
 export function resetPixi(renderer) {
+  // ★ 2026-11-18：raw GL 画完之后要把我们自己改过的 GL 状态交还给 Pixi，
+  //   否则下一帧 Pixi 的批次会带着被我们关掉的 SCISSOR/STENCIL 状态继续画。
+  //   renderer.state.reset() 会恢复 Pixi 记录的状态；SCISSOR_TEST 不在 Pixi 的记录里，所以显式再关一次。
+  try { renderer.gl?.disable(renderer.gl.SCISSOR_TEST); } catch { /* ignore */ }
+  try { renderer.gl?.disable(renderer.gl.STENCIL_TEST); } catch { /* ignore */ }
   try { renderer.shader.reset(); } catch { /* ignore */ }
   try { renderer.batch.reset(); } catch { /* ignore */ }
   try { renderer.geometry.reset(); } catch { /* ignore */ }
