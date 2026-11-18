@@ -246,6 +246,10 @@ export class FxWiring {
     this.skills = new SkillFx(this);
     this.talents = new TalentFx(this);
     this.funnels = new FunnelFx(this);
+    // ★ 2026-11-18：诊断钩子必须在**构造函数**里装 —— 放进 begin() 末尾时，ofx.active 为 false
+    //   会让 begin() 第一行就 return，钩子根本不存在（玩家执行时 got
+    //   __SP_FX_DEBUG__ is not defined）。而这个未定义本身就是诊断信息：官方特效没开/不可用。
+    this._installDebug();
   }
 
   get index() { return this.idx; }
@@ -401,11 +405,7 @@ export class FxWiring {
     const n = await this.ofx.lib.preload(keys, { half: this.ofx.lite });
     this.ofx.warm?.(keys);
     this._dbgKeys = keys;
-    // ★ 2026-11-18（维护者/玩家：银灰 S3、遥的技能特效「还是看不到」）：
-    //   素材 / 数据 / plan / 预加载四层都验证过了，剩下的只能从运行现场看。
-    //   玩家在控制台执行 __SP_FX_DEBUG__() 就能拿到：特效档位（tier，关掉就什么都看不到）、
-    //   丢弃计数、每个单位的 plan 桶与已持有的循环句柄数、以及这次战斗预加载了哪些 key。
-    this._installDebug();
+    // 钩子在构造函数里已装好（见 _installDebug 的注释）：这里只记录本次预加载的 key 供它读。
     return n;
   }
 
