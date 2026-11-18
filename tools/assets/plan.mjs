@@ -521,7 +521,13 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     }
     const primarySkill = skillSfx[String(idx[0])];
     if (primarySkill) u.skill = primarySkill;
-    if (Object.keys(skillSfx).length > 1) u.skills = skillSfx;
+    // ★ 2026-11-18（维护者：干员技能音效缺失）：以前只在 `skillSfx` **多于一条**时才写 `skills`，
+    //   于是一个只有某个技能带 ON_SKILL_START 的干员整条技能发动音都丢了 —— 凛御银灰 S3
+    //   (`p_skill_snwlprdg_s`)、塔露拉 S3 (`p_skill_xtlfgbw_s`) 都是这种：音在索引 2，
+    //   `skillSfx[String(idx[0])]`（索引 0）取不到，`length > 1` 也不成立，两条路都没写。
+    //   只要有一个技能有发动音就写 `skills`；客户端 audio.js 的取值顺序是 `skills[index]` 优先、
+    //   没有才退回 `u.skill`，所以这对原本有 `skill` 的单位没有改变行为。
+    if (Object.keys(skillSfx).length) u.skills = skillSfx;
     if (Object.keys(attacks).length) u.attacks = attacks;
     if (Object.keys(hits).length) u.hits = hits;
     if (Object.keys(attackMix).length) u.attackMix = attackMix;

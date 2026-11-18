@@ -160240,6 +160240,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_1036_fang2.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_1037_amiya3": {
@@ -160470,6 +160473,9 @@
           },
           "attackPools": {
             "2": "battle.ON_ABILITY_START.char_1045_svash2.attack.1"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/player/p_skill/p_skill_snwlprdg_s.mp3"
           }
         },
         "char_1046_sbell2": {
@@ -160723,6 +160729,9 @@
           },
           "attackPools": {
             "1": "battle.ON_ABILITY_START.char_135_halo.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_136_hsguma": {
@@ -160864,6 +160873,9 @@
           "attack": "/assets/audio/sfx/player/p_atk/p_atk_heal_l.mp3",
           "pools": {
             "attack": "battle.ON_ABILITY_START.char_179_cgbird.attack"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/player/p_skill/p_field_elefield_loop.mp3"
           }
         },
         "char_180_amgoat": {
@@ -160887,6 +160899,9 @@
           "attack": "/assets/audio/sfx/player/p_atk/p_atk_darkmag_n.mp3",
           "pools": {
             "attack": "battle.ON_ABILITY_START.char_183_skgoat.attack"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/player/p_skill/p_field_calcinosis.mp3"
           }
         },
         "char_185_frncat": {
@@ -160964,6 +160979,9 @@
             "hit": {
               "vol": 0.65
             }
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/player/p_skill/p_field_elefield_loop.mp3"
           }
         },
         "char_196_sunbr": {
@@ -161148,6 +161166,9 @@
           },
           "hitPools": {
             "2": "battle.ON_ABILITY_HIT.char_2025_shu.attack.2.1"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/player/p_skill/p_skill_drgndfmrhl.mp3"
           }
         },
         "char_2026_yu": {
@@ -161280,6 +161301,9 @@
           },
           "attackPools": {
             "1": "battle.ON_ABILITY_ON.char_218_cuttle.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_219_meteo": {
@@ -161755,6 +161779,9 @@
           "pools": {
             "attack": "battle.ON_ABILITY_ON.char_325_bison.attack",
             "hit": "battle.ON_ABILITY_HIT.char_325_bison.attack"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_defboost.mp3"
           }
         },
         "char_328_cammou": {
@@ -161769,6 +161796,9 @@
           },
           "attackPools": {
             "1": "battle.ON_ABILITY_ON.char_328_cammou.attack.2"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_332_archet": {
@@ -161814,6 +161844,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_333_sidero.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_337_utage": {
@@ -161929,6 +161962,9 @@
           "hit": "/assets/audio/sfx/player/p_atk/p_atk_punch_n.mp3",
           "pools": {
             "hit": "battle.ON_ABILITY_HIT.char_347_jaksel.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_tactboost.mp3"
           }
         },
         "char_348_ceylon": {
@@ -162044,6 +162080,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_367_swllow.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_tactboost.mp3"
           }
         },
         "char_373_lionhd": {
@@ -162261,6 +162300,9 @@
           "pools": {
             "attack": "battle.ON_ABILITY_START.char_4031_liesel.attack.0",
             "hit": "battle.ON_ABILITY_HIT.char_4031_liesel.attack.0"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4036_forcer": {
@@ -162750,6 +162792,9 @@
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_4098_vvana.attack.2.1",
             "2": "battle.ON_ABILITY_HIT.char_4098_vvana.attack.3"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4100_caper": {
@@ -162995,6 +163040,9 @@
           },
           "attackPools": {
             "1": "battle.ON_ABILITY_ON.char_4139_papyrs.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_healboost.mp3"
           }
         },
         "char_4145_ulpia": {
@@ -163154,6 +163202,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_4166_varkis.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_416_zumama": {
@@ -163190,6 +163241,9 @@
           },
           "attackPools": {
             "1": "battle.ON_ABILITY_START.char_4177_brigid.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4179_monstr": {
@@ -163212,6 +163266,9 @@
           },
           "hitPools": {
             "2": "battle.ON_ABILITY_HIT.char_4179_monstr.attack.4"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4191_tippi": {
@@ -163400,6 +163457,9 @@
           "attackPools": {
             "1": "battle.ON_ABILITY_ON.char_4204_mantra.attack.1",
             "2": "battle.ON_ABILITY_START.char_4204_mantra.attack.2"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/player/p_skill/p_skill_mtelrncpnt.mp3"
           }
         },
         "char_4207_branch": {
@@ -163493,6 +163553,9 @@
           "pools": {
             "attack": "battle.ON_ABILITY_START.char_4221_ju.attack",
             "hit": "battle.ON_PROJECTILE_HIT.projectile_chr_ju"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4222_taraxa": {
@@ -163756,6 +163819,9 @@
           },
           "attackPools": {
             "2": "battle.ON_ABILITY_ON.char_4244_tocka.attack.1"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/battle/b_char/b_char_rylntbw_s.mp3"
           }
         },
         "char_4245_alga": {
@@ -163776,6 +163842,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_4245_alga.attack.1"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_atkboost.mp3"
           }
         },
         "char_4246_dminon": {
@@ -163828,6 +163897,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_4247_oxi.attack.0.1"
+          },
+          "skills": {
+            "2": "/assets/audio/sfx/player/p_skill/p_skill_xtlfgbw_s.mp3"
           }
         },
         "char_426_billro": {
@@ -164007,6 +164079,9 @@
           },
           "hitPools": {
             "1": "battle.ON_ABILITY_HIT.char_455_nothin.attack.2"
+          },
+          "skills": {
+            "1": "/assets/audio/sfx/battle/b_char/b_char_tactboost.mp3"
           }
         },
         "char_469_indigo": {
