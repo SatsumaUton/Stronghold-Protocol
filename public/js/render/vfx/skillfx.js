@@ -1182,6 +1182,23 @@ export class SkillFx {
     const at = bind.at === 'point' || !tv ? this._ground(x, y, tv) : tv;
     if (bind.oneshot) {
       let drew = false;
+      // ★ 2026-11-18（玩家：塔露拉的火雨看不到）：heatwave 带 n（车道数）与 dir，
+      //   官方表现是「一条横向铺开的火」，不是脚下一次。这里按车道铺 n 份。
+      //   dir: 0/2 = 朝左右 → 车道是行（y 变化）；1/3 = 朝上下 → 车道是列（x 变化）。
+      const lanes = bind.lanes ? Math.max(1, Math.min(16, Number(extra.n) || 1)) : 1;
+      if (lanes > 1) {
+        const d = Number(extra.dir) | 0;
+        const across = (d === 0 || d === 2);
+        const half = (lanes - 1) / 2;
+        for (let i = 0; i < lanes; i++) {
+          const off = i - half;
+          const px = across ? x : x + off;
+          const py = across ? y + off : y;
+          const pt = this._ground(px, py, null);
+          for (const k of keys) if (this.w.playOn(k, pt, { important: true })) drew = true;
+        }
+        return drew;
+      }
       for (const k of keys) if (this.w.playOn(k, at, { important: true })) drew = true;
       return drew;
     }

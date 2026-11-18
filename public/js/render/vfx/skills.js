@@ -1438,7 +1438,7 @@ export const FX_BINDINGS = Object.freeze({
   // [ASSUMED] 只做「齐射点上放一次」：我们的技能数据里没有 projectileKey，无法还原逐颗沿车道飞行；
   // 资源与触发时机来自官方数据，只有位置/数量是近似。
   skchr_oxi_3: Object.freeze({
-    heatwave: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['oxi_skill_03_trail_01'] }),
+    heatwave: binding({ owner: 'id', at: 'point', oneshot: true, lanes: true, keys: ['oxi_skill_03_trail_01'] }),
   }),
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),

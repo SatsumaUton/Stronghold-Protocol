@@ -589,9 +589,15 @@ export class FxHandle {
     fx.handle = this;
     // a one-shot nobody stops is capped: its authored duration (plus its linger), else ONE_SHOT_TTL; a looping prefab
     // nobody owns (the wiring stops it at its end event) ends after LOOP_TTL at the latest
-    if (!this.opts.loop && !this.opts.important) {
+    // ★ 2026-11-18（玩家截图：银灰 S3 的地面范围把半个战场糊成一片蓝白）：
+    //   important 以前同时免掉了 LATE_START 与这里 —— 于是一个 **循环** prefab（range_01 的 isLoop=true）
+    //   被 one-shot 播却永远不会 done：每攻击一次就永久多一份，几击之后整片战场被叠加成一大片。
+    //   现在 important 只绕过 LATE_START（spawn 里那一处），不再免于寿命上限。
+    if (!this.opts.loop) {
       const d = Number(def.stats?.duration);
-      fx.ttl = def.isLoop ? LOOP_TTL : Number.isFinite(d) && d > 0 ? Math.min(ONE_SHOT_TTL * 2, d + def.delayToPlay + 0.5) : ONE_SHOT_TTL;
+      // 循环 prefab 被 one-shot 播（银灰 S3 的地面贴花就是这种）：用更短的 ONE_SHOT_TTL，
+      // 否则 8 秒的上限会让它同时叠 4~8 份，整片战场被糊住。
+      fx.ttl = def.isLoop ? (this.opts.important ? ONE_SHOT_TTL : LOOP_TTL) : Number.isFinite(d) && d > 0 ? Math.min(ONE_SHOT_TTL * 2, d + def.delayToPlay + 0.5) : ONE_SHOT_TTL;
     }
     fx.data = this.opts.data ?? null;
     if (this.opts.onFinish) fx.onFinish = this.opts.onFinish;
