@@ -1197,12 +1197,32 @@ export class SkillFx {
         //   oxi_skill_03_trail_01 屏幕占用约 420×284 px = 屏的 5.7%。
         //   之前每条车道铺 4 段 → 20~52 个实例 → 覆盖 114%~296%，必然糊住战场。
         //   官方语义是「每条车道一颗簇火」，所以每条车道只放一个。
+        // ★ 2026-11-18（玩家：塔露拉的动画不对，要与技能数值一致）：
+        //   技能是「每 2.67 秒在 5 行范围内，朝部署方向召唤簇火，簇火碰到敌人时爆炸」——
+        //   所以簇火必须**朝部署方向飞出去**，不是原地一条静止火带。
+        //   每条车道只 spawn 一个拖尾，再用 place() 按节拍沿 dir 推进 1 格。
+        const SWEEP_STEPS = 8;    // 推进格数（覆盖到棋盘边缘）
+        const SWEEP_GAP = 0.1;    // 每格间隔（秒）
         for (let i = 0; i < lanes; i++) {
           const off = i - half;
-          const px = across ? x : x + off;
-          const py = across ? y + off : y;
-          const pt = this._ground(px, py, null);
-          for (const k of keys) if (this.w.playOn(k, pt, { important: true })) drew = true;
+          const px0 = across ? x : x + off;
+          const py0 = across ? y + off : y;
+          const pt0 = this._ground(px0, py0, null);
+          for (const k of keys) {
+            const h = this.w.playOn(k, pt0, { important: true });
+            if (!h) continue;
+            drew = true;
+            for (let step = 1; step <= SWEEP_STEPS; step++) {
+              later(this.w.ofx, step * SWEEP_GAP, () => {
+                if (!h.alive) return;
+                const px = px0 + sx * step;
+                const py = py0 + sy * step;
+                // _ground 返回棋盘坐标，必须用 unitPoint 转成世界坐标（不能直接用 pose）
+                const p = unitPoint(null, null, this._ground(px, py, null));
+                h.place({ pos: [p[0], p[1], p[2]] });
+              });
+            }
+          }
         }
         return drew;
       }
