@@ -433,6 +433,38 @@ export class OfficialFx {
     };
   }
 
+  /**
+   * ★ 2026-11-18（玩家：银灰 S3 / 遥 / 塔露拉的特效「看不到」，但 effects/systems/particles 都有值）：
+   * json_effect.js 的 gather() 有四个**静默早退** —— state === 'done'、ctime < 0（还没到播放时刻）、
+   * hidden、pausedBy（被 PauseAnotherEffect 暂停）。任何一个成立，特效就在跑、却不画。
+   * 这里把每个 fx 的这四项、活跃粒子数、以及 gather() 实际会收集到的 entry 数量报出来，
+   * 一眼就能看出是哪一个条件把它吞了。仅供控制台诊断（__SP_FX_DEBUG__()）。
+   */
+  fxDetail() {
+    const out = [];
+    for (const fx of this.effects) {
+      let parts = 0, hier = 0;
+      for (const s of fx.sys) if (s && s.count) parts += s.count;
+      for (let i = 0; i < (fx.def?.n || 0); i++) if (fx.hier?.[i]) hier++;
+      // gather 实际收多少（一次只读遍历，不改状态）
+      let gathered = 0;
+      try {
+        fx.gather({ pos: [0, 0, 0] }, () => { gathered++; });
+      } catch { gathered = -1; }
+      out.push({
+        key: fx.def?.key ?? null,
+        state: fx.state, ctime: fx.ctime, hidden: !!fx.hidden, pausedBy: !!fx.pausedBy,
+        parts, hier, gathered,
+        n: fx.def?.n ?? 0,
+        lite: !!fx.lite,
+        zTest: undefined,
+        ownerId: fx.owner?.id ?? fx.owner?.info?.id ?? null,
+      });
+      if (out.length >= 40) break;
+    }
+    return out;
+  }
+
   /** Per-frame counters reset (draw counts are per frame). */
   frameStats() { if (this.glr) { this.glr.stats.draws = 0; this.glr.stats.tris = 0; } }
 

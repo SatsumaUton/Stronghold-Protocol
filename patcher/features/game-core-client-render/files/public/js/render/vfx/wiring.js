@@ -437,6 +437,11 @@ export class FxWiring {
         // ★ 2026-11-18：spawn 计数 —— 事件到了、plan 有 key、清单也有，但屏幕上看不到时，
         //   下一步要确认就是「spawn 到底有没有被调到」。这里记录最近 40 次 spawn 的 key。
         spawns: this._dbgSpawn || [],
+        // ★ 2026-11-18：每个正在播的特效的可见性诊断。
+        //   effects 有值、spawn 返回 ok，但画面没有 —— effect.js 的 gather() 有四个静默早退：
+        //   state==='done' / ctime<0（还没到播放时刻）/ hidden / pausedBy（被 PauseAnotherEffect 暂停）。
+        //   这里把每个 fx 的这四项 + 粒子数 + gather 实际收集到的 entry 数都报出来。
+        fx: typeof this.ofx.fxDetail === 'function' ? this.ofx.fxDetail() : null,
         indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
         preloaded: (this._dbgKeys || []).length,
         preloadedKeys: this._dbgKeys || [],
