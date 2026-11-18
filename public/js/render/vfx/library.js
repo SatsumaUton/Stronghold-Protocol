@@ -180,7 +180,9 @@ export class FxLibrary {
 
   /** URL of a file-list entry. */
   url(group, key) {
-    const e = this.groups?.[group]?.[key];
+    // 2026-11-18：清单键混合大小写（hudun_GeoSphere001-74515470）而引用是小写，
+    // 精确查不到就走小写索引，否则网格/贴图永久取不到。
+    const e = this._groupEntry(group, key);
     return isObj(e) && typeof e.path === 'string' ? e.path : null;
   }
 
@@ -296,6 +298,22 @@ export class FxLibrary {
     return null;
   }
 
+  /**
+   * 清单里 fx/tex 与 fx/mesh 的键是混合大小写，而描述符引用的是小写 ——
+   * 精确命中优先，未命中再查小写索引。
+   * 2026-11-18：以前精确查表，大小写不匹配就永久缓存 null，
+   * 导致该贴图/网格在整局里不可用，引用它的特效每帧被 draw() 静默跳过。
+   */
+  _groupEntry(name, key) {
+    const g = this.groups?.[name];
+    if (!g || !key) return null;
+    const exact = g[key];
+    if (exact) return exact;
+    this._lowerIdx = this._lowerIdx || new Map();
+    let idx = this._lowerIdx.get(name);
+    if (!idx) { idx = new Map(); for (const k of Object.keys(g)) idx.set(k.toLowerCase(), g[k]); this._lowerIdx.set(name, idx); }
+    return idx.get(String(key).toLowerCase()) || null;
+  }
   loadTexture(key, half) {
     const id = `${key}|${half ? 1 : 0}`;
     const revision = this.pluginRevision || 0;
@@ -305,7 +323,7 @@ export class FxLibrary {
     let p = this.imageLoads.get(id);
     if (!p) {
       p = Promise.all([this.init(), this.texInfo()]).then(async ([, infos]) => {
-        const e = this.groups?.['fx/tex']?.[key];
+        const e = this._groupEntry('fx/tex', key);
         const url = isObj(e) ? (half && typeof e.half === 'string' ? e.half : e.path) : null;
         if (!url) return null;
         const img = await this._limit(() => this._image(url));
