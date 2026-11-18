@@ -442,6 +442,9 @@ export class FxWiring {
         //   state==='done' / ctime<0（还没到播放时刻）/ hidden / pausedBy（被 PauseAnotherEffect 暂停）。
         //   这里把每个 fx 的这四项 + 粒子数 + gather 实际收集到的 entry 数都报出来。
         fx: typeof this.ofx.fxDetail === 'function' ? this.ofx.fxDetail() : null,
+        // ★ 2026-11-18：每个 key 的历史峰值 —— 不受「取样时特效已播完」影响。
+        //   peakEntries > 0 说明它确实进过绘制列表；一直 0 才是渲染层吞了画面。
+        fxPeaks: typeof this.ofx.fxPeaks === 'function' ? this.ofx.fxPeaks() : null,
         indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
         preloaded: (this._dbgKeys || []).length,
         preloadedKeys: this._dbgKeys || [],

@@ -376,7 +376,26 @@ export class OfficialFx {
       if (e.mat.state.zTest) depth = true;
       (e.unitBack ? this._unitBackground(e.effect.owner) || g : e.ground ? g : o).push(e);
     };
-    for (const fx of this.effects) fx.gather(basis, sink);
+    // ★ 2026-11-18（玩家：银灰 S3 / 遥 / 塔露拉的特效看不到）：
+    //   取一次快照永远可能撞上「特效已经播完」（parts=0、gathered=0，能看到的与看不到的读数一模一样）。
+    //   所以改在**每一帧**累计每个 key 的峰值：本帧 gather 收集了多少 entry、粒子峰值多少。
+    //   只要某 key 的 peakEntries 曾经 > 0，它就进过绘制列表；一直是 0 才是渲染层的问题。
+    this._dbgPeak = this._dbgPeak || new Map();
+    for (const fx of this.effects) {
+      const before = seq;
+      fx.gather(basis, sink);
+      const key = fx.def?.key;
+      if (!key) continue;
+      let parts = 0;
+      for (const sy of fx.sys) if (sy && sy.count) parts += sy.count;
+      const e = seq - before;
+      const rec = this._dbgPeak.get(key) || { frames: 0, peakEntries: 0, peakParts: 0, zero: 0 };
+      rec.frames++;
+      if (e > rec.peakEntries) rec.peakEntries = e;
+      if (parts > rec.peakParts) rec.peakParts = parts;
+      if (e === 0 && parts > 0) rec.zero++;
+      this._dbgPeak.set(key, rec);
+    }
     const lists = [g, ...[...this.unitBack.values()].map(bucket => bucket.items), o];
     for (const list of lists) list.sort(byUnityOrder);
     // geometry in draw order: neighbours of one material and kind become one draw (their ranges are contiguous)
@@ -440,6 +459,13 @@ export class OfficialFx {
    * 这里把每个 fx 的这四项、活跃粒子数、以及 gather() 实际会收集到的 entry 数量报出来，
    * 一眼就能看出是哪一个条件把它吞了。仅供控制台诊断（__SP_FX_DEBUG__()）。
    */
+  /** Per-key peaks accumulated every frame (see _prepare): the timing-proof version of fxDetail. */
+  fxPeaks() {
+    const out = {};
+    for (const [k, r] of this._dbgPeak || []) out[k] = { ...r };
+    return out;
+  }
+
   fxDetail() {
     const out = [];
     for (const fx of this.effects) {
