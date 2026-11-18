@@ -412,6 +412,14 @@ export class FxWiring {
   /** Console probe: __SP_FX_DEBUG__() → the live effect state (see begin()). */
   _installDebug() {
     if (typeof globalThis === 'undefined' || globalThis.__SP_FX_DEBUG__) return;
+    // 一次性像素探针：调用后下一帧 draw 前后各读一次画布，结果见 fxPasses().probe。
+    globalThis.__SP_FX_PROBE__ = () => {
+      const g = this.ofx && this.ofx.glr;
+      if (!g) return { error: (this.ofx ? '无 glr' : '无 ofx') + '：特效层没起来' };
+      g.stats.probe = null;
+      g._probeArmed = 1;
+      return '已置位，等下一帧或两帧后再看 __SP_FX_DEBUG__().fxPasses.probe';
+    };
     globalThis.__SP_FX_DEBUG__ = () => {
       const ofx = this.ofx;
       const st = typeof ofx.stats === 'function' ? ofx.stats() : {};
@@ -445,6 +453,9 @@ export class FxWiring {
         // ★ 2026-11-18：每个 key 的历史峰值 —— 不受「取样时特效已播完」影响。
         //   peakEntries > 0 说明它确实进过绘制列表；一直 0 才是渲染层吞了画面。
         fxPeaks: typeof this.ofx.fxPeaks === 'function' ? this.ofx.fxPeaks() : null,
+        // ★ 2026-11-18：每层跑了多少次、共画了多少件 —— ground 层有 draw 但画面看不到，
+        //   就说明它被地形/单位盖住了（不是没渲染）。
+        fxPasses: typeof this.ofx.fxPasses === 'function' ? this.ofx.fxPasses() : null,
         indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
         preloaded: (this._dbgKeys || []).length,
         preloadedKeys: this._dbgKeys || [],

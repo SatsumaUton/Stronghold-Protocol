@@ -514,6 +514,8 @@ export class OfficialFx {
       glQuads: this.glr ? this.glr.stats.quads : 0,
       glTris: this.glr ? this.glr.stats.tris : 0,
       // ★ 2026-11-18：渲染层抛错的原文与次数 —— 以前它只 console.error 一次就永久静默。
+      // probe: 一次性前后像素对比结果（__SP_FX_DEBUG__().probe() 置位后的下一帧）
+      probe: this.glr ? this.glr.stats.probe || null : null,
       err: this._renderErr || null,
       errCount: this._renderErrCount || 0,
     };

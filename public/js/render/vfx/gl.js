@@ -308,6 +308,16 @@ export class FxGL {
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.enable(gl.BLEND);
     gl.frontFace(gl.CW);
+    // 2026-11-18 诊断：一次性前后像素对比探针（见 _probeAfter）。__SP_FX_DEBUG__().probe() 置位。
+    if (this._probeArmed > 0) {
+      this._probeArmed--;
+      try {
+        const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+        if (!this._probeBuf || this._probeBuf.length !== w * h * 4) this._probeBuf = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this._probeBuf);
+        this._probeW = w; this._probeH = h; this._probeArmed2 = true;
+      } catch (e) { this.stats.probe = { error: 'before:' + String(e && e.message || e) }; }
+    }
     let lastProg = null, lastState = null;
     const time = frame.time;
     const tv = [time / 20, time, time * 2, time * 3];
@@ -416,6 +426,29 @@ export class FxGL {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.frontFace(gl.CCW);
+    if (this._probeArmed2) {
+      this._probeArmed2 = false;
+      try {
+        const w = this._probeW, h = this._probeH;
+        const after = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, after);
+        const before = this._probeBuf;
+        let changed = 0, sampled = 0, maxD = 0, sumD = 0;
+        for (let i = 0; i < before.length; i += 4 * 3) {   // 每 3 个像素采一次
+          sampled++;
+          const d = Math.abs(before[i] - after[i]) + Math.abs(before[i + 1] - after[i + 1])
+            + Math.abs(before[i + 2] - after[i + 2]) + Math.abs(before[i + 3] - after[i + 3]);
+          if (d > 6) changed++;
+          if (d > maxD) maxD = d;
+          sumD += d;
+        }
+        this.stats.probe = {
+          sampled, changed, pct: Math.round((changed / sampled) * 1000) / 10,
+          maxDelta: maxD, avgDelta: Math.round(sumD / sampled),
+          size: [w, h], items: items.length, tris: this.stats.tris,
+        };
+      } catch (e) { this.stats.probe = { error: 'after:' + String(e && e.message || e) }; }
+    }
   }
 
   /** Render state of a material pass (see the header for the alpha factors). */
