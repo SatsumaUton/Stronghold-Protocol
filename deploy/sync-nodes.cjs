@@ -24,7 +24,7 @@ function walk(dir, base = '', out = new Map()) {
     const full = path.join(dir, e.name);
     const rel = base ? base + '/' + e.name : e.name;
     if (e.isDirectory()) walk(full, rel, out);
-    else if (e.isFile()) out.set(rel, full);
+    else if (e.isFile() && !e.name.endsWith('.sptmp')) out.set(rel, full);   // 残留的原子替换临时文件不算内容
   }
   return out;
 }
@@ -53,7 +53,13 @@ for (let n = 2; n <= 30; n++) {
   if (APPLY) {
     for (const x of diffs) {
       fs.mkdirSync(path.dirname(x.target), { recursive: true });
-      fs.copyFileSync(x.full, x.target);
+      // ★ 2026-11-18（玩家：动态 import 某 kit 报 ERR_FAILED）：
+      //   copyFileSync 会先截断目标再写 —— 浏览器此时 import 这个模块就会读到半截文件。
+      //   改成「写同目录临时文件 → 设 mtime → rename 原子替换」：
+      //   读者要么看到旧文件、要么看到新文件，永远看不到半截。
+      //   mtime 必须在 rename **之前**设好（rename 不保留源时间戳，见下面的注释）。
+      const tmp = x.target + '.sptmp';
+      fs.copyFileSync(x.full, tmp);
       // ★ 2026-10-31：**必须把源文件的 mtime 一起带过去**。
       //
       //   /healthz.build（server/http/buildTag.js）的指纹是 `[相对路径, 大小, mtimeMs]`。
@@ -64,8 +70,10 @@ for (let n = 2; n <= 30; n++) {
       //   把 mtime 复制成源文件的，各节点的 build 就只由内容决定。
       try {
         const st = fs.statSync(x.full);
-        fs.utimesSync(x.target, st.atime, st.mtime);
+        fs.utimesSync(tmp, st.atime, st.mtime);
       } catch { /* 设不上也不致命，只是那一轮 build 可能不一致 */ }
+      // 原子替换：读者要么看到旧文件、要么看到新文件，不会读到半截
+      try { fs.renameSync(tmp, x.target); } catch (e) { try { fs.unlinkSync(tmp); } catch { /* ignore */ } throw e; }
       totalCopied++;
     }
     console.log(`   → 已复制 ${diffs.length} 个文件`);
