@@ -511,6 +511,8 @@ export class OfficialFx {
       skip: this.glr ? { noProg: this.glr.stats.skipNoProg, noTex: this.glr.stats.skipNoTex, noMesh: this.glr.stats.skipNoMesh, missingTex: this.glr.stats.missingTex, texFail: this.lib.texFail || 0, texFailKeys: this.lib.texFailKeys || [] } : null,
       progFail: this.glr ? this.glr.stats.progFail : 0,
       failLog: this.glr ? this.glr.stats.failLog : [],
+      // ★ 2026-11-18：按 key 的累计绘制量 —— 时机无关，打完一局任何时候读都有效。
+      drawnByKey: this.glr ? this.glr.stats.drawnByKey : {},
       glQuads: this.glr ? this.glr.stats.quads : 0,
       glTris: this.glr ? this.glr.stats.tris : 0,
       // ★ 2026-11-18：渲染层抛错的原文与次数 —— 以前它只 console.error 一次就永久静默。

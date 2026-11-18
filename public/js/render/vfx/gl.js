@@ -36,6 +36,9 @@ export class FxGL {
       skipNoTex: 0,       // 材质引用的贴图还没加载好
       skipNoMesh: 0,      // 网格缺失
       missingTex: [],     // ★ 取不到的贴图 key（前 20 个）—— 「items 有、tris 为 0」的直接原因
+      // ★ 2026-11-18：按 key 累计「真的画了多少次 / 多少实例」。
+      //   时机无关 —— 打完一局任何时候读都有意义，不会因为取样那一帧没特效就全是 0。
+      drawnByKey: {},
       progFail: 0,        // program 失败总数
       failLog: [],        // 失败原因（前 12 条）
     };
@@ -139,6 +142,15 @@ export class FxGL {
     }
     this.programs.set(key, rec);
     return rec;
+  }
+
+  /** 2026-11-18：按 key 累计实际绘制量（时机无关的判据）。 */
+  _countDrawn(it) {
+    const k = it.effect?.def?.key;
+    if (!k) return;
+    const r = this.stats.drawnByKey[k] || (this.stats.drawnByKey[k] = { draws: 0, instances: 0 });
+    r.draws++;
+    r.instances += it.count || 0;
   }
 
   /**
@@ -424,6 +436,7 @@ export class FxGL {
         gl.vertexAttribPointer(LOC.t2, 4, gl.FLOAT, false, B, base + 92);
         gl.drawElementsInstanced(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0, it.count);
         this.stats.tris += it.count * 2;
+        this._countDrawn(it);
       } else if (kind === 'mesh') {
         gl.bindVertexArray(mesh.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.meshBuf);
@@ -439,6 +452,7 @@ export class FxGL {
         gl.vertexAttribPointer(LOC.t2, 4, gl.FLOAT, false, B, base + 104);
         const s = mesh.sub[it.submesh];
         gl.drawElementsInstanced(gl.TRIANGLES, s.count, mesh.type, s.first * mesh.size, it.count);
+        this._countDrawn(it);
         this.stats.tris += (s.count / 3) * it.count;
       } else {
         gl.bindVertexArray(this.stripVao);
