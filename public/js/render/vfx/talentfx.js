@@ -48,10 +48,14 @@ const uniq = (list) => { const seen = new Set(); return list.filter((e) => { con
 /** A use carried by a reborn talent's own buffs (`RebornTalent._buffs`): it plays after the stand-up. */
 const isPost = (e) => /^\w*RebornTalent\._buffs\b/.test(e.from || '');
 
+/** 泡泡的官方循环特效最多持续多久（泡泡本来会破；没人停时按这个兜底）。 */
+const BUBBLE_HOLD = 6;
+
 export class TalentFx {
   constructor(w) {
     this.w = w;
-    this.units = new Map();   // battle id → U | null
+    this.units = new Map();
+    this.bubbleLoops = new Map();   // `${单位id}|${key}` → 泡泡循环句柄（同单位同 key 只留一个）   // battle id → U | null
     this.wasActive = false;
   }
 
@@ -248,7 +252,20 @@ export class TalentFx {
               if (use.on !== 'targets' || !/_activeBuffs/.test(use.from || '')) continue;
               for (const k of use.keys || []) {
                 if (!this.w.ofx.lib.has(k)) continue;
-                this.w.playOn(k, rcv, { loop: true, important: true });
+                // ★ 2026-11-18（玩家：遥在干员身上的特效太夸张）：
+                //   以前这里没有 stop —— 每次发泡泡都在收到者身上叠一个永久循环特效，
+                //   遥每个攻击间隔都发，几下之后干员就被糊成一大团。
+                //   现在同单位同 key 只留一个，并且按 BUBBLE_HOLD 秒自动停（泡泡本来就会破）。
+                const slot = `${idOf(rcv)}|${k}`;
+                const old = this.bubbleLoops.get(slot);
+                if (old && old.alive) { old.until = this.w.ofx.time + BUBBLE_HOLD; continue; }
+                const h = this.w.playOn(k, rcv, { loop: true, important: true });
+                if (!h) continue;
+                this.bubbleLoops.set(slot, h);
+                this._later(BUBBLE_HOLD, () => {
+                  const cur = this.bubbleLoops.get(slot);
+                  if (cur === h) { h.stop(); this.bubbleLoops.delete(slot); }
+                });
               }
             }
           }
