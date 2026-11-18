@@ -98,6 +98,10 @@ export function AdminTools({ open, onClose, anchor = null }) {
   const [q, setQ] = useState('');
   // 盟约的层数（绝对值）。留空 = 老行为「加一层」；填了数字就按这个层数设置。
   const [bondLayers, setBondLayers] = useState('');
+  // 悬赏的数量（维护者 2026-11-18）。留空 = 1 张。
+  const [bountyCount, setBountyCount] = useState('');
+  // 召唤页签：当前选中的场上干员 uid（维护者 2026-11-18 —— 不再手填 uid / token id）。
+  const [tokenOwner, setTokenOwner] = useState(null);
   // 「深渊回响」页签：图鉴（祝福/诅咒/词条/投影的 id + 名字）与当前子分类
   const [codex, setCodex] = useState(null);
   const [echoKind, setEchoKind] = useState('blessing');
@@ -128,10 +132,15 @@ export function AdminTools({ open, onClose, anchor = null }) {
   //   （服务端每条 echo 指令都以 `echoVariant !== 'deepecho'` 拒绝，回 WRONG_PHASE + detail 'echo'）。
   //   没有深潜的对局不该把这个页签摆出来。
   const isEcho = useStore((st) => st.match.public?.echo?.deepecho === true);
+  // ★ 2026-11-18：召唤页签要「场上干员 → 该干员的召唤物」两级列表，所以订阅自己的棋盘。
+  //   privateView().board 的每块带 uid / kind / id（chessId）/ tier（server/match/player/views.js pieceView）。
+  //   只取 chess 的项：召唤物必须挂在一块在场的干员上（server 的 _testToken 校验 ps.find(ownerUid).piece.kind === 'chess'）。
+  const boardChess = useStore((st) => (Array.isArray(st.match.private?.board) ? st.match.private.board : []))
+    .filter((p) => p && p.kind === 'chess' && Number.isInteger(p.uid));
   const [codeLeftMin, setCodeLeftMin] = useState(() => readLeftMin());
   // 必须订阅才会真正去加载 data/*.json；否则下面 list() 拿到的永远是空表。
   // 一次订阅全部列表数据集，切页签不会又变回空白。
-  useData('chess', 'items', 'bonds', 'bands', 'enemies');
+  useData('chess', 'items', 'bonds', 'bands', 'enemies', 'tokens');
   // 每 5 秒核对一次有效期。到点要做的不只是「改一个布尔值」：
   // 必须把令牌一起清掉并重新握手，否则 window.__SP_ADMIN_TOKEN 还留着，
   // 服务端也还认它（服务端只看令牌 exp）—— 面板会退回取码界面，
@@ -431,6 +440,42 @@ export function AdminTools({ open, onClose, anchor = null }) {
     if (!raw || typeof raw !== 'object') return [];
     return Object.entries(raw).filter(([k, v]) => v && typeof v === 'object' && k !== 'name' && k !== 'displayName');
   };
+  // ★ 2026-11-18（维护者：悬赏提示「指令参数不对」，且没有数量输入框）：
+  //   列表里的每一条发出什么参数，集中在这里，避免每个页签各写一套（悬赏就是这么漏掉 count 的）。
+  //   · 盟约：填了层数就按绝对值设置，否则老行为「加一层」
+  //   · 悬赏：填了数量就按这个数量发，缺省 1（服务端 _testBounty 认 count，范围 1..99）
+  //   · 其余：只发 id
+  const argsForRow = (tabId, key, rec) => {
+    if (tabId === 'bond' && Number(bondLayers) > 0) return { id: key, layers: Number(bondLayers) };
+    if (tabId === 'bounty') {
+      const n = Number(bountyCount);
+      return Number.isInteger(n) && n > 0 ? { id: key, enemyKey: key, count: Math.min(n, 99) } : { id: key, enemyKey: key };
+    }
+    return { id: key };
+  };
+
+  // ★ 2026-11-18：选中的干员能放哪些召唤物 —— 与 server 的 gd.placeableTokens 同一判据
+  //   （tokens.json: placeable === true 且 owners / variants 里有这个 chessId）。
+  //   这里只求「列出来是对的」，最终合法性仍由服务端 _testToken 裁决。
+  const tokensOfOwner = (() => {
+    if (tokenOwner == null) return [];
+    const piece = boardChess.find((p) => p.uid === tokenOwner);
+    if (!piece) return [];
+    const all = data.get('tokens');
+    if (!all || typeof all !== 'object') return [];
+    const out = [];
+    for (const [tid, t] of Object.entries(all)) {
+      if (!t || typeof t !== 'object' || t.placeable !== true) continue;
+      const owners = Array.isArray(t.owners) ? t.owners : [];
+      const vs = t.variants && typeof t.variants === 'object' ? t.variants : {};
+      // 与 placeableTokens 一致：variants 里认 chessId，也认它的 _b → _a 写法
+      const alias = String(piece.id).replace(/_b$/, '_a');
+      if (!owners.includes(piece.id) && !vs[piece.id] && !vs[alias]) continue;
+      out.push({ tokenId: tid, name: data.localeName?.(t.name || '') || t.name || tid });
+    }
+    return out;
+  })();
+
   const shown = (() => {
     const all = list();
     // ★ 本服 2026-11-01：**空搜索时不截断**，列出全部条目。
@@ -475,11 +520,16 @@ export function AdminTools({ open, onClose, anchor = null }) {
           <input value=${bondLayers} onInput=${(e) => setBondLayers(e.target.value.replace(/[^0-9]/g, ''))}
             inputmode="numeric" placeholder=${t('留空 = 加一层')} data-testid="bond-layers" />
         </label>` : null}
+        ${/* ★ 2026-11-18（维护者：悬赏没有数量输入框）：与盟约的层数一样给一个数字框，缺省 1。 */ ''}
+        ${tab === 'bounty' ? html`<label class="admintools__field">${t('数量')}
+          <input value=${bountyCount} onInput=${(e) => setBountyCount(e.target.value.replace(/[^0-9]/g, ''))}
+            inputmode="numeric" placeholder=${t('默认 1')} data-testid="bounty-count" />
+        </label>` : null}
         <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)}
           placeholder=${t('搜索…')} aria-label=${t('搜索')} />
         <div class="admintools__list">
           ${shown.length ? shown.map(([key, rec]) => html`<button key=${key} type="button" class="admintools__row"
-            disabled=${!!busy} title=${key} onClick=${() => send(tab, tab === 'bond' && Number(bondLayers) > 0 ? { id: key, layers: Number(bondLayers) } : { id: key }, nameOf(rec, key))}>
+            disabled=${!!busy} title=${key} onClick=${() => send(tab, argsForRow(tab, key, rec), nameOf(rec, key))}>
             <span class="admintools__name">${nameOf(rec, key)}</span>
             ${rec && rec.tier ? html`<span class="admintools__tier">${rec.tier}</span>` : null}
           </button>`) : html`<div class="admintools__empty">${t('没有匹配的条目')}</div>`}
@@ -570,19 +620,42 @@ export function AdminTools({ open, onClose, anchor = null }) {
             onClick=${() => send('choice', { idx: Number(num2) || 0 }, `${t('机变')} #${num2}`)}>${t('选择该项')}</button>
         </div>`
 
-      // 召唤物：需要一个持有该召唤物的干员
+      // 召唤物（★ 2026-11-18 维护者：以前要手填干员 uid 和召唤物 id，没人记得住）：
+      //   改成两级列表 —— 先选场上干员（名字 + uid 直接给你），再列这个干员**能放**的召唤物。
+      //   发出去的组合必然合法：与 testCommands._testToken 校验的两条完全一致
+      //   （ownerUid 是场上 chess，tokenId 在该干员的 placeableTokens 里）。
       : tab === 'token' ? html`
-        <p class="admintools__note">${t('给某个已上场的干员 +1 个可放置召唤物。填干员的 uid 和召唤物 id。')}</p>
-        <label class="admintools__field">${t('干员 uid')}
-          <input value=${num2} onInput=${(e) => setNum2(e.target.value)} inputmode="numeric" />
-        </label>
+        <p class="admintools__note">${t('先选场上干员，再点它能放的召唤物，每个发 1 个。')}</p>
         <div class="admintools__row3">
-          <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)} placeholder=${t('召唤物 id…')} />
+          <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)}
+            placeholder=${t('搜索干员…')} aria-label=${t('搜索')} />
         </div>
-        <div class="admintools__row3">
-          <button type="button" disabled=${!!busy}
-            onClick=${() => send('token', { id: String(q || '').trim(), ownerUid: Number(num2) || 0 }, t('发放召唤物'))}>${t('发放')}</button>
-        </div>`
+        <div class="admintools__list">
+          ${boardChess.length ? boardChess.filter((p) => {
+            if (!q) return true;
+            const nm = data.localeName?.(data.lookup('chess', p.id)?.name || '') || (data.lookup('chess', p.id)?.name || '');
+            return (`${nm} ${p.id} ${p.uid}`).toLowerCase().includes(q.toLowerCase());
+          }).map((p) => {
+            const rec = data.lookup('chess', p.id) || {};
+            const nm = data.localeName?.(rec.name || rec.displayName) || rec.name || p.id;
+            const on = tokenOwner === p.uid;
+            return html`<button key=${p.uid} type="button"
+              class=${`admintools__row${on ? ' is-on' : ''}`} title=${`${p.id} · uid ${p.uid}`}
+              onClick=${() => setTokenOwner(on ? null : p.uid)}>
+              <span class="admintools__name">${nm}</span>
+              <span class="admintools__tier">uid ${p.uid}</span>
+            </button>`;
+          }) : html`<div class="admintools__empty">${t('场上没有干员（要在作战/休整阶段）')}</div>`}
+        </div>
+        ${tokenOwner != null ? html`
+          <div class="admintools__list">
+            ${tokensOfOwner.length ? tokensOfOwner.map((tk) => html`<button key=${tk.tokenId} type="button"
+              class="admintools__row" disabled=${!!busy} title=${tk.tokenId}
+              onClick=${() => send('token', { id: tk.tokenId, ownerUid: tokenOwner }, tk.name)}>
+              <span class="admintools__name">${tk.name}</span>
+              <span class="admintools__tier">${tk.tokenId}</span>
+            </button>`) : html`<div class="admintools__empty">${t('这个干员没有可放置的召唤物')}</div>`}
+          </div>` : null}`
       : null
     }
 

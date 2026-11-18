@@ -195,7 +195,7 @@ export class MatchTestCommands {
       case 'bond': return this._testBond(ps, args.id, args.layers, args.count);
       case 'strategy': return this._testStrategy(ps, args.id, args.resetLp === true);
       case 'level': return ps.levelUp();
-      case 'bounty': return this._testBounty(ps, args.enemyKey);
+      case 'bounty': return this._testBounty(ps, args.enemyKey ?? args.id, args.count);
       case 'choice': return this._testChoice(ps, args.idx, args.choiceId);
       // 深渊回响专用（维护者 2026-11-17）
       case 'echoBlessing': return this._testEchoBlessing(args.id, args.clear === true);
@@ -450,11 +450,17 @@ export class MatchTestCommands {
     return OK;
   }
 
-  _testBounty(ps, enemyKey) {
+  _testBounty(ps, enemyKey, count) {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
     const enemy = this.gd.enemy(enemyKey);
     if (!enemy || this.gd.inactiveEnemies.has(enemyKey)) return fail(ERR.BAD_TARGET);
+    // ★ 2026-11-18（维护者：悬赏提示「指令参数不对」，且没有数量输入框）：
+    //   ① 原来只读 `args.enemyKey`，而管理面板发的是 `{ id }` —— 别的页签都读 `args.id`，只有悬赏读
+    //      `enemyKey`，于是 enemyKey 是 undefined → 立刻 BAD_TARGET（「指令参数不对」）。
+    //      现在两者都认（`enemyKey ?? id`，兼容旧客户端）。
+    //   ② 数量（count）以前写死 1；现在按面板输入，缺省 1，范围 1..99（面板默认 1）。
+    const n = Number.isInteger(count) && count > 0 ? Math.min(count, 99) : 1;
     const id = this.addBounty(ps, {
       enemyKey,
       name: typeof enemy.name === 'string' && enemy.name ? enemy.name : enemyKey,
@@ -464,6 +470,15 @@ export class MatchTestCommands {
       rounds: 1,
     });
     if (!id) return fail(ERR.BAD_TARGET);
+    // 数量 > 1：addBounty 只建一张卡即「+1 张悬赏卡」，多发放就是再建几张同 enemyKey 的卡
+    for (let i = 1; i < n; i++) this.addBounty(ps, {
+      enemyKey,
+      name: typeof enemy.name === 'string' && enemy.name ? enemy.name : enemyKey,
+      coin: 0,
+      payout: 'kill',
+      count: 1,
+      rounds: 1,
+    });
     return OK;
   }
 

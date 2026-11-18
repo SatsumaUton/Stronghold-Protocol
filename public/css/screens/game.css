@@ -1605,6 +1605,7 @@
   background: transparent; border: 1px solid transparent; border-radius: 5px; color: var(--text-md); cursor: pointer; }
 .admintools__row:hover:not(:disabled) { background: rgba(255,198,0,.08); border-color: var(--gold-a20); color: var(--text-hi); }
 .admintools__row:disabled { opacity: .45; cursor: default; }
+.admintools__row.is-on { background: rgba(255,198,0,.14); border-color: var(--gold-a20); color: var(--text-hi); }
 .admintools__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admintools__tier { flex: none; color: var(--gold); font-size: 11px; }
 .admintools__empty { padding: 12px 0; text-align: center; color: var(--text-dim); }
