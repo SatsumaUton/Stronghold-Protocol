@@ -1140,7 +1140,11 @@ export function slotKey(entry, dir) {
 export function planKeys(plan) {
   const out = new Set();
   const add = (e) => { if (!e) return; out.add(e.key); for (const s of e.slots || []) if (s) out.add(s); };
-  for (const g of ['start', 'loop', 'end', 'ready', 'range', 'trigger', 'targets']) for (const e of plan?.[g] || []) add(e);
+  // ★ 2026-11-18（维护者：遥 / 塔露拉 / 凛御银灰「还是没有过程特效」）：
+  //   `modeCast` 之前没进这个集合，于是**战斗前预加载漏掉它** —— spawn() 走 pending 路径，
+  //   超过 LATE_START（0.6 s）的一击性特效被直接丢弃（system.js:202）。
+  //   技能施放特效粒子多、体积大，最容易超时，表现就是「开了技能但看不到特效」。
+  for (const g of ['start', 'loop', 'end', 'ready', 'range', 'trigger', 'targets', 'modeCast']) for (const e of plan?.[g] || []) add(e);
   for (const a of plan?.attacks || []) {
     for (const e of [...a.cast, ...a.range, ...(a.aim || [])]) add(e);
     for (const g of a.hit) for (const e of g) add(e);
