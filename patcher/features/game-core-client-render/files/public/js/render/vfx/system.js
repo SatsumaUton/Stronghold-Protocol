@@ -454,6 +454,13 @@ export class OfficialFx {
         this.glr.draw(items, { vp: this.vpU, cam: this.camU, time: this.time, half: this.lite, pass: this.frameNo * 3 + (pass === 'over' ? 2 : pass === 'unitBack' ? 1 : 0) });
       }
     } catch (err) {
+      // ★ 2026-11-18（玩家：官方特效全都看不到，只有我们的程序化泡泡能看见）：
+      //   这里以前只 console.error 一次就永久静默 —— 而 _prepare() 的第一行已经把 prepared 设成本帧，
+      //   抛错后每帧都跳过 _prepare，items 永远是空的，整个官方特效层就此死掉。
+      //   现在：把错误记进诊断、并把 prepared 复位让它下一帧重试，同时每次都记计数。
+      this._renderErr = String(err && err.stack || err);
+      this._renderErrCount = (this._renderErrCount || 0) + 1;
+      this.prepared = -1;
       if (!this._warned) { this._warned = true; console.error('[fx] render failed', err); }
     } finally {
       resetPixi(renderer);
@@ -501,6 +508,9 @@ export class OfficialFx {
       failLog: this.glr ? this.glr.stats.failLog : [],
       glQuads: this.glr ? this.glr.stats.quads : 0,
       glTris: this.glr ? this.glr.stats.tris : 0,
+      // ★ 2026-11-18：渲染层抛错的原文与次数 —— 以前它只 console.error 一次就永久静默。
+      err: this._renderErr || null,
+      errCount: this._renderErrCount || 0,
     };
   }
 
