@@ -323,6 +323,9 @@ export class FxGL {
     const tv = [time / 20, time, time * 2, time * 3];
     let lastMat = null, lastOv = null;
     for (const it of items) {
+      // 2026-11-18 诊断：按 key 过滤（__SP_FX_PROBE__('svash2')）—— 只画匹配的条目，
+      // 配合前后像素对比就能单独判断这一条特效有没有画上去。
+      if (this._probeFilter && !String(it.effect?.def?.key || '').startsWith(this._probeFilter)) continue;
       const mat = it.mat;
       const kind = it.kind;
       const rec = this.program(kind, mat);
@@ -445,7 +448,7 @@ export class FxGL {
         this.stats.probe = {
           sampled, changed, pct: Math.round((changed / sampled) * 1000) / 10,
           maxDelta: maxD, avgDelta: Math.round(sumD / sampled),
-          size: [w, h], items: items.length, tris: this.stats.tris,
+          size: [w, h], items: items.length, tris: this.stats.tris, filter: this._probeFilter || null,
         };
       } catch (e) { this.stats.probe = { error: 'after:' + String(e && e.message || e) }; }
     }
