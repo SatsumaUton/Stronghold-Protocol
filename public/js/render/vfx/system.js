@@ -374,7 +374,16 @@ export class OfficialFx {
     const sink = (e) => {
       e.seq = seq++;
       if (e.mat.state.zTest) depth = true;
+      const layer = e.unitBack ? 'unitBack' : e.ground ? 'ground' : 'over';
       (e.unitBack ? this._unitBackground(e.effect.owner) || g : e.ground ? g : o).push(e);
+      // ★ 2026-11-18：每个 entry 最终进了哪一层 —— ground 层画在**单位之下**，
+      //   贴地的大面积技能特效一旦被判为 isFlatParticles&&nearGround 就会被地形/单位盖住。
+      const key = e.effect?.def?.key;
+      if (key) {
+        const rec = (this._dbgLayer || (this._dbgLayer = new Map())).get(key) || { ground: 0, over: 0, unitBack: 0 };
+        rec[layer]++;
+        this._dbgLayer.set(key, rec);
+      }
     };
     // ★ 2026-11-18（玩家：银灰 S3 / 遥 / 塔露拉的特效看不到）：
     //   取一次快照永远可能撞上「特效已经播完」（parts=0、gathered=0，能看到的与看不到的读数一模一样）。
@@ -462,7 +471,7 @@ export class OfficialFx {
   /** Per-key peaks accumulated every frame (see _prepare): the timing-proof version of fxDetail. */
   fxPeaks() {
     const out = {};
-    for (const [k, r] of this._dbgPeak || []) out[k] = { ...r };
+    for (const [k, r] of this._dbgPeak || []) out[k] = { ...r, ...((this._dbgLayer || new Map()).get(k) || {}) };
     return out;
   }
 
