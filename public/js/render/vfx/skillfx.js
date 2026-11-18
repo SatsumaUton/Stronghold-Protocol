@@ -1190,11 +1190,16 @@ export class SkillFx {
       //   dir: 0/2 = 朝左右 → 车道是行（y 变化）；1/3 = 朝上下 → 车道是列（x 变化）。
       const lanes = bind.lanes ? Math.max(1, Math.min(16, Number(extra.n) || 1)) : 1;
       if (lanes > 1) {
-        const d = Number(extra.dir) | 0;
-        const across = (d === 0 || d === 2);
-        // 朝向的步进：0=右(+x) 1=下(+y) 2=左(−x) 3=上(−y)
-        const sx = d === 0 ? 1 : d === 2 ? -1 : 0;
-        const sy = d === 1 ? 1 : d === 3 ? -1 : 0;
+        // ★ 2026-11-18（玩家：火雨位置不对）：unit.dir 是**字符串**（UP/RIGHT/DOWN/LEFT），
+        //   以前写成 Number(extra.dir) | 0 —— Number('RIGHT') 是 NaN，NaN | 0 恒等于 0，
+        //   于是不管朝哪边都当成「朝右、车道是行」。这里按 dir.js 的编码正确解析：
+        //   RIGHT/LEFT → 车道是行（y 变化）；UP/DOWN → 车道是列（x 变化）；
+        //   UP = +row(+y)，DOWN = −row(−y)，RIGHT = +col(+x)，LEFT = −col(−x)
+        const rawDir = extra.dir;
+        const D = typeof rawDir === 'string' ? rawDir.trim().toUpperCase() : (Number(rawDir) < 0 ? 'LEFT' : 'RIGHT');
+        const across = (D === 'RIGHT' || D === 'LEFT');
+        const sx = D === 'RIGHT' ? 1 : D === 'LEFT' ? -1 : 0;
+        const sy = D === 'UP' ? 1 : D === 'DOWN' ? -1 : 0;
         const half = (lanes - 1) / 2;
         // ★ 2026-11-18（玩家：火雨呈现方式不对 / 遥的特效太夸张）：
         //   oxi_skill_03_trail_01 屏幕占用约 420×284 px = 屏的 5.7%。
