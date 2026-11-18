@@ -1430,16 +1430,6 @@ const binding = (o) => Object.freeze({
   ...(o.hits ? { hits: Object.freeze(o.hits) } : {}),
 });
 export const FX_BINDINGS = Object.freeze({
-  // 塔露拉 S3 日冕重烈（op-oxi.js volley）：每次齐射发一次 heatwave { x, y, dir, n, id, skill }。
-  // 官方没有独立的「簇火」prefab，但投射物 projectile_chr_oxi_s_3_heatwave 的 _mainEffect 就是它：
-  //   oxi_skill_03_trail_01（9 个粒子系统 / 3 个网格 / 峰值 31 粒子 / 屏幕 420×284 px）
-  // 且该投射物的 _randomDelayToBorn=0.6、key=random_birth_delay，与 kit 黑board 的 b3.random_birth_delay 一致，
-  // 可以确认它就是 S3 的簇火。
-  // [ASSUMED] 只做「齐射点上放一次」：我们的技能数据里没有 projectileKey，无法还原逐颗沿车道飞行；
-  // 资源与触发时机来自官方数据，只有位置/数量是近似。
-  skchr_oxi_3: Object.freeze({
-    heatwave: binding({ owner: 'id', at: 'point', oneshot: true, lanes: true, keys: ['oxi_skill_03_trail_01'] }),
-  }),
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it

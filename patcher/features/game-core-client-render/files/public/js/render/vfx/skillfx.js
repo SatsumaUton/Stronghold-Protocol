@@ -118,7 +118,10 @@ const RELEASE_GUARD_S = 0.35;
 /** A fx on the unit: its (x, y) within this many tiles (render/fx/simfx.js ANCHOR_SNAP). */
 const ON_UNIT = 0.75;
 /** Procedural archetypes (render/fx/kinds.js) that are a cast flash: an official skill start / loop stands for them. */
-export const FLASH = Object.freeze(new Set(['blast', 'buff', 'wave', 'pillar', 'strike', 'element', 'shield', 'heal', 'healAoe', 'sp', 'generic']));
+export // 2026-11-18：'wave' 从 FLASH 里移除 —— 塔露拉的 heatwave 是**方向性齐射**，不是单位身上的闪光。
+// 它在 FLASH 里会被 simFx 末尾的通用「技能闪光」规则（extra.skill != null && loops 还活着）认领，
+// 那条分支返回 true 但一个特效都不播，程序化的 wave 因此被跳过 —— 两段（普通/过载）都看不到火。
+const FLASH = Object.freeze(new Set(['blast', 'buff', 'pillar', 'strike', 'element', 'shield', 'heal', 'healAoe', 'sp', 'generic']));
 /** Archetypes that show a unit's state or a game fact (never replaced by a skill's pulse). */
 const NOT_PULSE = new Set(['none', 'dp', 'coin', 'lp', 'crate', 'down', 'reticle', 'mark', 'summon', 'vanish', 'blink', 'move', 'sleep', 'lift', 'dodge', 'crit', 'telegraph', 'zone', 'wall', 'shell']);
 const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];

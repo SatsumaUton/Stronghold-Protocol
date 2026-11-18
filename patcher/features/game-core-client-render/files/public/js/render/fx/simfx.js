@@ -201,6 +201,23 @@ export class FxSim {
       case 'wave': {
         const k = clamp(num(ex.scale, 1), 0.5, 4);
         const rr = Math.max(0.8, r * (ex.scale ? Math.min(2, k / 2) : 1));
+        // 2026-11-18（玩家：过载看不出区别）：载荷自带 n（车道数）与 dir。
+        // 塔露拉 S3 普通 5 行、过载 13 行（sim 的 overload_half_width = 6）。
+        // 以前只画 3 个环，两段长得一样 —— 这里 n > 1 时按车道各画一组。
+        const n = Math.max(0, Math.min(16, Number(ex.n) || 0));
+        if (n > 1) {
+          const d = String(ex.dir || '').toUpperCase();
+          const across = d === 'RIGHT' || d === 'LEFT';
+          const half = (n - 1) / 2;
+          for (let i = 0; i < n; i++) {
+            const off = i - half;
+            const lx = across ? at.x : at.x + off;
+            const ly = across ? at.y + off : at.y;
+            for (let j = 0; j < 2; j++) this.ring(lx, ly, at.z, 0.12 + j * 0.16, rr * (0.55 + j * 0.3), col, 0.4 + j * 0.14);
+          }
+          this.particle('glow', p.x, p.y, { tint: col, life: 0.3, s0: s / 128 * 0.5, s1: s / 128 * 1.2, a0: 0.7, a1: 0 });
+          break;
+        }
         for (let i = 0; i < 3; i++) this.ring(at.x, at.y, at.z, 0.15 + i * 0.15, rr * (0.7 + i * 0.25), col, 0.45 + i * 0.12);
         this.particle('glow', p.x, p.y, { tint: col, life: 0.3, s0: s / 128 * 0.5, s1: s / 128 * 1.2, a0: 0.7, a1: 0 });
         break;
