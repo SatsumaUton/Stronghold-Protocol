@@ -239,6 +239,38 @@ export class TalentFx {
    */
   fx(kind, extra, x = NaN, y = NaN) {
     if (!this.active() || !extra || typeof extra !== 'object' || extra.id == null) return false;
+    // 2026-11-18（玩家：遥干员身上加的泡泡特效看不到）：泡泡的官方视觉是施法者天赋里
+    // `on=targets` 的 `_activeBuffs` 循环（遥的天赋 1 → haruka_talent_01_buff）。fx 的 extra.id 是**收到者**，
+    // 而收到者自己往往没有天赋绑定（下面那个 return 会直接返回），它的天赋也不是施法者的。
+    // 所以在这里、解析 U 之前先处理：遍历场上单位，找施法者天赋里 on=targets 且来自 _activeBuffs 的循环，
+    // 播在**收到者**身上。同单位同 key 只留一个（常驻），单位死亡/撤退时由 release 停掉。
+    // 仍然返回 false：程序化泡泡照旧画，保证一定看得见。
+    if (kind === 'shield' && extra.kind === 'bubble') {
+      const rcv = this.w.view(extra.id);
+      if (rcv) {
+        for (const id of this.units.keys()) {
+          const vv = this.w.view(id);
+          if (!vv) continue;
+          const uk = this.w.unitKeyOf(vv);
+          const tal = uk ? this.w.idx?.units?.[uk]?.talents : null;
+          if (!tal) continue;
+          for (const tt of Object.values(tal)) {
+            for (const use of tt.uses || []) {
+              if (use.on !== 'targets' || !/_activeBuffs/.test(use.from || '')) continue;
+              for (const k of use.keys || []) {
+                if (!this.w.ofx.lib.has(k)) continue;
+                const slot = `${idOf(rcv)}|${k}`;
+                const old = this.bubbleLoops.get(slot);
+                if (old && old.alive) continue;   // 已经有一个：常驻，不重复
+                const h = this.w.playOn(k, rcv, { loop: true, important: true, stick: true });
+                if (h) this.bubbleLoops.set(slot, h);
+              }
+            }
+          }
+        }
+      }
+      return false;
+    }
     const U = this.units.get(extra.id) ?? (this.w.view(extra.id) ? this.of(this.w.view(extra.id)) : null);
     if (!U || !U.v) return false;
     // an arts barrier (the sim's artsBarrier: 'phase' kind 'artsBarrier' as it is raised, 'shieldBreak' as it breaks):

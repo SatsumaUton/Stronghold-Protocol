@@ -1431,6 +1431,13 @@ const binding = (o) => Object.freeze({
 });
 export const FX_BINDINGS = Object.freeze({
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
+  // 塔露拉 S3 日冕重烈（op-oxi.js volley → battle.fx('heatwave')）: the kit volleys 簇火 across lanes; the official
+  // 描述「每2.67秒在5行范围内，朝部署方向召唤簇火」/ 过载 13 行, and the client's projectile_chr_oxi_s_3_heatwave
+  // _mainEffect is oxi_skill_03_trail_01 — one trail per lane, swept along `dir` from 11 tiles behind her to the
+  // edge + wave_exit_distance (both from the skill's own blackboard), stopped at the edge (no lingering) [ASSUMED: 车道铺法]
+  skchr_oxi_3: Object.freeze({
+    heatwave: binding({ owner: 'id', at: 'point', oneshot: true, lanes: true, keys: ['oxi_skill_03_trail_01'] }),
+  }),
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it
   // three times ('blast', id = her, 0.5 / 1.5 / 2.5 s later). The client fires projectile_chr_clemnt_s3 at the marked
