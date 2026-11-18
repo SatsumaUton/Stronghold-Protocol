@@ -423,7 +423,12 @@ export class SkillFx {
       let drew = false;
       for (const e of uniq([...U.plan.start, ...U.plan.range, ...U.plan.loop])) {
         if (e.birth) continue;     // the deploy's (birthOf: FxWiring.deploy plays it)
-        const h = this._play(e, v);
+        // ★ 2026-11-18（玩家实测：tier=full、dropped=0、plan 全对，但三个干员的技能特效都看不到）：
+        //   根因是**预加载没覆盖**（egin() 时 infos 为空 → keysFor 只取到 31 个 generic key；more() 的
+        //   按需补加载是异步的，赶不上技能开启那一帧），于是 spawn 走 pending、超过 LATE_START(0.6 s)
+        //   **静默丢弃**（不计数，所以 dropped 一直是 0 —— 这也解释了为什么诊断看起来「一切正常」）。
+        //   技能自身的 start / range / loop 是官方技能的视觉主体，慢一点也必须播：标 important 绕过 LATE_START。
+        const h = this._play(e, v, { important: true });
         if (h) { drew = true; this._keep(U, e, h); }
       }
       // the skill's own cast at its start (tagCasts 'start'): its rows now, its hits on the damage that follows

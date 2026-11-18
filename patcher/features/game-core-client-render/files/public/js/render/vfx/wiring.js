@@ -447,6 +447,9 @@ export class FxWiring {
     if (!this.ofx.active || !this.idx) return;
     const keys = this.keysFor(views, false).filter((k) => !this.ofx.lib.defs?.has(k));
     if (!keys.length) return;
+    // ★ 2026-11-18：按需补加载的 key 也要记进 _dbgKeys —— 否则诊断里的 preloaded 只反映 begin() 那一次，
+    //   会让人误以为「什么都没预加载」，而实际上 more() 之后已经在补（只是赶不上技能开启那一帧）。
+    this._dbgKeys = [...new Set([...(this._dbgKeys || []), ...keys])];
     this.ofx.lib.preload(keys, { half: this.ofx.lite }).then(() => this.ofx.warm?.(keys), () => {});
   }
 
