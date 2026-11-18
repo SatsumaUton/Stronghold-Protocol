@@ -42,3 +42,11 @@ test('静读：wiring.attack 的 flies 在 ownMode 下成立', () => {
   assert.match(body, /this\.mode\(u, src\)\?\.name === sk\.U\.plan\.modeName/, '★ 同样比 .name');
   assert.match(body, /isShot \|\| display \|\| ownModeShot/, '★ flies 要把 ownModeShot 算进去');
 });
+
+test('静读：ownMode 时技能攻击是附加，不替换模式自带的挥砍', () => {
+  const src = readFileSync(join(ROOT, 'public/js/render/vfx/skillfx.js'), 'utf8');
+  const i = src.indexOf('attackFx(src, tgt, kind, skillOn) {');
+  const body = src.slice(i, src.indexOf('/**', i + 10));
+  assert.match(body, /const replace = !ownMode && \(fits \|\| forced\);/, '★ ownMode 下 replace 必须为假（否则模式挥砍被整段丢掉）');
+  assert.match(body, /!replace && !ownMode/, '★ ownMode 下也不过滤 cast 行（deploy_01 会被一起滤掉）');
+});
