@@ -315,8 +315,16 @@ export class FxLibrary {
         this.images.set(id, r); this._notify(); return r;
       }, (err) => {
         if (stale()) return null;
-        console.warn('[fx] texture failed', key, err?.message || err);
-        this.images.set(id, null);
+        // 2026-11-18：以前这里把失败写进 images 缓存（值为 null），于是永久失效 ——
+        // texture() 命中这个 null 之后永远返回 null，一次网络抖动就让这张贴图
+        // 在整个会话里彻底不可用，引用它的特效每帧都被 draw 里的 !ready 静默跳过
+        // （items 照常计数、tris 恒 0、changed 恒 0、dropped 恒 0，几乎无法察觉）。
+        // 现在不写缓存，只让 in-flight 记录失效，下一次 texture() 会重新加载。
+        console.warn('[fx] texture failed (will retry)', key, err?.message || err);
+        this.texFail = (this.texFail || 0) + 1;
+        this.texFailKeys = this.texFailKeys || [];
+        if (this.texFailKeys.length < 20 && !this.texFailKeys.includes(key)) this.texFailKeys.push(key);
+        this.imageLoads.delete(id);
         return null;
       });
       this.imageLoads.set(id, p);

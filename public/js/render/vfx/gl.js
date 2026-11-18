@@ -35,6 +35,7 @@ export class FxGL {
       skipNoProg: 0,      // program 编译/链接失败
       skipNoTex: 0,       // 材质引用的贴图还没加载好
       skipNoMesh: 0,      // 网格缺失
+      missingTex: [],     // ★ 取不到的贴图 key（前 20 个）—— 「items 有、tris 为 0」的直接原因
       progFail: 0,        // program 失败总数
       failLog: [],        // 失败原因（前 12 条）
     };
@@ -352,7 +353,15 @@ export class FxGL {
         e.glTex = e.key ? this.texture(e.key, frame.half) : e.fallback;
         if (!e.glTex) { ready = false; break; }
       }
-      if (!ready) { this.stats.skipNoTex++; continue; }
+      if (!ready) {
+        this.stats.skipNoTex++;
+        if (this.stats.missingTex.length < 20) {
+          for (const e of plan.tex) {
+            if (!e.glTex && e.key && !this.stats.missingTex.includes(e.key)) this.stats.missingTex.push(e.key);
+          }
+        }
+        continue;
+      }
       let mesh = null;
       if (kind === 'mesh') { mesh = this.mesh(it.meshKey); if (!mesh || !mesh.sub[it.submesh]) { this.stats.skipNoMesh++; continue; } }
       if (rec !== lastProg) {

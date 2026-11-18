@@ -508,7 +508,7 @@ export class OfficialFx {
       passes: { ...(this._dbgPass || {}) },
       drawn: { ...(this._dbgDrawn || {}) },
       // gl.js 里所有「静默跳过绘制」的出口：program 失败 / 贴图没就绪 / 网格缺失
-      skip: this.glr ? { noProg: this.glr.stats.skipNoProg, noTex: this.glr.stats.skipNoTex, noMesh: this.glr.stats.skipNoMesh } : null,
+      skip: this.glr ? { noProg: this.glr.stats.skipNoProg, noTex: this.glr.stats.skipNoTex, noMesh: this.glr.stats.skipNoMesh, missingTex: this.glr.stats.missingTex, texFail: this.lib.texFail || 0, texFailKeys: this.lib.texFailKeys || [] } : null,
       progFail: this.glr ? this.glr.stats.progFail : 0,
       failLog: this.glr ? this.glr.stats.failLog : [],
       glQuads: this.glr ? this.glr.stats.quads : 0,
