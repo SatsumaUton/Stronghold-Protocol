@@ -428,6 +428,11 @@ export class OfficialFx {
 
   /** Draw one pass from inside Pixi's render (see the header). */
   renderPass(pass, renderer, selectedItems = null) {
+    // ★ 2026-11-18：诊断每层实际画了多少次、多少件 —— 若 ground 层一直有 draw 而画面看不到，
+    //   就是「画在单位之下被盖住」。这里的计数与 fxPeaks 的分层计数配套使用。
+    this._dbgPass = this._dbgPass || {};
+    const pk = pass === 'unitBack' ? 'unitBack' : pass;
+    this._dbgPass[pk] = (this._dbgPass[pk] || 0) + 1;
     if (!this.active || (!this.effects.length && !this.warmQueue.length)) return;
     const gl = renderer.gl;
     if (!this.glr) {
@@ -443,7 +448,11 @@ export class OfficialFx {
       if (this.prepared !== this.frameNo) this._prepare(renderer);
       const items = selectedItems || this.items[pass];
       if (this.needDepth && this.depthDone !== this.frameNo) { this.glr.depthPrepass(this.vpB); this.depthDone = this.frameNo; }
-      if (items.length) this.glr.draw(items, { vp: this.vpU, cam: this.camU, time: this.time, half: this.lite, pass: this.frameNo * 3 + (pass === 'over' ? 2 : pass === 'unitBack' ? 1 : 0) });
+      if (items.length) {
+        this._dbgDrawn = this._dbgDrawn || {};
+        this._dbgDrawn[pk] = (this._dbgDrawn[pk] || 0) + items.length;
+        this.glr.draw(items, { vp: this.vpU, cam: this.camU, time: this.time, half: this.lite, pass: this.frameNo * 3 + (pass === 'over' ? 2 : pass === 'unitBack' ? 1 : 0) });
+      }
     } catch (err) {
       if (!this._warned) { this._warned = true; console.error('[fx] render failed', err); }
     } finally {
@@ -458,6 +467,12 @@ export class OfficialFx {
       tier: this.tier, available: this.available, effects: this.effects.length, pending: this.pending.length, particles: this.particles, reused: this.pooled,
       systems, dropped: this.dropped, draws: this.glr ? this.glr.stats.draws : 0, programs: this.glr ? this.glr.stats.programs : 0,
       textures: this.glr ? this.glr.stats.textures : 0, texMB: this.glr ? Math.round(this.glr.stats.texBytes / 1048576) : 0,
+      // ★ 2026-11-18：被静默跳过的绘制，以及 program 编译失败的原因 —— 这些才是「特效在跑、画面却没有」的出口。
+      skipNoProg: this.glr ? this.glr.stats.skipNoProg : 0,
+      skipNoTex: this.glr ? this.glr.stats.skipNoTex : 0,
+      skipNoMesh: this.glr ? this.glr.stats.skipNoMesh : 0,
+      progFail: this.glr ? this.glr.stats.progFail : 0,
+      failLog: this.glr ? this.glr.stats.failLog : [],
     };
   }
 
@@ -473,6 +488,20 @@ export class OfficialFx {
     const out = {};
     for (const [k, r] of this._dbgPeak || []) out[k] = { ...r, ...((this._dbgLayer || new Map()).get(k) || {}) };
     return out;
+  }
+
+  /** Render-pass counters: how often each layer ran and how many items it drew this battle. */
+  fxPasses() {
+    return {
+      passes: { ...(this._dbgPass || {}) },
+      drawn: { ...(this._dbgDrawn || {}) },
+      // gl.js 里所有「静默跳过绘制」的出口：program 失败 / 贴图没就绪 / 网格缺失
+      skip: this.glr ? { noProg: this.glr.stats.skipNoProg, noTex: this.glr.stats.skipNoTex, noMesh: this.glr.stats.skipNoMesh } : null,
+      progFail: this.glr ? this.glr.stats.progFail : 0,
+      failLog: this.glr ? this.glr.stats.failLog : [],
+      glQuads: this.glr ? this.glr.stats.quads : 0,
+      glTris: this.glr ? this.glr.stats.tris : 0,
+    };
   }
 
   fxDetail() {

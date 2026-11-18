@@ -30,7 +30,14 @@ export class FxGL {
     this.textures = new Map();     // `${key}|${half}` → { tex, bytes }
     this.meshes = new Map();       // mesh key → { vao, vbo, ibo, sub: [{ first, count }], type }
     this.defaults = {};
-    this.stats = { draws: 0, programs: 0, textures: 0, texBytes: 0, quads: 0, meshes: 0, tris: 0 };
+    this.stats = { draws: 0, programs: 0, textures: 0, texBytes: 0, quads: 0, meshes: 0, tris: 0,
+      // ★ 2026-11-18：被静默跳过的绘制计数 —— 这些是「特效在跑、但画面上什么都没出现」的全部出口。
+      skipNoProg: 0,      // program 编译/链接失败
+      skipNoTex: 0,       // 材质引用的贴图还没加载好
+      skipNoMesh: 0,      // 网格缺失
+      progFail: 0,        // program 失败总数
+      failLog: [],        // 失败原因（前 12 条）
+    };
     this.hasDepth = !!(gl.getContextAttributes && gl.getContextAttributes()?.depth);
     this._init();
   }
@@ -124,6 +131,8 @@ export class FxGL {
       rec = { prog, uniforms, vp: gl.getUniformLocation(prog, 'u_vp'), time: gl.getUniformLocation(prog, 'u_Time'), camPos: gl.getUniformLocation(prog, 'u_WorldSpaceCameraPos'), pass: -1, plans: new WeakMap() };
       this.stats.programs++;
     } catch (err) {
+      this.stats.progFail++;
+      if (this.stats.failLog.length < 12) this.stats.failLog.push({ family: mat.family, defs: mat.defs, msg: String(err?.message || err).slice(0, 400) });
       console.warn('[fx] program failed', mat.family, err?.message || err);
       rec = null;
     }
@@ -299,7 +308,7 @@ export class FxGL {
       const mat = it.mat;
       const kind = it.kind;
       const rec = this.program(kind, mat);
-      if (!rec) continue;
+      if (!rec) { this.stats.skipNoProg++; continue; }
       const plan = this._plan(rec, mat);
       // textures first: a draw whose texture is still loading is skipped (no white flash)
       let ready = true;
@@ -307,9 +316,9 @@ export class FxGL {
         e.glTex = e.key ? this.texture(e.key, frame.half) : e.fallback;
         if (!e.glTex) { ready = false; break; }
       }
-      if (!ready) continue;
+      if (!ready) { this.stats.skipNoTex++; continue; }
       let mesh = null;
-      if (kind === 'mesh') { mesh = this.mesh(it.meshKey); if (!mesh || !mesh.sub[it.submesh]) continue; }
+      if (kind === 'mesh') { mesh = this.mesh(it.meshKey); if (!mesh || !mesh.sub[it.submesh]) { this.stats.skipNoMesh++; continue; } }
       if (rec !== lastProg) {
         gl.useProgram(rec.prog);
         lastProg = rec;
