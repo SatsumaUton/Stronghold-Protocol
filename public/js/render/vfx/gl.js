@@ -39,6 +39,8 @@ export class FxGL {
       // ★ 2026-11-18：按 key 累计「真的画了多少次 / 多少实例」。
       //   时机无关 —— 打完一局任何时候读都有意义，不会因为取样那一帧没特效就全是 0。
       drawnByKey: {},
+      // ★ 2026-11-18：每个 key 最后一次真正被绘制的坐标（判断「该在 A 脚下却在 B」这类问题）。
+      lastSpawn: {},
       progFail: 0,        // program 失败总数
       failLog: [],        // 失败原因（前 12 条）
     };
@@ -151,6 +153,13 @@ export class FxGL {
     const r = this.stats.drawnByKey[k] || (this.stats.drawnByKey[k] = { draws: 0, instances: 0 });
     r.draws++;
     r.instances += it.count || 0;
+    // 最后绘制坐标（取该节点的世界位置），用于判断锚点是否正确
+    const w = it.effect?.world?.[it.node];
+    if (w) {
+      const p = this.stats.lastSpawn[k] || (this.stats.lastSpawn[k] = { pos: [0, 0, 0], n: 0 });
+      p.pos = [Math.round(w[12] * 100) / 100, Math.round(w[13] * 100) / 100, Math.round(w[14] * 100) / 100];
+      p.n++;
+    }
   }
 
   /**
