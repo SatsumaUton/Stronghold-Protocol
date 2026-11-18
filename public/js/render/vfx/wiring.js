@@ -434,6 +434,9 @@ export class FxWiring {
         // ★ 2026-11-18：技能事件计数 —— calls 为 0 就是事件根本没到特效层；
         //   calls > 0 而 units 里 on 仍是 null 就是 of(v) 取不到单位（看 last 里的 key）。
         skill: this._dbgSkill || { calls: 0, on: 0, off: 0, noV: 0, noIdx: 0, noUnit: 0, last: [] },
+        // ★ 2026-11-18：spawn 计数 —— 事件到了、plan 有 key、清单也有，但屏幕上看不到时，
+        //   下一步要确认就是「spawn 到底有没有被调到」。这里记录最近 40 次 spawn 的 key。
+        spawns: this._dbgSpawn || [],
         indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
         preloaded: (this._dbgKeys || []).length,
         preloadedKeys: this._dbgKeys || [],
@@ -669,7 +672,12 @@ export class FxWiring {
         if (d && d.pause) fx.hidden = this._paused(d.pause, v, p);
       };
     }
-    return this.ofx.spawn(k, place, opts);
+    // ★ 2026-11-18 诊断：记录真正交给特效层的 spawn。玩家实测「事件到了、plan 有 key、清单也有，
+    //   但屏幕上看不到」—— 这一步的返回值就是分水岭：返回 null 说明特效层拒绝（预算/未加载）。
+    const h = this.ofx.spawn(k, place, opts);
+    this._dbgSpawn = this._dbgSpawn || [];
+    if (this._dbgSpawn.length < 40) this._dbgSpawn.push({ k, ok: !!h, important: !!opts.important, loop: !!opts.loop, pos: place.pos && place.pos.map((x) => Math.round(x * 100) / 100) });
+    return h;
   }
 
   /**
