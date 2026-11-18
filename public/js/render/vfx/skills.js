@@ -506,6 +506,9 @@ function kindOf(srec, rootClass = null) {
 export const emptyPlan = (unitKey, skillId) => ({
   unitKey, skillId, mode: null, modeName: null, kind: null, rootClass: null, projectiles: [],
   start: [], loop: [], end: [], ready: [], range: [], attacks: [], each: { cast: [], hit: [[]] }, trigger: [], targets: [],
+  // ★ 2026-11-18：技能切到某个 mode 时**播一次**的行（mode.attack 的 cast，官方在进入该 mode 时放一次，
+  //   不是每次攻击都放 —— 详见 skillPlan 里 walkModeCast 的注释）。和 each.cast 分开，避免被当成每击重播。
+  modeCast: [],
   pulse: [], unmapped: [], cond: [],
 });
 
@@ -636,26 +639,53 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
   if (!skill) return plan;
   plan.kind = kindOf(opts.rec, skill.rootClass);
   let attach = [];
-  // ★ 2026-11-18（维护者：凛御银灰 S3 的地面范围特效不显示）：技能带的 mode 以前只取它的 `attach` 行，
-  //   **mode 自己的 `attack.cast` 行被整个漏掉** —— svash2 S3（mode 1「S3」）的
-  //   `svash2_skill_03_combat_start_01 / _01_2 / _02` 就在那里（startEvent 2、endEvent 3），
-  //   三个 prefab 在 index 与清单里都存在，却从来没进过 plan，于是永远不播。
-  //   这里把它们按 `cast` 行合进来（只对干员：敌人的 mode 走 enemySkillsOf 的 skillPlan(mode) 路径，
-  //   加在通用处会让敌人重复播放）。
-  const modeCast = [];
+  // ★ 2026-11-18（维护者：凛御银灰 S3 的地面范围特效不显示 / 遥的技能特效也看不到）：
+  //   技能带的 mode 以前只取它的 `attach` 行，**mode 自己的 `attack.cast` 行被整个漏掉**。
+  //   · svash2 S3（mode 1）的 `svash2_skill_03_combat_start_01 / _01_2 / _02` 直接在 attack.cast；
+  //   · 遥 S3（mode 3）的 `haruka_skill_03_start` 在 attack → abilities[]（ParallelGroup）→ abilities[]（RangedHeal）
+  //     两层里，所以要递归。
+  //
+  //   语义：mode 的 cast 是「**进入该 mode 时播一次**」（官方的 skill 切换），不是每次攻击都播。
+  //   因此放进独立的 `plan.modeCast`，由 SkillFx.skill() 在技能开启那一帧播一次；
+  //   **不要**塞进 `each.cast` —— 那是每击重播（会重复），也**不要**塞进 `start`（那会被当成 _keep 的循环持有）。
+  //   只对干员做：敌人的 mode 走 enemySkillsOf 的 skillPlan(mode) 路径，加在通用处会让敌人重复播放。
   if (Number.isInteger(skill.mode)) {
     plan.mode = skill.mode;
     plan.modeName = unit?.modes?.[skill.mode]?.name ?? null;
     attach = attachUses(unit?.modes?.[skill.mode]);
     if (unit?.kind === 'char') {
-      const md = unit?.modes?.[skill.mode];
-      for (const row of Array.isArray(md?.attack?.cast) ? md.attack.cast : []) {
-        for (const k of Array.isArray(row?.effects) ? row.effects : []) {
-          const lk = lc(k);
-          if (!lk || !isObj(idx?.prefabs) || !idx.prefabs[lk]) continue;
-          modeCast.push({ role: 'cast', keys: [lk], from: 'mode.attack.cast', node: md.attack.node ?? null });
+      const GROUPS = new Set(['AbilityRandomGroup', 'AbilityParallelGroup', 'AbilitySelectableGroup']);
+      // 嵌套在 group 里的 **Attack 类**（MeleeAttack / RangedAttack …）是「按攻击方式二选一」的替代项 ——
+      // 它们由 planUses + 播放时的 pickAttacks 按这一击的类型挑，**不能**在开技能时全播
+      // （vfx-index2 的 sel_r/sel_m 用例就是这么红的）。Heal / AnimatedAction 之类不是替代项，照收。
+      const isAlternative = (cls) => typeof cls === 'string' && /Attack$/.test(cls);
+      const seen = new Set();
+      const walkModeCast = (a, depth = 0) => {
+        if (!isObj(a) || depth > 4) return;
+        const isGroup = typeof a.class === 'string' ? GROUPS.has(a.class) : Array.isArray(a.abilities) && a.abilities.length > 0;
+        if (!isGroup && !(depth > 0 && isAlternative(a.class))) {
+          for (const row of Array.isArray(a.cast) ? a.cast : []) {
+            for (const k of Array.isArray(row?.effects) ? row.effects : []) {
+              const lk = lc(k);
+              if (!lk || !isObj(idx?.prefabs) || !idx.prefabs[lk] || seen.has(lk)) continue;
+              seen.add(lk);
+              plan.modeCast.push({
+                key: lk, role: 'cast', at: 'owner', loop: false, hold: null, from: 'mode.attack.cast',
+                node: a.node ?? null,
+                // 保留官方字段，播放时的 castPhase / 方向判定要用
+                ...(Number.isInteger(row.startEvent) ? { startEvent: row.startEvent } : {}),
+                ...(Number.isInteger(row.endEvent) ? { endEvent: row.endEvent } : {}),
+                ...(Number.isInteger(row.directionType) ? { directionType: row.directionType } : {}),
+                ...(Array.isArray(row.slots) ? { slots: row.slots } : {}),
+                ...(typeof row.anim === 'string' && row.anim ? { anim: row.anim } : {}),
+                ...(Number.isInteger(row.group) ? { group: row.group } : {}),
+              });
+            }
+          }
         }
-      }
+        for (const sub of Array.isArray(a.abilities) ? a.abilities : []) walkModeCast(sub, depth + 1);
+      };
+      walkModeCast(unit?.modes?.[skill.mode]?.attack);
     }
   }
   if (typeof skill.rootClass === 'string' && skill.rootClass) plan.rootClass = skill.rootClass;
@@ -681,7 +711,7 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     plan.unmapped.push({ key: 'yu_skill3_annex_01', role: 'hit', reason: 'bound', from: 'ProjectileProbElimateBehaviour._effectOnEliminatePos' });
     plan.unmapped.push({ key: 'yu_skill3_annex_02', role: 'trigger', reason: 'conditional', from: 'GlobalAuraAbility._buffs' });
   }
-  planUses(idx, plan, [...uses, ...attach, ...modeCast], { ...opts, abilities: skill.abilities });
+  planUses(idx, plan, [...uses, ...attach], { ...opts, abilities: skill.abilities });
   // EmptyEffect has no particles/loop flag, but FinishEffectViaOwnerBuff holds this controller for yu_s_3[effect].
   if (id === 'skchr_yu_3') for (const role of ['start', 'loop', 'range']) for (const e of plan[role]) {
     if (e.key === 'yu_skill3_range_01_source') { e.hold = 'skill'; e.loop = true; }

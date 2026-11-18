@@ -428,6 +428,13 @@ export class SkillFx {
       }
       // the skill's own cast at its start (tagCasts 'start'): its rows now, its hits on the damage that follows
       if (this._castOnce(U, v, 'start')) drew = true;
+      // ★ 2026-11-18（维护者：凛御银灰 S3 的地面范围特效 / 遥的技能特效不显示）：
+      //   技能切到它自己的 mode 时，官方**放一次**该 mode 的 cast 行（skills.js 的 plan.modeCast）。
+      //   以前这些行根本没进 plan；放进 each.cast 会变成每击重播。这里在开启那一帧播一次，
+      //   走 _play 同一套位置/朝向/皮肤替换，但**不 _keep**（它不是持续持有的循环）。
+      for (const e of uniq(U.plan.modeCast || [])) {
+        if (this._play(e, v)) drew = true;
+      }
       // an instant skill: what its kit hits in this frame without an attack are its attack's hits (kit hits)
       if (U.plan.kind === 'instant' && perAttack(U.plan).attacks.length) this._open(U, null, true);
       U.loopsOn = true;
