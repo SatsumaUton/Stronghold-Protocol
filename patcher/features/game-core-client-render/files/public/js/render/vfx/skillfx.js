@@ -796,8 +796,11 @@ export class SkillFx {
     const ownMode = !!st.plan.modeName && _mode?.name === st.plan.modeName;
     const fits = !!fx.ability && (fitsAttack(fx.ability, { heal, ranged }) || (!heal && ownMode && /Attack/.test(fx.ability)));
     const forced = !fits && inst && !!fx.ability && /Heal/.test(fx.ability) === heal;
-    const replace = fits || forced;
-    if (fx.ability && !replace) { fx.cast = fx.cast.filter((e) => e.ability !== fx.ability); fx.range = []; fx.aim = []; fx.hit = st.plan.each.hit[0].length ? [st.plan.each.hit[0]] : []; }
+    // ★ 2026-11-18（玩家：凛御银灰少了手上挥砍）：ownMode 时技能攻击是**附加**而不是替换 ——
+    //   否则模式自带的挥砍（combat_start_*）会被整段丢掉。
+    const replace = !ownMode && (fits || forced);
+    // ownMode 时也不过滤 cast 行（deploy_01 的能力类名就是 RangedAttack，会被下面这行滤掉）
+    if (fx.ability && !replace && !ownMode) { fx.cast = fx.cast.filter((e) => e.ability !== fx.ability); fx.range = []; fx.aim = []; fx.hit = st.plan.each.hit[0].length ? [st.plan.each.hit[0]] : []; }
     // the projectile its ability fires (index v3: abilities[].projectileKey, a use's projectileKey), else the naming guess
     // ownMode 时即使本次是近战 / kind 为 'none'，技能模式的投射物也要返回（地面范围特效挂在它的 onReached 上）
     const projectile = fits && (ranged || ownMode) ? fx.projectile || skillProjectile(this.w.idx, st.plan) : null;
