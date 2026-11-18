@@ -6576,61 +6576,51 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.333,
                 "Default": 0,
-                "Interact": 3.5,
-                "Move": 8,
-                "Relax": 8,
-                "Sit": 8,
-                "Sleep": 2.667,
-                "Special": 20.767
+                "Die": 1,
+                "Idle": 8,
+                "Skill": 1.267,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.5
+                ],
+                "Skill": [
+                  0.8
+                ]
+              },
+              "bounds": {
+                "x": -136.826,
+                "y": -3.153,
+                "width": 1712.463,
+                "height": 497.811
+              }
             }
           }
         },
@@ -6650,65 +6640,50 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.333,
                 "Default": 0,
-                "Interact": 1.5,
-                "Move": 5.333,
-                "Relax": 4,
-                "Sit": 4,
-                "Sleep": 4,
-                "Special": 13.833
+                "Die": 1,
+                "Idle": 4,
+                "Skill": 1.267,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.5
+                ],
+                "Skill": [
+                  0.8
+                ]
+              },
               "bounds": {
-                "x": -1497.792,
-                "y": -488.461,
-                "width": 2447.036,
-                "height": 1565.165
+                "x": -422.306,
+                "y": -263.789,
+                "width": 535.738,
+                "height": 818.753
               }
             }
           }
@@ -6727,63 +6702,45 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.333,
                 "Default": 0,
-                "Interact": 5.867,
-                "Move": 10,
-                "Relax": 10,
-                "Sit": 8,
-                "Sleep": 8,
-                "Special": 27.633
+                "Die": 1,
+                "Idle": 8,
+                "Skill": 1.267,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.5
+                ],
+                "Skill": [
+                  0.8
+                ]
+              },
               "bounds": null
             }
           },
@@ -11044,61 +11001,62 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
                 "Default": 0,
-                "Interact": 2.133,
-                "Move": 5.333,
-                "Relax": 5.333,
-                "Sit": 6,
-                "Sleep": 3,
-                "Special": 13.067
+                "Die": 1,
+                "Idle": 4.6,
+                "Skill_1": 1,
+                "Skill_2_End": 0.533,
+                "Skill_2_Idle": 4.6,
+                "Skill_2_Loop": 1,
+                "Skill_Down_2_Loop": 1,
+                "Start": 1,
+                "Start_2": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack"
+              ],
+              "hits": {
+                "Attack": [
+                  0.333
+                ],
+                "Skill_1": [
+                  0.333,
+                  0.5
+                ],
+                "Skill_2_Loop": [
+                  0.5
+                ],
+                "Skill_Down_2_Loop": [
+                  0.5
+                ]
+              },
+              "bounds": {
+                "x": -178.865,
+                "y": -1.612,
+                "width": 799.229,
+                "height": 450.168
+              }
             }
           },
           "portrait": "/assets/char/skin/char_1036_fang2_snow_8.png",
@@ -11314,42 +11272,54 @@
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Attack",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
                   "index": 0,
                   "idle": null
                 },
                 "die": "Die",
                 "move": null,
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  },
-                  "2": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 2,
-                    "idle": null
-                  }
-                }
+                "stun": null
+              },
+              "animations": {
+                "Attack": 1.6,
+                "Default": 0,
+                "Die": 1,
+                "Idle": 4,
+                "Skill_1_Attack": 1,
+                "Skill_1_Begin": 0.167,
+                "Skill_1_End": 0.167,
+                "Skill_1_Loop": 4,
+                "Skill_2_Attack": 1.6,
+                "Skill_2_Begin": 1.833,
+                "Skill_2_End": 0.167,
+                "Skill_2_Loop": 6,
+                "Start": 1
+              },
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.767
+                ],
+                "Skill_1_Attack": [
+                  0.433
+                ],
+                "Skill_2_Attack": [
+                  0.633
+                ],
+                "Skill_2_Begin": [
+                  1.1
+                ]
+              },
+              "bounds": {
+                "x": -189.255,
+                "y": -2.355,
+                "width": 623.379,
+                "height": 547.656
               }
             },
             "back": {
@@ -11369,42 +11339,54 @@
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Attack",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
                   "index": 0,
                   "idle": null
                 },
                 "die": "Die",
                 "move": null,
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  },
-                  "2": {
-                    "begin": null,
-                    "loop": "Attack",
-                    "end": null,
-                    "via": "attack",
-                    "index": 2,
-                    "idle": null
-                  }
-                }
+                "stun": null
+              },
+              "animations": {
+                "Attack": 1.6,
+                "Default": 0,
+                "Die": 1,
+                "Idle": 4,
+                "Skill_1_Attack": 1,
+                "Skill_1_Begin": 0.167,
+                "Skill_1_End": 0.167,
+                "Skill_1_Loop": 4,
+                "Skill_2_Attack": 1.6,
+                "Skill_2_Begin": 1.833,
+                "Skill_2_End": 0.167,
+                "Skill_2_Loop": 6,
+                "Start": 1
+              },
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.767
+                ],
+                "Skill_1_Attack": [
+                  0.433
+                ],
+                "Skill_2_Attack": [
+                  0.633
+                ],
+                "Skill_2_Begin": [
+                  1.1
+                ]
+              },
+              "bounds": {
+                "x": -189.255,
+                "y": -2.355,
+                "width": 623.379,
+                "height": 547.656
               }
             }
           }
@@ -20454,64 +20436,48 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
                 "Default": 0,
-                "Interact": 2.167,
-                "Move": 1.333,
-                "Relax": 2,
-                "Sit": 4,
-                "Sleep": 4,
-                "Special": 7.567
+                "Die": 1,
+                "Idle": 2,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.5
+                ]
+              },
+              "bounds": {
+                "x": -681.305,
+                "y": -5.628,
+                "width": 2270.484,
+                "height": 534.008
+              }
             }
           }
         },
@@ -20531,65 +20497,47 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
                 "Default": 0,
-                "Interact": 2.667,
-                "Move": 2.667,
-                "Relax": 13.333,
-                "Sit": 8,
-                "Sleep": 8,
-                "Special": 13.167
+                "Die": 1,
+                "Idle": 4,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.5
+                ]
+              },
               "bounds": {
-                "x": -1353.925,
-                "y": -312.073,
-                "width": 1463.648,
-                "height": 718.084
+                "x": -109.595,
+                "y": -5.55,
+                "width": 514.184,
+                "height": 411.561
               }
             }
           }
@@ -28629,61 +28577,53 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.2,
+                "Attack_2": 1.2,
                 "Default": 0,
-                "Interact": 1.5,
-                "Move": 4.8,
-                "Relax": 5,
-                "Sit": 6,
-                "Sleep": 3,
-                "Special": 13.133
+                "Die": 1,
+                "Idle": 3.333,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.467
+                ],
+                "Attack_2": [
+                  0.367,
+                  0.633
+                ]
+              },
+              "bounds": {
+                "x": -214.815,
+                "y": -1.244,
+                "width": 353.531,
+                "height": 483.644
+              }
             }
           },
           "portrait": "/assets/char/skin/char_185_frncat_marthe_12.png",
@@ -28705,65 +28645,52 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.2,
+                "Attack_2": 1.2,
                 "Default": 0,
-                "Interact": 2.133,
-                "Move": 1.333,
-                "Relax": 2.667,
-                "Sit": 2.667,
-                "Sleep": 2.667,
-                "Special": 15.433
+                "Die": 1,
+                "Idle": 2.667,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.467
+                ],
+                "Attack_2": [
+                  0.367,
+                  0.633
+                ]
+              },
               "bounds": {
-                "x": -360.825,
-                "y": -65.949,
-                "width": 1364.764,
-                "height": 439.581
+                "x": -923.326,
+                "y": -0.705,
+                "width": 1834.383,
+                "height": 374.337
               }
             }
           }
@@ -29344,68 +29271,60 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
-                "attackDown": null,
+                "attackDown": {
+                  "begin": null,
+                  "loop": "Combat_Down",
+                  "end": null,
+                  "via": "combat"
+                },
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.333,
+                "Combat": 1.167,
+                "Combat_Down": 1.167,
                 "Default": 0,
-                "Interact": 1.467,
-                "Move": 4.267,
-                "Relax": 4,
-                "Sit": 2,
-                "Sleep": 3.333,
-                "Special": 6.667
+                "Die": 1,
+                "Idle": 2,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.533
+                ],
+                "Combat": [
+                  0.5
+                ],
+                "Combat_Down": [
+                  0.5
+                ]
+              },
               "bounds": {
-                "x": -167.273,
-                "y": -3.751,
-                "width": 326,
-                "height": 398.989
+                "x": -289.265,
+                "y": -136.126,
+                "width": 453.447,
+                "height": 540.667
               }
             }
           }
@@ -29608,64 +29527,63 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
-                "attackDown": null,
+                "attackDown": {
+                  "begin": null,
+                  "loop": "Attack_Down",
+                  "end": null
+                },
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.3,
+                "Attack_Down": 1.3,
+                "Combat": 1.3,
                 "Default": 0,
-                "Interact": 3.167,
-                "Move": 1.333,
-                "Relax": 2.667,
-                "Sit": 2.667,
-                "Sleep": 3.333,
-                "Special": 19.5
+                "Die": 1,
+                "Idle": 2.667,
+                "Skill_2": 1.3,
+                "Skill_Down_2": 1.3,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnPlayAudio",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.333
+                ],
+                "Attack_Down": [
+                  0.333
+                ],
+                "Combat": [
+                  0.467
+                ],
+                "Skill_2": [
+                  0.467
+                ],
+                "Skill_Down_2": [
+                  0.467
+                ]
+              },
               "bounds": null
             }
           },
@@ -29847,65 +29765,52 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_Start",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.2,
                 "Default": 0,
-                "Interact": 1.167,
-                "Move": 1.067,
-                "Relax": 4,
-                "Sit": 6.667,
-                "Sleep": 4,
-                "Special": 5
+                "Die": 1,
+                "Idle": 2,
+                "Skill_End": 0.367,
+                "Skill_Loop": 1.333,
+                "Skill_Start": 0.367,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.433
+                ],
+                "Skill_Loop": [
+                  0.167
+                ]
+              },
               "bounds": {
                 "x": -353.381,
                 "y": -16.247,
                 "width": 492.142,
-                "height": 379.039
+                "height": 379.044
               }
             }
           }
@@ -38770,65 +38675,56 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 0.967,
                 "Default": 0,
-                "Interact": 5.367,
-                "Move": 1.333,
-                "Relax": 4,
-                "Sit": 6,
-                "Sleep": 6,
-                "Special": 12.633
+                "Die": 1,
+                "Idle": 4,
+                "Skill": 1.033,
+                "Skill_2": 1.033,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnPlayAudio",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.267
+                ],
+                "Skill": [
+                  0.4
+                ],
+                "Skill_2": [
+                  0.4
+                ]
+              },
+              "bounds": {
+                "x": -336.54,
+                "y": -1.748,
+                "width": 800.491,
+                "height": 573.798
+              }
             }
           },
           "portrait": "/assets/char/skin/char_219_meteo_summer_22.png",
@@ -38850,68 +38746,50 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 0.967,
                 "Default": 0,
-                "Interact": 1,
-                "Move": 1.2,
-                "Relax": 4,
-                "Sit": 6.667,
-                "Sleep": 4,
-                "Special": 4.167
+                "Die": 0.9,
+                "Idle": 2.4,
+                "Skill": 1.033,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.267
+                ],
+                "Skill": [
+                  0.4
+                ]
+              },
               "bounds": {
-                "x": -144.843,
+                "x": -144.844,
                 "y": -0.954,
-                "width": 514.5,
-                "height": 497.046
+                "width": 514.501,
+                "height": 534.046
               }
             }
           }
@@ -45926,68 +45804,47 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.2,
                 "Default": 0,
-                "Interact": 1,
-                "Move": 1,
-                "Relax": 4,
-                "Sit": 3.333,
-                "Sleep": 2.667,
-                "Special": 10.667
+                "Die": 1,
+                "Idle": 2,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.533
+                ]
+              },
               "bounds": {
-                "x": -213.863,
+                "x": -329.453,
                 "y": -0.279,
-                "width": 1292.019,
-                "height": 446.939
+                "width": 643.135,
+                "height": 376.762
               }
             }
           }
@@ -46008,68 +45865,47 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
-                "Default": 0,
-                "Interact": 1,
-                "Move": 1,
-                "Relax": 4,
-                "Sit": 4,
-                "Sleep": 2.667,
-                "Special": 7.833
+                "Attack": 1.2,
+                "Default": 1,
+                "Die": 1,
+                "Idle": 2,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.533
+                ]
+              },
               "bounds": {
-                "x": -175.505,
-                "y": -26.961,
-                "width": 653.164,
-                "height": 454.625
+                "x": -337.041,
+                "y": -10.484,
+                "width": 685.926,
+                "height": 439.001
               }
             }
           }
@@ -46090,65 +45926,47 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.2,
                 "Default": 0,
-                "Interact": 1.333,
-                "Move": 2.667,
-                "Relax": 6,
-                "Sit": 8,
-                "Sleep": 2,
-                "Special": 16.667
+                "Die": 1,
+                "Idle": 4,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.533
+                ]
+              },
               "bounds": {
-                "x": -293.613,
+                "x": -291.39,
                 "y": -3.911,
-                "width": 1044.894,
-                "height": 427.498
+                "width": 1042.671,
+                "height": 879.338
               }
             }
           }
@@ -50967,72 +50785,59 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  },
-                  "2": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 2,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
                 "Default": 0,
-                "Interact": 5.433,
-                "Move": 5.333,
-                "Relax": 8,
-                "Sit": 8,
-                "Sleep": 4,
-                "Special": 17.667
+                "Die": 1,
+                "Idle": 8,
+                "Skill_2_Start": 0.333,
+                "Skill_3_End": 0.333,
+                "Skill_3_Idle": 4,
+                "Skill_3_Loop": 1,
+                "Skill_3_Start": 0.333,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.467
+                ],
+                "Skill_2_Start": [
+                  0.2
+                ],
+                "Skill_3_Loop": [
+                  0.033
+                ]
+              },
+              "bounds": {
+                "x": -483.22,
+                "y": -1.745,
+                "width": 1644.43,
+                "height": 606.401
+              }
             }
           }
         }
@@ -51208,61 +51013,50 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_Begin",
+                  "loop": "Skill",
+                  "end": "Skill_End",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.167,
                 "Default": 0,
-                "Interact": 2.433,
-                "Move": 4,
-                "Relax": 8,
-                "Sit": 8,
-                "Sleep": 8,
-                "Special": 8.867
+                "Die": 1,
+                "Idle": 8,
+                "Skill": 0.667,
+                "Skill_Begin": 0.133,
+                "Skill_End": 0.133,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.533
+                ]
+              },
+              "bounds": {
+                "x": -150.781,
+                "y": -1.671,
+                "width": 1300.573,
+                "height": 542.803
+              }
             }
           }
         }
@@ -51448,61 +51242,55 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.5,
                 "Default": 0,
-                "Interact": 3.3,
-                "Move": 6,
-                "Relax": 5.333,
-                "Sit": 6,
-                "Sleep": 2.667,
-                "Special": 15.2
+                "Die": 1,
+                "Idle": 5.333,
+                "Skill2_Begin": 0.567,
+                "Skill2_End": 0.833,
+                "Skill2_Idle": 4,
+                "Skill2_Loop": 1.133,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.567
+                ],
+                "Skill2_Loop": [
+                  0.5
+                ]
+              },
+              "bounds": {
+                "x": -141.802,
+                "y": -1.57,
+                "width": 361.115,
+                "height": 383.846
+              }
             }
           },
           "portrait": "/assets/char/skin/char_328_cammou_summer_22.png",
@@ -51524,68 +51312,54 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.5,
                 "Default": 0,
-                "Interact": 1.4,
-                "Move": 3.067,
-                "Relax": 3.333,
-                "Sit": 4.667,
-                "Sleep": 4,
-                "Special": 5.333
+                "Die": 0.933,
+                "Idle": 4,
+                "Skill2_Begin": 0.567,
+                "Skill2_End": 0.833,
+                "Skill2_Idle": 4,
+                "Skill2_Loop": 1.133,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.567
+                ],
+                "Skill2_Loop": [
+                  0.5
+                ]
+              },
               "bounds": {
-                "x": -125.495,
-                "y": -2.53,
-                "width": 830.354,
-                "height": 422.24
+                "x": -456.03,
+                "y": -2.297,
+                "width": 568.541,
+                "height": 428.394
               }
             }
           }
@@ -52308,62 +52082,41 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.333,
                 "Default": 0,
-                "Interact": 2,
-                "Move": 2.333,
-                "Relax": 2,
-                "Sit": 6,
-                "Sleep": 2.667,
-                "Special": 8
+                "Die": 1,
+                "Idle": 2.667,
+                "Start": 1
               },
               "events": [
                 "OnAttack"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.5
+                ]
+              },
               "bounds": {
                 "x": -121.414,
                 "y": -0.369,
@@ -54535,69 +54288,51 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 2.333,
                 "Default": 0,
-                "Interact": 1.167,
-                "Move": 1.067,
-                "Relax": 2.667,
-                "Sit": 4,
-                "Sleep": 3.333,
-                "Special": 10.367
+                "Die": 1,
+                "Idle": 2,
+                "Skill": 3,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnPlayAudio",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.667
+                ],
+                "Skill": [
+                  1
+                ]
+              },
               "bounds": {
-                "x": -771.44,
+                "x": -184.645,
                 "y": -57.89,
-                "width": 1533.761,
-                "height": 799.33
+                "width": 946.966,
+                "height": 440.666
               }
             }
           }
@@ -54792,68 +54527,58 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack_A",
                   "end": null,
-                  "via": "idle"
+                  "via": "attackAny"
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_Start",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
                   "index": 0,
-                  "idle": null
+                  "idle": "Skill_Idle"
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack_A": 0.733,
+                "Attack_B": 0.733,
                 "Default": 0,
-                "Interact": 2.767,
-                "Move": 2.467,
-                "Relax": 3.633,
-                "Sit": 6,
-                "Sleep": 3,
-                "Special": 8.2
+                "Die": 0.833,
+                "Idle": 9,
+                "Skill_End": 0.333,
+                "Skill_Idle": 4,
+                "Skill_Loop": 0.667,
+                "Skill_Start": 0.333,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack_A": [
+                  0.333
+                ],
+                "Attack_B": [
+                  0.333
+                ],
+                "Skill_Loop": [
+                  0.333
+                ]
+              },
               "bounds": {
-                "x": -919.843,
-                "y": -2.739,
-                "width": 1189.471,
-                "height": 919.809
+                "x": -104.538,
+                "y": -0.777,
+                "width": 217.513,
+                "height": 403.51
               }
             }
           }
@@ -57331,68 +57056,62 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "begin": "Attack_Begin",
+                  "loop": "Attack_Loop",
+                  "end": "Attack_End"
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_Loop",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack_Begin": 0.167,
+                "Attack_End": 0.167,
+                "Attack_Loop": 1,
                 "Default": 0,
-                "Interact": 1,
-                "Move": 1.067,
-                "Relax": 6.667,
-                "Sit": 3.333,
-                "Sleep": 3.333,
-                "Special": 5.033
+                "Die": 1,
+                "Idle": 3.333,
+                "Skill_2_Begin": 0.167,
+                "Skill_2_End": 0.167,
+                "Skill_2_Idle": 1.667,
+                "Skill_2_Loop": 1,
+                "Skill_Loop": 1,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack_Loop": [
+                  0.067
+                ],
+                "Skill_2_Loop": [
+                  0.067,
+                  0.233,
+                  0.4
+                ],
+                "Skill_Loop": [
+                  0.067,
+                  0.267
+                ]
+              },
               "bounds": {
                 "x": -230.49,
                 "y": -1.906,
-                "width": 402.502,
-                "height": 385.735
+                "width": 402.507,
+                "height": 598.813
               }
             }
           }
@@ -65867,65 +65586,70 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 2.333,
                 "Default": 0,
-                "Interact": 2.5,
-                "Move": 1.333,
-                "Relax": 4,
-                "Sit": 4,
-                "Sleep": 4,
-                "Special": 4.667
+                "Die": 1,
+                "Idle": 4,
+                "Skill": 0.933,
+                "Skill2_Attack": 1,
+                "Skill2_Down_Attack": 1,
+                "Skill2_Down_End": 0.467,
+                "Skill2_Down_Idle": 2,
+                "Skill2_Down_Start": 0.167,
+                "Skill2_End": 0.467,
+                "Skill2_Idle": 2,
+                "Skill2_Start": 0.167,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.833
+                ],
+                "Skill": [
+                  0.467
+                ],
+                "Skill2_Attack": [
+                  0.633
+                ],
+                "Skill2_Down_Attack": [
+                  0.633
+                ],
+                "Skill2_Down_End": [
+                  0
+                ],
+                "Skill2_Down_Start": [
+                  0.167
+                ]
+              },
               "bounds": {
-                "x": -163.496,
-                "y": -4.491,
-                "width": 413.008,
-                "height": 429.043
+                "x": -167.376,
+                "y": -17.22,
+                "width": 568.706,
+                "height": 379.82
               }
             }
           }
@@ -67308,68 +67032,57 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.6,
                 "Default": 0,
-                "Interact": 1.833,
-                "Move": 1.333,
-                "Relax": 5.333,
-                "Sit": 8,
-                "Sleep": 8,
-                "Special": 14
+                "Die": 1,
+                "Idle": 4,
+                "Skill_2_Attack": 1.6,
+                "Skill_2_Begin": 0.167,
+                "Skill_2_End": 1.567,
+                "Skill_2_Idle": 2,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.467
+                ],
+                "Skill_2_Attack": [
+                  0.467
+                ],
+                "Skill_2_End": [
+                  0.533
+                ]
+              },
               "bounds": {
-                "x": -507.966,
-                "y": -65.352,
-                "width": 1047.273,
-                "height": 526.893
+                "x": -203.952,
+                "y": -65.877,
+                "width": 989.968,
+                "height": 527.417
               }
             }
           }
@@ -71035,61 +70748,58 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.3,
                 "Default": 0,
-                "Interact": 1.333,
-                "Move": 4,
-                "Relax": 6,
-                "Sit": 4,
-                "Sleep": 2.667,
-                "Special": 16.967
+                "Die": 1,
+                "Idle": 4,
+                "Skill_1": 1.3,
+                "Skill_2_Attack": 1.3,
+                "Skill_2_Begin": 0.333,
+                "Skill_2_End": 0.667,
+                "Skill_2_Idle": 6,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.533
+                ],
+                "Skill_1": [
+                  0.5
+                ],
+                "Skill_2_Attack": [
+                  0.333
+                ]
+              },
+              "bounds": {
+                "x": -161.772,
+                "y": -2.266,
+                "width": 1382.421,
+                "height": 417.838
+              }
             }
           }
         },
@@ -71109,61 +70819,58 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.3,
                 "Default": 0,
-                "Interact": 4.167,
-                "Move": 6,
-                "Relax": 8,
-                "Sit": 8,
-                "Sleep": 8,
-                "Special": 9.167
+                "Die": 1,
+                "Idle": 5.333,
+                "Skill_1": 1.3,
+                "Skill_2_Attack": 1.3,
+                "Skill_2_Begin": 0.333,
+                "Skill_2_End": 0.667,
+                "Skill_2_Idle": 4.5,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.533
+                ],
+                "Skill_1": [
+                  0.5
+                ],
+                "Skill_2_Attack": [
+                  0.333
+                ]
+              },
+              "bounds": {
+                "x": -197.242,
+                "y": -709.394,
+                "width": 1285.875,
+                "height": 1380.351
+              }
             }
           }
         }
@@ -81907,61 +81614,61 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
                 "Default": 0,
-                "Interact": 4.167,
-                "Move": 4,
-                "Relax": 4,
-                "Sit": 4,
-                "Sleep": 2.667,
-                "Special": 11.333
+                "Die": 1,
+                "Idle": 3.6,
+                "Skill_1": 1,
+                "Skill_2_Begin": 0.167,
+                "Skill_2_End": 0.167,
+                "Skill_2_Idle": 1.2,
+                "Skill_2_Loop": 1,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.367
+                ],
+                "Skill_1": [
+                  0.367
+                ],
+                "Skill_2_Loop": [
+                  0.4
+                ],
+                "Start": [
+                  0.133
+                ]
+              },
+              "bounds": {
+                "x": -486.103,
+                "y": -4.135,
+                "width": 626.648,
+                "height": 400.495
+              }
             }
           }
         }
@@ -83485,64 +83192,91 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
-                },
-                "attackDown": null,
-                "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
-                  "index": 0,
-                  "idle": null
-                },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
+                  "loop": "Attack",
                   "end": null
                 },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "attackDown": {
+                  "begin": null,
+                  "loop": "Attack_Down",
+                  "end": null
+                },
+                "skill": {
+                  "begin": "Skill_Begin",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
+                  "index": 0,
+                  "idle": "Skill_Idle"
+                },
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.3,
+                "Attack_Down": 1.3,
                 "Default": 0,
-                "Interact": 1.733,
-                "Move": 1.2,
-                "Relax": 4,
-                "Sit": 2.667,
-                "Sleep": 2.667,
-                "Special": 9.333
+                "Die": 1,
+                "Idle": 2,
+                "Skill_2_Begin": 1,
+                "Skill_2_Die": 1,
+                "Skill_2_End": 1,
+                "Skill_2_Idle": 2,
+                "Skill_2_Loop": 1.3,
+                "Skill_Begin": 1,
+                "Skill_Die": 1,
+                "Skill_Down_2_Loop": 1.3,
+                "Skill_Down_Loop": 1.3,
+                "Skill_End": 1,
+                "Skill_Idle": 2,
+                "Skill_Loop": 1.3,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.533
+                ],
+                "Attack_Down": [
+                  0.533
+                ],
+                "Skill_2_Begin": [
+                  0.167
+                ],
+                "Skill_2_End": [
+                  0.833
+                ],
+                "Skill_2_Loop": [
+                  0.533
+                ],
+                "Skill_Begin": [
+                  0.167
+                ],
+                "Skill_Down_2_Loop": [
+                  0.533
+                ],
+                "Skill_Down_Loop": [
+                  0.533
+                ],
+                "Skill_End": [
+                  0.833
+                ],
+                "Skill_Loop": [
+                  0.533
+                ]
+              },
+              "bounds": {
+                "x": -135.292,
+                "y": -1.66,
+                "width": 284.736,
+                "height": 370.268
+              }
             }
           },
           "portrait": "/assets/char/skin/char_4165_ctrail_yun_11.png",
@@ -84316,64 +84050,77 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
-                "attackDown": null,
+                "attackDown": {
+                  "begin": null,
+                  "loop": "Attack_Down",
+                  "end": null
+                },
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1,
+                "Attack_Down": 1,
                 "Default": 0,
-                "Interact": 2.6,
-                "Move": 1.2,
-                "Relax": 3.333,
-                "Sit": 3.333,
-                "Sleep": 3.333,
-                "Special": 15
+                "Die": 1,
+                "Idle": 2.667,
+                "Skill_1": 1,
+                "Skill_2_Begin": 0.2,
+                "Skill_2_End": 0.167,
+                "Skill_2_Idle": 2.667,
+                "Skill_2_Loop": 1,
+                "Skill_Down_1": 1,
+                "Skill_Down_2_Begin": 0.2,
+                "Skill_Down_2_End": 0.167,
+                "Skill_Down_2_Idle": 2.667,
+                "Skill_Down_2_Loop": 1,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.4
+                ],
+                "Attack_Down": [
+                  0.4
+                ],
+                "Skill_1": [
+                  0.4
+                ],
+                "Skill_2_Loop": [
+                  0.333
+                ],
+                "Skill_Down_1": [
+                  0.4
+                ],
+                "Skill_Down_2_Loop": [
+                  0.333
+                ]
+              },
+              "bounds": {
+                "x": -164.021,
+                "y": -2.926,
+                "width": 308.977,
+                "height": 393.502
+              }
             }
           },
           "portrait": "/assets/char/skin/char_4177_brigid_epoque_53.png",
@@ -86821,64 +86568,54 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Skill_1",
                   "end": null,
-                  "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.6,
                 "Default": 0,
-                "Interact": 4.933,
-                "Move": 4,
-                "Relax": 3.333,
-                "Sit": 4.667,
-                "Sleep": 2,
-                "Special": 11.833
+                "Die": 1,
+                "Idle": 3.333,
+                "Skill_1": 1.6,
+                "Skill_2_Begin": 0.267,
+                "Skill_2_End": 0.167,
+                "Skill_2_Loop": 10,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.433
+                ],
+                "Skill_1": [
+                  0.467
+                ]
+              },
+              "bounds": {
+                "x": -255.194,
+                "y": -15.377,
+                "width": 1204.803,
+                "height": 272.668
+              }
             }
           },
           "portrait": "/assets/char/skin/char_4198_christ_epoque_56.png",
@@ -96984,68 +96721,64 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.1,
                 "Default": 0,
-                "Interact": 2.4,
-                "Move": 3.2,
-                "Relax": 4,
-                "Sit": 4.667,
-                "Sleep": 3,
-                "Special": 6
+                "Die": 1.067,
+                "Idle": 1.333,
+                "Idle_2": 1.333,
+                "Skill_1_Begin": 0.8,
+                "Skill_1_End": 0.533,
+                "Skill_1_Loop": 0.833,
+                "Skill_1_die": 0.833,
+                "Skill_2_Begin": 1.1,
+                "Skill_2_End": 0.333,
+                "Skill_2_Loop": 1.333,
+                "Start": 1.167
               },
               "events": [
                 "OnAttack",
+                "OnPlayAudio",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.367
+                ],
+                "Skill_1_Begin": [
+                  0.8
+                ],
+                "Skill_2_Begin": [
+                  0.433
+                ],
+                "Skill_2_Loop": [
+                  0.533
+                ]
+              },
               "bounds": {
                 "x": -439.958,
-                "y": -5.796,
-                "width": 998.514,
-                "height": 723.45
+                "y": -67.633,
+                "width": 383.608,
+                "height": 645.601
               }
             }
           }
@@ -99395,68 +99128,51 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.533,
                 "Default": 0,
-                "Interact": 2.833,
-                "Move": 10.667,
-                "Relax": 13.333,
-                "Sit": 5.333,
-                "Sleep": 8,
-                "Special": 16.8
+                "Die": 1,
+                "Idle": 5.333,
+                "Skill2_Begin": 0.167,
+                "Skill2_Die": 1,
+                "Skill2_End": 0.667,
+                "Skill2_Loop": 6,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.5
+                ]
+              },
               "bounds": {
-                "x": -265.869,
-                "y": -3.393,
-                "width": 1130.05,
-                "height": 390.999
+                "x": -294.758,
+                "y": -4.472,
+                "width": 1189.072,
+                "height": 394.579
               }
             }
           }
@@ -99477,68 +99193,51 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.533,
                 "Default": 0,
-                "Interact": 2.567,
-                "Move": 2.667,
-                "Relax": 4,
-                "Sit": 2,
-                "Sleep": 2.667,
-                "Special": 8.033
+                "Die": 1,
+                "Idle": 4,
+                "Skill2_Begin": 0.167,
+                "Skill2_Die": 1.033,
+                "Skill2_End": 0.667,
+                "Skill2_Loop": 4.833,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
+              "hits": {
+                "Attack": [
+                  0.5
+                ]
+              },
               "bounds": {
-                "x": -439.737,
-                "y": -1.318,
-                "width": 353.779,
-                "height": 364.497
+                "x": -422.809,
+                "y": -3.176,
+                "width": 933.828,
+                "height": 529.85
               }
             }
           }
@@ -100327,64 +100026,55 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
                   "begin": null,
-                  "loop": "Default",
+                  "loop": "Attack",
                   "end": null,
                   "via": "attack",
                   "index": 0,
                   "idle": null
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.267,
                 "Default": 0,
-                "Interact": 2,
-                "Move": 1.333,
-                "Relax": 3.067,
-                "Sit": 2.933,
-                "Sleep": 1.667,
-                "Special": 6.333
+                "Die": 1,
+                "Idle": 2,
+                "Skill_2_Begin": 0.167,
+                "Skill_2_End": 0.167,
+                "Skill_2_Idle": 2,
+                "Skill_2_Loop": 1.267,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.5
+                ],
+                "Skill_2_Loop": [
+                  0.5
+                ]
+              },
+              "bounds": {
+                "x": -143.068,
+                "y": -1.978,
+                "width": 459.213,
+                "height": 362.026
+              }
             }
           }
         }
@@ -100907,64 +100597,60 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Interact",
-                "deploy": "Interact",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Interact",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Interact",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_begin",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
                   "index": 0,
-                  "idle": null
+                  "idle": "Skill_Idle"
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Interact",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Interact",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
-                "Interact": 1.833,
-                "Move": 2.667,
-                "Relax": 4,
-                "Sit": 4,
-                "Sleep": 4,
-                "Special": 4.5
+                "Attack": 1.667,
+                "Default": 0,
+                "Die": 0.833,
+                "Idle": 2,
+                "Skill_2_End": 0.667,
+                "Skill_2_Idle": 2,
+                "Skill_2_Loop": 1.667,
+                "Skill_2_begin": 0.667,
+                "Skill_End": 0.667,
+                "Skill_Idle": 2,
+                "Skill_Loop": 1.667,
+                "Skill_begin": 0.667,
+                "Start": 1
               },
-              "events": [],
-              "hits": {},
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.9
+                ],
+                "Skill_2_Loop": [
+                  0.833
+                ],
+                "Skill_Loop": [
+                  0.433
+                ]
+              },
               "bounds": {
-                "x": -190.951,
-                "y": -2.905,
-                "width": 311.003,
-                "height": 466.863
+                "x": -225.771,
+                "y": -2.906,
+                "width": 450.175,
+                "height": 579.25
               }
             }
           }
@@ -100985,64 +100671,61 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_begin",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
                   "index": 0,
-                  "idle": null
+                  "idle": "Skill_Idle"
                 },
-                "die": null,
-                "move": {
-                  "begin": null,
-                  "loop": "Move",
-                  "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
-                }
+                "die": "Die",
+                "move": null,
+                "stun": null
               },
               "animations": {
+                "Attack": 1.667,
                 "Default": 0,
-                "Interact": 2.333,
-                "Move": 1,
-                "Relax": 4.667,
-                "Sit": 2.333,
-                "Sleep": 4,
-                "Special": 7.467
+                "Die": 1,
+                "Idle": 2.333,
+                "Skill_2_End": 0.667,
+                "Skill_2_Idle": 2,
+                "Skill_2_Loop": 1.667,
+                "Skill_2_begin": 0.667,
+                "Skill_End": 0.667,
+                "Skill_Idle": 2,
+                "Skill_Loop": 1.667,
+                "Skill_begin": 0.667,
+                "Start": 1
               },
               "events": [
                 "OnAttack",
                 "OnStart"
               ],
-              "hits": {},
-              "bounds": null
+              "hits": {
+                "Attack": [
+                  0.9
+                ],
+                "Skill_2_Loop": [
+                  0.833
+                ],
+                "Skill_Loop": [
+                  0.433
+                ]
+              },
+              "bounds": {
+                "x": -653.31,
+                "y": -5.81,
+                "width": 1020.31,
+                "height": 466
+              }
             }
           }
         }
@@ -102477,61 +102160,59 @@
               ],
               "pma": false,
               "anims": {
-                "idle": "Default",
-                "deploy": "Default",
+                "idle": "Idle",
+                "deploy": "Start",
                 "attack": {
                   "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "idle"
+                  "loop": "Attack",
+                  "end": null
                 },
                 "attackDown": null,
                 "skill": {
-                  "begin": null,
-                  "loop": "Default",
-                  "end": null,
-                  "via": "attack",
+                  "begin": "Skill_Begin",
+                  "loop": "Skill_Loop",
+                  "end": "Skill_End",
                   "index": 0,
-                  "idle": null
+                  "idle": "Skill_Idle"
                 },
-                "die": null,
-                "move": {
+                "die": "Die",
+                "move": null,
+                "stun": {
                   "begin": null,
-                  "loop": "Move",
+                  "loop": "Stun",
                   "end": null
-                },
-                "stun": null,
-                "skills": {
-                  "0": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 0,
-                    "idle": null
-                  },
-                  "1": {
-                    "begin": null,
-                    "loop": "Default",
-                    "end": null,
-                    "via": "attack",
-                    "index": 1,
-                    "idle": null
-                  }
                 }
               },
               "animations": {
+                "Attack": 1.6,
                 "Default": 0,
-                "Interact": 2.5,
-                "Move": 4,
-                "Relax": 8,
-                "Sit": 8,
-                "Sleep": 2.667,
-                "Special": 8.7
+                "Die": 1,
+                "Idle": 6,
+                "Skill_Begin": 0.5,
+                "Skill_End": 0.667,
+                "Skill_Idle": 6,
+                "Skill_Loop": 1.6,
+                "Start": 1,
+                "Stun": 1
               },
-              "events": [],
-              "hits": {},
-              "bounds": null
+              "events": [
+                "OnAttack",
+                "OnStart"
+              ],
+              "hits": {
+                "Attack": [
+                  0.6
+                ],
+                "Skill_Loop": [
+                  0.5
+                ]
+              },
+              "bounds": {
+                "x": -128.21,
+                "y": -1.487,
+                "width": 954.314,
+                "height": 480.947
+              }
             }
           }
         }
