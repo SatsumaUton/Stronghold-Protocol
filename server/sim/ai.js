@@ -566,6 +566,30 @@ function legFieldInfo(b, r, c, k) {
   return { f: null, soft: false, out: true };
 }
 
+/**
+ * 离 (r, c) 最近的可行瓦片（按环逐圈扩大搜索，8 邻接优先）。
+ * 用于 `out` 分支：敌人站在墙/虚空瓦片上时，先走回可走区域，而不是直线冲终点。
+ */
+function nearestWalkable(b, r, c) {
+  const g = b.grid;
+  for (let d = 1; d <= 6; d++) {
+    let best = null;
+    let bestD = Infinity;
+    for (let dr = -d; dr <= d; dr++) {
+      for (let dc = -d; dc <= d; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== d) continue;   // 只看这一圈
+        const rr = r + dr;
+        const cc = c + dc;
+        if (!g.inBounds(rr, cc) || !g.walkable(rr, cc, true)) continue;
+        const dist = dr * dr + dc * dc;
+        if (dist < bestD) { bestD = dist; best = { r: rr, c: cc }; }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
 function legField(b, r, c, k) {
   const info = legFieldInfo(b, r, c, k);
   // ★ 2026-11-18: the obstacle-free fallback is only safe when the tile is not on the walkable map at all
@@ -615,10 +639,31 @@ function planLeg(b, e, leg) {
       }
     }
     R.blocked = false;
-    // `info.out`: no field reaches the tile at all (a spawn gate ON a wall tile) — the enemy must step into the
-    // field, so it walks straight to the leg target. This is the long-standing behaviour every stage relies on.
-    const last = pts[pts.length - 1];
-    if (!last || last.x !== leg.c || last.y !== leg.r) pts.push({ x: leg.c, y: leg.r });
+    // ★ 2026-11-18（玩家：深渊回响里敌对目标穿墙直接去终点）：
+    //   `out` 反两个流场都到不了该瓦片。`ignoreObstacles` 只忽略 BLOCK/CRATE 位，
+    //   **不忽略瓦片类型** —— X（passable NONE）与 #/a/A（FLY_ONLY, groundPassable false）永远不可走。
+    //   所以敌人站在墙瓦片上时（被推挤、出生点压墙、诱导结束）会走到这里；
+    //   以前无条件 push 终点 = 直线穿墙。现在：
+    //     · 脚下是墙/虚空 → 走向**最近的可行邻居**，绝不朝终点直线走；
+    //     · 脚下本来可走（老情况：k 越界等）→ 保留原来的直线行为。
+    const r0 = Math.round(e.y);
+    const c0 = Math.round(e.x);
+    const onWall = k < 0 ? false : !b.grid.walkable(r0, c0, true);
+    if (onWall) {
+      const nb = nearestWalkable(b, r0, c0);
+      if (!nb) {
+        R.pts = [];
+        R.blocked = true;
+        R.ptIdx = 0;
+        R.version = b.grid.version;
+        R.suffix = new Float64Array(0);
+        return;
+      }
+      pts.push({ x: nb.c, y: nb.r });
+    } else {
+      const last = pts[pts.length - 1];
+      if (!last || last.x !== leg.c || last.y !== leg.r) pts.push({ x: leg.c, y: leg.r });
+    }
     // The smoothed chain is line-of-sight clear from the tile CENTRE only. An enemy re-planning off-centre (pushed,
     // released by 诱导, an obstacle change mid-segment) first steps back to its tile centre when the straight line to
     // the first waypoint would cut a tile it cannot walk (a fence corner, a crate) — else it would walk inside it.

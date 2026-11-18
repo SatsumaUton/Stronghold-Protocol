@@ -8,7 +8,8 @@
 //
 // 但 `legField` 为 null 有**两种成因**，必须分开处理（第一版修得太狠，敌人卡在出生点不动）：
 //   A. 正常场不可达、忽略障碍场**可达** → 路被干员/木箱堵住 → 原地等待（每帧重算）
-//   B. 两个场**都不可达** → 出生口在墙格上 → 必须先直线走进战场（这是所有关卡一直依赖的行为）
+//   B. 两个场**都不可达** → 站在墙/虚空瓦片上（`ignoreObstacles` 不忽略瓦片类型）→ 必须先走回**最近的可行瓦片**；
+//      2026-11-18 修正：以前这里无条件下直线冲终点，那就是「深渊回响穿墙直接去终点」的成因。
 //
 // 这条测试盯住：A 类等待、B 类照走、第一版不推进 legIdx。
 import test from 'node:test';
@@ -26,10 +27,15 @@ test('静读：无可用流场（被堵住）时标记 blocked，不补终点', 
   assert.doesNotMatch(softBranch, /pts\.push\(\{ x: leg\.c, y: leg\.r \}\)/, 'A 类不能 push 终点（那就是直线穿墙）');
 });
 
-test('静读：B 类（出生口在墙格）仍然直线走进战场', () => {
+test('静读：B 类（站墙格）走向最近的可行瓦片，不直线冲终点', () => {
   const fn = SRC.slice(SRC.indexOf('function planLeg'), SRC.indexOf('/** Estimated length of legs'));
-  assert.match(fn, /info\.out/, '要区分「两个场都不可达」');
-  assert.match(fn, /pts\.push\(\{ x: leg\.c, y: leg\.r \}\);/, 'B 类要补终点（否则敌人永远不动）');
+  assert.match(fn, /const onWall = k < 0 \? false : !b\.grid\.walkable/, '要先判断脚下是不是墙/虚空');
+  assert.match(fn, /nearestWalkable\(b, r0, c0\)/, 'B 类要走向最近的可行瓦片（否则敌人永远不动，且不会穿墙）');
+  assert.match(fn, /onWall/, '要先判断脚下是不是墙/虚空');
+  assert.doesNotMatch(
+    fn.slice(fn.indexOf('nearestWalkable(b, r0, c0)'), fn.indexOf("if (info.f)")),
+    /pts\.push\(\{ x: leg\.c, y: leg\.r \}\)/, '站墙格时绝不能补终点（那就是穿墙）',
+  );
 });
 
 test('静读：legFieldInfo 的三向判定（可达 / 只忽略障碍可达 / 都不可达）', () => {
