@@ -784,12 +784,23 @@ export class SkillFx {
     // (斩业星熊 S2: her MultiMelee mode attacks while the skill's AroundTargetRangedAttack throws on its own); in the frame
     // of an instant skill's activation its attack is the skill's whatever kind the sim made it (阿罗玛 S1's 'beam' is her
     // MeleeAttack, 夕 S1's 'bolt' her MultiMeleeAttack: their cast, aim and hits) — a heal stays a heal
-    const fits = !!fx.ability && fitsAttack(fx.ability, { heal, ranged });
+    // ★ 2026-11-18（玩家：凛御银灰 S3 的地面范围特效看不到）：
+    //   他是近战，而 S3 的 plan 攻击能力是 RangedAttack；实战里这一击的 kind 是 'none'
+    //   （模式能力 AnimatedActionToOwnerAbility 是动画动作，不是射击），于是 ranged=false、fits=false，
+    //   下面这行会把 deploy_01（ability=RangedAttack）过滤掉。
+    //   技能自己把单位切到它的模式时（plan.modeName 且当前模式就是它），模式内的攻击定义是权威的。
+    //   这条比放宽 fitsAttack 窄得多：斩业星熊 S2 那类没有 modeName，行为不变。
+    const _u = this.w.unitOf(src);
+    const _mode = _u ? this.w.mode(_u, src, skillOn) : null;
+    // w.mode() 返回的是模式对象（{ name, attack, ... }），要比 .name
+    const ownMode = !!st.plan.modeName && _mode?.name === st.plan.modeName;
+    const fits = !!fx.ability && (fitsAttack(fx.ability, { heal, ranged }) || (!heal && ownMode && /Attack/.test(fx.ability)));
     const forced = !fits && inst && !!fx.ability && /Heal/.test(fx.ability) === heal;
     const replace = fits || forced;
     if (fx.ability && !replace) { fx.cast = fx.cast.filter((e) => e.ability !== fx.ability); fx.range = []; fx.aim = []; fx.hit = st.plan.each.hit[0].length ? [st.plan.each.hit[0]] : []; }
     // the projectile its ability fires (index v3: abilities[].projectileKey, a use's projectileKey), else the naming guess
-    const projectile = fits && ranged ? fx.projectile || skillProjectile(this.w.idx, st.plan) : null;
+    // ownMode 时即使本次是近战 / kind 为 'none'，技能模式的投射物也要返回（地面范围特效挂在它的 onReached 上）
+    const projectile = fits && (ranged || ownMode) ? fx.projectile || skillProjectile(this.w.idx, st.plan) : null;
     if (!replace && !fx.cast.length && !fx.hit.length && !st.U.tHit.length) return null;
     return { U: st.U, fx, replace, projectile, shot: replace ? fx.shot : null, buffs: st.U.tHit, late: forced };
   }

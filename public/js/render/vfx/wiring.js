@@ -976,7 +976,12 @@ export class FxWiring {
     // a sim-melee attack whose official ability is a ranged one with a projectile (蒂比): the projectile flies for show
     const heal = !!tgt && !tgt.isEnemy && !src.isEnemy;
     const display = !isShot && !!proj && !!tgt && !src.isEnemy && !sk?.projectile && fitsAttack(set?.shotClass, { heal, ranged: true });
-    const flies = !!proj && !!tgt && (isShot || display);
+    // ★ 2026-11-18（同一个现场）：kind 为 'none' 时 isShot 为假，而 display 要求 !sk?.projectile，
+    //   银灰有技能自己的投射物 → display 也为假 → flies 为假 → 投射物不飞 → 地面范围特效不播。
+    //   技能自己把单位切进它的模式时，它自己的投射物必须飞。
+    const ownModeShot = !!proj && !!sk?.projectile && !!sk.U?.plan?.modeName
+      && this.mode(u, src)?.name === sk.U.plan.modeName;
+    const flies = !!proj && !!tgt && (isShot || display || ownModeShot);
     if (flies && fun?.skipBody) return true;
     if (flies) {
       // index v3: where the shot leaves (mount, a mount group's points) and its follow-up shots (skills.js shotOf); the
