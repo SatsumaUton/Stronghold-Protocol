@@ -1828,6 +1828,12 @@ def buff_target(cls, field, fields):
     if 'Aura' in cls:
         return 'owner' if field == '_passiveBuffs' else 'targets'
     if cls in ('ActiveBuffAbility', 'ActiveOneOfBuffAbility'):
+        # ★ 2026-11-18（玩家：遥 S2 的友方干员身上没有出现技能特效）：
+        #   _extraBuffs 是「额外发给被选目标」的第二份 buff（遥 S2 治到谁就挂到谁身上），
+        #   与 _buffs（挂给自己）**归属不同**。以前两者都被判成 owner，于是 buff 特效只播在遥身上，
+        #   被治疗的友军身上什么都没有。全库只有 6 个技能用 _extraBuffs（buildr/dminon/thorns/headb2/typhon/haruka）。
+        if field == '_extraBuffs':
+            return 'targets'
         sel = fields.get('_selector')
         return 'targets' if field != '_passiveBuffs' and isinstance(sel, dict) and sel.get('m_PathID') else 'owner'
     if cls.startswith(('BuffToOwner', 'BuffDuring', 'BuffAfter', 'Passive', 'ToggleablePassive', 'ExtraPassive', 'Chant')):
@@ -2597,9 +2603,36 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log):
     effect_refs = lambda strings: sorted({x.lower() for x in strings if x.lower() in eff})  # noqa: E731
     ek = lambda x: x.lower() if isinstance(x, str) and x.lower() in eff else x  # noqa: E731
     pk = lambda x: x.lower() if isinstance(x, str) and x.lower() in proj_roots else None  # noqa: E731
+    # ★ 2026-11-18（维护者：凛御银灰 S3 的地面范围特效看不到 / 补齐所有干员特效缺失）：
+    #   以前只有下面这 8 个「标准」字段进事件表，其余 behaviour 的特效字段只落到 entry['effects']
+    #   （一个总集合），而播放层只读 onStart / onReached / onHit / … —— 于是那些特效**有资源、永远不播**。
+    #   官方语义（从包里读出的原文）逐个映射：
+    #     · Svash2ProjectileEffectBehaviour._effectsAlignToTargetDirection  到达时在目标处、对齐目标方向
+    #       （projectile_chr_svash2_s3 → svash2_skill_03_range_01，就是银灰 S3 的地面范围特效）
+    #     · SnsantSkill2ProjectileEffectBehaviour._effectsWhenReached / _movingEffectsWhenReached  到达
+    #     · EffectBehaviour._repalceEffectsWhenHit  命中替换（官方拼写就是 repalce）
+    #     · WangStoneHitBehaviour._triggeredEffect  命中触发
+    #     · VortexMultiHitBehaviour._castEffect  施放
+    #     · ScalableAuraHitBehaviour._effectKey  光环命中
+    #     · CoolDownAfterHitBehaviour._hitEffectOnProjectilePos  命中在弹体位置
+    #     · BounceHitBehaviour._overwritedMainEffectAfterFirstHit  第一次命中后替换（拼写 overwrited）
     lists = (('_effectsWhenStart', 'onStart'), ('_effectsWhenReached', 'onReached'), ('_effectsWhenHit', 'onHit'),
              ('_effectsWhenStop', 'onStop'), ('_effectsToTargetWhenStart', 'toTargetOnStart'),
-             ('_effectsToTileWhenStart', 'toTileOnStart'), ('_effectOnTrigger', 'onTrigger'), ('_effectsWhenSelect', 'onSelect'))
+             ('_effectsToTileWhenStart', 'toTileOnStart'), ('_effectOnTrigger', 'onTrigger'), ('_effectsWhenSelect', 'onSelect'),
+             # —— 非标准 behaviour 的特效字段（按官方语义映射到已有事件）——
+             ('_effectsAlignToTargetDirection', 'onReached'),
+             ('_effectsAlignToProjectileDirection', 'onReached'),
+             ('_effectsAlignToProjectileDirectionWhenDirRight', 'onReached'),
+             ('_movingEffectsWhenReached', 'onReached'),
+             ('_harpoonEffect', 'onStart'),
+             ('_triggeredEffect', 'onHit'),
+             ('_castEffect', 'onStart'),
+             ('_effectKey', 'onReached'),
+             ('_hitEffectOnProjectilePos', 'onHit'),
+             ('_repalceEffectsWhenHit', 'onHit'),
+             ('_overwritedMainEffectAfterFirstHit', 'onHit'),
+             ('_specialHitEffect', 'onHit'),
+             ('_selectEffectOnGround', 'onSelect'))
 
     def projectile(key, depth=0):
         key = pk(key)
@@ -2632,7 +2665,15 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log):
                 if cls.endswith('Movement') and entry['movement'] is None:
                     entry['movement'] = {'class': cls, **{k.lstrip('_'): v for k, v in fields.items()}}
                 for src, dst in lists:
-                    vals = [ek(x) for x in (d.get(src) or []) if isinstance(x, str) and x]
+                    # ★ 有些字段是单个字符串而不是列表（_castEffect / _triggeredEffect / _effectKey /
+                    #   _specialHitEffect / _hitEffectOnProjectilePos …）：or x in '<str>' 会拆成逐字符，
+                    #   于是 entry 里存成 ['g','l','a','d','y',…]。必须先包成列表。
+                    raw_vals = d.get(src)
+                    if isinstance(raw_vals, str):
+                        raw_vals = [raw_vals] if raw_vals else []
+                    elif not isinstance(raw_vals, (list, tuple)):
+                        raw_vals = []
+                    vals = [ek(x) for x in raw_vals if isinstance(x, str) and x]
                     if vals:
                         entry.setdefault(dst, []).extend(vals)
             stack.extend(go_children(shared, go))
@@ -3021,7 +3062,8 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log):
             f'when: {", ".join(f"{k} {v}" for k, v in sorted(whens.items(), key=lambda kv: str(kv[0])))}; '
             f'{sum(1 for n in [n for t in tk for n in t["nodes"]] + ab if n.get("triggers"))} with template triggers')
     for p in projectiles.values():
-        referenced.update(p['effects'])
+        # a partial record (an exception part-way through a bundle) may lack ffects: never crash the run on it
+        referenced.update(p.get('effects') or [])
     return units, projectiles, skills, skins, referenced
 
 

@@ -1047,7 +1047,10 @@ export function skillProjectile(_idx, plan) {
 }
 
 /** Attack abilities whose `_activeBuffs` sit on the targets an 'atk' names (targetsOf `hit`). */
-const ACTIVE_BUFFS = /^(\w+)\._activeBuffs\b/;
+// 2026-11-18(players: allies show no effect for Haruka S2): `_extraBuffs` is the second buff handed to the *selected targets*,
+// so its carrier is the unit that was hit/healed — same `hit` path as `_activeBuffs` (SkillFx._targetLoop plays it on the
+// _kitHit target). Before, only `_activeBuffs` matched and `_extraBuffs` fell into `none` (nothing played it).
+const ACTIVE_BUFFS = /^(\w+)\.(_activeBuffs|_extraBuffs)\b/;
 
 /**
  * The `targets` entries the client can place (module header): `hit` — carried by an attack ability's `_activeBuffs`, on
@@ -1061,7 +1064,12 @@ export function targetsOf(idx, plan) {
   const out = { status: [], hit: [], none: [] };
   for (const e of plan?.targets || []) {
     const m = ACTIVE_BUFFS.exec(e.from || '');
-    if (m && isAttack(m[1])) out.hit.push(e);
+    // ★ 2026-11-18：_extraBuffs 的携带者由「被选中的目标」决定，与能力类名无关 ——
+    //   遥 S2 的能力是 ActiveOneOfBuffAbility（类名不含 Attack/Heal），以前被 isAttack 挡掉落到 none，
+    //   于是被治疗的友军身上什么都不播。_activeBuffs 仍走原来的 isAttack 判定。
+    const extra = m && m[2] === '_extraBuffs';
+    if (extra) out.hit.push(e);
+    else if (m && isAttack(m[1])) out.hit.push(e);
     else if (generic.has(e.key)) out.status.push(e);
     else out.none.push(e);
   }
@@ -1137,7 +1145,7 @@ export function slotKey(entry, dir) {
 }
 
 /** Every key a plan can play (slots included) — for preloading. */
-export function planKeys(plan) {
+export function planKeys(plan, projs = null) {
   const out = new Set();
   const add = (e) => { if (!e) return; out.add(e.key); for (const s of e.slots || []) if (s) out.add(s); };
   // ★ 2026-11-18（维护者：遥 / 塔露拉 / 凛御银灰「还是没有过程特效」）：
@@ -1153,6 +1161,19 @@ export function planKeys(plan) {
   for (const g of plan?.each?.hit || []) for (const e of g) add(e);
   for (const e of plan?.pulse || []) add(e);
   for (const e of plan?.cond || []) add(e);
+  // ★ 2026-11-18（银灰 S3 地面范围特效 / 补齐所有干员特效缺失）：
+  //   技能投射物在**到达 / 命中 / 施放**时播放的特效（projectiles[pk].onReached 等）。
+  //   银灰 S3 的地面范围特效 svash2_skill_03_range_01 就挂在 projectile_chr_svash2_s3.onReached 上；
+  //   skillfx.keys 早已通过 p.effects 把它算进预加载，这里让 planKeys 也带上，两处保持一致。
+  if (isObj(projs)) {
+    for (const pk of plan?.projectiles || []) {
+      const p = projs[pk];
+      if (!isObj(p)) continue;
+      for (const f of ['onStart', 'onReached', 'onHit', 'onStop', 'toTargetOnStart', 'toTileOnStart', 'onTrigger', 'onSelect']) {
+        for (const k of p[f] || []) if (typeof k === 'string' && k) out.add(k.toLowerCase());
+      }
+    }
+  }
   return [...out];
 }
 

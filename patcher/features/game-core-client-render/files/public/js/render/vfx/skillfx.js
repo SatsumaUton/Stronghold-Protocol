@@ -483,8 +483,20 @@ export class SkillFx {
     if (!v) return false;
     const seq = this._mark();
     this.hitLog.push({ v, heal: !!heal, claimed: !!claimed, seq });
-    if (claimed || !this.windows.length || !this.active()) return false;
+    if (claimed || !this.active()) return false;
     let drew = false;
+    // ★ 2026-11-18（玩家：遥 S2 的友方干员身上没有出现技能特效）：
+    //   遥 S2 是 lasting + 治疗型、plan.attacks 为 0 —— 下面的 _kitHit 需要一条 attack 做节点匹配，
+    //   她根本没有 attack，整段一次都不跑。她的 buff（_extraBuffs → targets）恰恰是「治到谁就挂到谁身上」。
+    //   这段必须在「windows 为空就 return」之前：这类技能本来就不开窗口。
+    if (heal) {
+      for (const U of this.units.values()) {
+        if (!U || !U.plan || !U.on || !U.tHit.length || U.plan.attacks.length) continue;
+        for (const e of uniq(U.tHit)) if (this._targetLoop(U, e, v)) drew = true;
+      }
+      if (drew) return true;
+    }
+    if (!this.windows.length) return false;
     for (const win of this.windows) {
       if (win.inst && win.U.attacked) continue;   // the activation made its attack: its rows are that attack's
       const a = win.a || this._instAttack(win.U, heal);
@@ -574,7 +586,7 @@ export class SkillFx {
     if (p.start.length || p.loop.length || p.range.length || p.attacks.some((a) => a.cast.length || a.range.length)) return false;
     if (U.unitOk === undefined) {
       const u = this.w.idx.units[U.key];
-      const ks = new Set(planKeys(p));
+      const ks = new Set(planKeys(p, this.w.idx.projectiles));
       for (const k of u?.skills?.[U.skillId]?.effects || []) ks.add(lc(k));
       for (const m of u?.modes || []) for (const r of [...(m?.attack?.cast || []), ...(m?.attack?.hit || [])]) for (const k of r?.effects || []) ks.add(lc(k));
       for (const k of Array.isArray(u?.refs) ? u.refs : []) ks.add(lc(k));   // every prefab the unit references (its shots')
@@ -586,7 +598,7 @@ export class SkillFx {
 
   /** The skill's plan has installed effects (FX_COVER: they stand for the kit fx only when they are drawn). */
   _planDrawn(U) {
-    if (U.planOk === undefined) U.planOk = !!U.plan && planKeys(U.plan).some((k) => this.w.ofx.lib.has(k));
+    if (U.planOk === undefined) U.planOk = !!U.plan && planKeys(U.plan, this.w.idx.projectiles).some((k) => this.w.ofx.lib.has(k));
     return U.planOk;
   }
 
@@ -1525,16 +1537,16 @@ export class SkillFx {
       const U = this.of(v);
       if (!U) continue;
       if (U.plan) {
-        for (const k of planKeys(U.plan)) out.add(k);
+        for (const k of planKeys(U.plan, idx.projectiles)) out.add(k);
         for (const pk of U.plan.projectiles) proj(pk);
         for (const k of bindingKeys(idx, U.skillId)) out.add(k);
       }
       for (const en of U.enemy) {
-        for (const k of planKeys(en.plan)) out.add(k);
+        for (const k of planKeys(en.plan, idx.projectiles)) out.add(k);
         for (const pk of en.plan.projectiles) proj(pk);
         // the copies of a boss's skill in its other modes (the forms it may take)
         for (const mode of new Set((en.plan && this.w.idx.units[U.key]?.skills?.[en.prefabKey]?.uses || []).map((x) => x.mode).filter((m) => typeof m === 'string' && m !== 'Default'))) {
-          for (const k of planKeys(skillPlan(idx, U.key, en.prefabKey, { mode }))) out.add(k);
+          for (const k of planKeys(skillPlan(idx, U.key, en.prefabKey, { mode }), idx.projectiles)) out.add(k);
         }
       }
       if (U.charge) {

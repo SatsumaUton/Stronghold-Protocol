@@ -548,13 +548,29 @@ export function compileRoute(route, rect = null) {
  * Flow field of a WALK leg target usable from tile key `k`: the live field, else the obstacle-free one (the goal is
  * walled off by hard blocks), else null.
  */
-function legField(b, r, c, k) {
+/**
+ * The flow field a WALK leg walks by, with **why** it was chosen — the three outcomes are different problems:
+ *   · `{ f }`          a field from the enemy's tile under the live obstacles: the normal case;
+ *   · `{ f, soft }`    only the obstacle-free field reaches it: the way is blocked by an ally / a crate **right now** —
+ *                      walking it would go through those blockers (the 穿墙 report of 2026-11-18), so the caller waits;
+ *   · `{ f: null, out }` neither field reaches it: the tile is off the walkable map (a spawn gate ON a wall tile) —
+ *                      the enemy has to step into the field first, so it walks straight to the leg target (the
+ *                      behaviour every stage has always had; without it an enemy spawning on a wall tile never moves).
+ */
+function legFieldInfo(b, r, c, k) {
   const g = b.grid;
   const f = g.flowField(r, c);
-  if (k >= 0 && f.dist[k] >= 0) return f;
+  if (k >= 0 && f.dist[k] >= 0) return { f, soft: false };
   const f2 = g.flowField(r, c, { ignoreObstacles: true });
-  if (k >= 0 && f2.dist[k] >= 0) return f2;
-  return null;
+  if (k >= 0 && f2.dist[k] >= 0) return { f: f2, soft: true };
+  return { f: null, soft: false, out: true };
+}
+
+function legField(b, r, c, k) {
+  const info = legFieldInfo(b, r, c, k);
+  // ★ 2026-11-18: the obstacle-free fallback is only safe when the tile is not on the walkable map at all
+  // (`out`); when it IS reachable by ignoring allies/crates that means the way is blocked → no field (wait).
+  return info.out ? info.f : info.f;
 }
 
 const tileKey = (b, e) => {
@@ -569,31 +585,49 @@ const tileKey = (b, e) => {
 function planLeg(b, e, leg) {
   const R = e.route;
   let pts;
+  // ★ 2026-11-18（玩家反馈：深渊回响里敌对目标穿墙走到终点）：走不到时**不能**补目标点。
+  //   以前 `legField` 返回 null（这条路被干员/木箱堵死）后仍然无条件 push 终点 ——
+  //   于是敌人沿「起点→终点」直线穿墙直走。实测：221 条 WALK 路线里，把走廊铺满障碍后有 147 条会变成不可达。
+  //   现在：走不到就标记 `R.blocked`，本帧原地不动（每帧重算，路一开就继续走）。
   if (e.motion === 'FLY') {
     pts = [{ x: leg.c, y: leg.r }];
   } else {
     const k = tileKey(b, e);
-    const f = legField(b, leg.r, leg.c, k);
+    const info = legFieldInfo(b, leg.r, leg.c, k);
     pts = [];
-    if (f) {
+    if (info.soft) {
+      // ★ 2026-11-18（玩家：深渊回响里敌对目标穿墙）：只有「忽略障碍」的流场走得到 = 路被干员/木箱堵住了。
+      //   走这条路就是穿墙 —— 所以原地等待。每帧重算，路一开就继续。
+      R.pts = [];
+      R.blocked = true;
+      R.ptIdx = 0;
+      R.version = b.grid.version;
+      R.suffix = new Float64Array(0);
+      return;
+    }
+    if (info.f) {
       let x = k;
       let guard = COLS * 32;
-      while (x !== f.dest && guard-- > 0) { // loop-cap: flow-field guard
-        x = f.next[x];
+      while (x !== info.f.dest && guard-- > 0) { // loop-cap: flow-field guard
+        x = info.f.next[x];
         if (x < 0) break;
         pts.push({ x: x % COLS, y: (x / COLS) | 0 });
       }
     }
+    R.blocked = false;
+    // `info.out`: no field reaches the tile at all (a spawn gate ON a wall tile) — the enemy must step into the
+    // field, so it walks straight to the leg target. This is the long-standing behaviour every stage relies on.
     const last = pts[pts.length - 1];
     if (!last || last.x !== leg.c || last.y !== leg.r) pts.push({ x: leg.c, y: leg.r });
     // The smoothed chain is line-of-sight clear from the tile CENTRE only. An enemy re-planning off-centre (pushed,
     // released by 诱导, an obstacle change mid-segment) first steps back to its tile centre when the straight line to
     // the first waypoint would cut a tile it cannot walk (a fence corner, a crate) — else it would walk inside it.
-    if (f && (e.x !== k % COLS || e.y !== ((k / COLS) | 0)) && !straightClear(b.grid, e.x, e.y, pts[0])) {
+    if ((e.x !== k % COLS || e.y !== ((k / COLS) | 0)) && !straightClear(b.grid, e.x, e.y, pts[0])) {
       pts.unshift({ x: k % COLS, y: (k / COLS) | 0 });
     }
   }
   R.pts = pts;
+  R.blocked = false;
   R.ptIdx = 0;
   R.version = b.grid.version;
   // suffix lengths for remaining-distance queries
@@ -638,6 +672,9 @@ function tailLength(b, e, idx) {
 export function remainingDistance(b, e) {
   const R = e.route;
   if (!R) return 0;
+  // ★ 2026-11-18: a blocked leg (planLeg set R.blocked: no field reaches the leg target) has no pts.
+  // The enemy cannot close the distance until the way clears — report what is left (the straight line is an
+  // optimistic estimate, not a route the enemy may walk).
   let d = tailLength(b, e, R.legIdx + 1);
   const leg = R.legs[R.legIdx];
   if (leg && leg.t === 'move' && R.pts && R.ptIdx < R.pts.length) {
@@ -796,6 +833,14 @@ function advanceRoute(b, e, dt, R, standing = false) {
     }
     // move
     if (standing) { e.moving = false; return; }   // the walking waits for the attack clip
+    // ★ 2026-11-18（穿墙修复）：路被堵死时 planLeg 置 `R.blocked` 且 pts 为空。
+    //   这里**必须**先返回：否则下面的 `ptIdx >= pts.length` 会推进 legIdx，等于瞬移到下一段（也是穿墙）。
+    //   每帧都重算（`!R.pts` 为真 → planLeg），路一开就继续走。
+    if (R.blocked) {
+      e.moving = false;
+      planLeg(b, e, leg);
+      if (R.blocked) return;
+    }
     if (!R.pts || R.version !== b.grid.version) planLeg(b, e, leg);
     const speed = e.s.moveSpeed * MOVE_SCALE;
     if (speed <= 0) { e.moving = false; return; }
@@ -804,6 +849,7 @@ function advanceRoute(b, e, dt, R, standing = false) {
     let steps = 64;
     while (dist > 1e-9 && steps-- > 0) { // loop-cap: step budget
       if (!R.pts || R.version !== b.grid.version) planLeg(b, e, leg);
+      if (R.blocked) { e.moving = false; return; }
       if (R.ptIdx >= R.pts.length) break;
       const p = R.pts[R.ptIdx];
       const dx = p.x - e.x, dy = p.y - e.y;
@@ -820,7 +866,7 @@ function advanceRoute(b, e, dt, R, standing = false) {
       if (b._checkBlock(e)) return;
     }
     budget = dist / speed;
-    if (R.pts && R.ptIdx >= R.pts.length) {
+    if (R.pts && !R.blocked && R.ptIdx >= R.pts.length) {
       if (leg.final) {
         if (!portalPickup(b, e)) { b.leak(e); return; }
       }
