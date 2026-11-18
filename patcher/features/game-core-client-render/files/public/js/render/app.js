@@ -251,18 +251,11 @@ export async function createFieldView(host, options = {}) {
   // 手机 DPR 通常是 3，夹到 1 等于只画了 1/9 的像素，画面当然糊 ——
   // 玩家反馈「手机调到最高画质还是很模糊」就是这个原因。
   // 现在高画质给 2（手机 2x 已经很清晰，3x 太耗电），中画质 1.5，低画质保持 1 省电。
-  const TOUCH_DPR_CAP = { high: 2, medium: 1.5, low: 1 };
-  const TOUCH_BOARD_DPR_CAP = { high: 1.5, medium: 1.25, low: 0.85 };
-  const dpr = () => Math.min(
-    globalThis.devicePixelRatio || 1,
-    QUALITY_RES[settings.quality] || 2,
-    lean ? (TOUCH_DPR_CAP[settings.quality] || 1) : 2,
-  );
-  const boardDpr = () => Math.min(
-    globalThis.devicePixelRatio || 1,
-    BOARD_RES[settings.quality] || 2,
-    lean ? (TOUCH_BOARD_DPR_CAP[settings.quality] || 0.85) : 2,
-  );
+  // ★ 2026-11-16（已由玩家实测确认）：触屏另加的 DPR 上限在大窗口/全屏下会让棋盘画布位图尺寸
+  //   与拾取用的 CSS 尺寸比例不一致 → 格子点不中、干员放不上（小窗口正常）。改回 0.4.0 的这两行后
+  //   玩家恢复正常，所以保持 0.4.0 写法（手机画面质量的「分档上限」随之退役）。
+  const dpr = () => Math.min(globalThis.devicePixelRatio || 1, QUALITY_RES[settings.quality] || 2);
+  const boardDpr = () => Math.min(globalThis.devicePixelRatio || 1, BOARD_RES[settings.quality] || 2);
   const s0 = size();
   // Construction is synchronous until the complete view can own cancellation. If setup throws,
   // dispose only the resources acquired by this attempt, never another view's host contents.
@@ -892,7 +885,7 @@ export async function createFieldView(host, options = {}) {
   }
   /** The tile under a canvas point in BOARD space (null off-grid; an impossible tile off the player's half). */
   function pickBoardTile(x, y) {
-    const t = pickTile(cam, x, y, heightAt, tiles.levels);
+    const t = pickTile(cam, x, y, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
     if (!t || prepXf === IDENTITY) return t;
     const b = prepXf.toBoard(t.row, t.col);
     return b ? { ...t, row: b.row, col: b.col } : { row: -1, col: -1, x: t.x, y: t.y };
@@ -1271,7 +1264,7 @@ export async function createFieldView(host, options = {}) {
 
   /** The display tile under a canvas point (raised tops first) and the point on its top (world x, y), or null. */
   function groundTile(x, y) {
-    const t = pickTile(cam, x, y, heightAt, tiles.levels);
+    const t = pickTile(cam, x, y, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
     return t ? { row: t.row, col: t.col, x: t.x, y: t.y } : null;
   }
 
@@ -1396,7 +1389,7 @@ export async function createFieldView(host, options = {}) {
       const g = cam.unproject(p.x, p.y, 0);
       const hold = item ? 0 : DRAG_HOLD_TILES;
       const s0 = g ? cam.scaleAt(g.x, g.y, 0) : cam.scale;
-      const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels);
+      const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
       const z = t ? heightAt(t.row, t.col) : 0;
       const up = item ? z : z + (v.lift || 0) + (v.hover || 0);
       let w = cam.unproject(p.x, p.y + hold * s0, up);

@@ -263,6 +263,10 @@ export class TileField {
     this.flashes = [];             // objective leak flashes { r, c, t }
     this._p = { x: 0, y: 0, s: 0, depth: 0 };
     this.levels = [0];
+    // 真实棋盘边界（拾取用）：pickTile 的 rows/cols 默认值只是 19×21 的兜底，
+    // 尺寸不同的地图必须按真实值判断，否则边界外的区域恒返回 null（点不到）。
+    this.boardRows = 19;
+    this.boardCols = 21;
     this.band = [0, ROWS - 1];
     this.field = [0, 13];
     this.focus = null;
@@ -336,6 +340,9 @@ export class TileField {
   _rebuild() {
     const stage = this.stage;
     this.grid = parseStage(stage, this.band, this.field);
+    // 真实棋盘边界（拾取用）：尺寸不同的地图不能让 pickTile 用 19×21 的默认值
+    this.boardRows = this.grid.length || 19;
+    this.boardCols = (this.grid[0] && this.grid[0].length) || 21;
     const F = this.focus;
     for (const row of this.grid) for (const t of row) {
       t.focus = !F || (t.r >= F.r0 && t.r <= F.r1 && t.c >= F.c0 && t.c <= F.c1);

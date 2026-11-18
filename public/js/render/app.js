@@ -885,7 +885,7 @@ export async function createFieldView(host, options = {}) {
   }
   /** The tile under a canvas point in BOARD space (null off-grid; an impossible tile off the player's half). */
   function pickBoardTile(x, y) {
-    const t = pickTile(cam, x, y, heightAt, tiles.levels);
+    const t = pickTile(cam, x, y, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
     if (!t || prepXf === IDENTITY) return t;
     const b = prepXf.toBoard(t.row, t.col);
     return b ? { ...t, row: b.row, col: b.col } : { row: -1, col: -1, x: t.x, y: t.y };
@@ -1264,7 +1264,7 @@ export async function createFieldView(host, options = {}) {
 
   /** The display tile under a canvas point (raised tops first) and the point on its top (world x, y), or null. */
   function groundTile(x, y) {
-    const t = pickTile(cam, x, y, heightAt, tiles.levels);
+    const t = pickTile(cam, x, y, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
     return t ? { row: t.row, col: t.col, x: t.x, y: t.y } : null;
   }
 
@@ -1389,7 +1389,7 @@ export async function createFieldView(host, options = {}) {
       const g = cam.unproject(p.x, p.y, 0);
       const hold = item ? 0 : DRAG_HOLD_TILES;
       const s0 = g ? cam.scaleAt(g.x, g.y, 0) : cam.scale;
-      const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels);
+      const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels, tiles.boardRows, tiles.boardCols);
       const z = t ? heightAt(t.row, t.col) : 0;
       const up = item ? z : z + (v.lift || 0) + (v.hover || 0);
       let w = cam.unproject(p.x, p.y + hold * s0, up);
