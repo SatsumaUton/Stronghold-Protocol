@@ -2454,6 +2454,35 @@ export async function createFieldView(host, options = {}) {
   // 排障钩子（维护者 2026-11-16）：玩家反馈「干员不能部署 / 不能移动 / 点不出范围与描述卡」时，
   // 控制台可以直接读 __SP_VIEW__（mode / drag.dragging / destroyed），不用再猜。
   try { globalThis.__SP_VIEW__ = view; } catch { /* ignore */ }
+  // ★ 2026-11-19（玩家：部分地图部分地区无法部署/点击/移动）：
+  //   在浏览器控制台跑 `__SP_PICK_DEBUG__(e)`（e 用真实点击事件，或直接给 clientX/clientY），
+  //   会一次性回答：画布尺寸对不对、点到了哪一格、该格高度与可部署性、以及有没有 DOM 覆盖层挡着。
+  try {
+    globalThis.__SP_PICK_DEBUG__ = (x, y) => {
+      const ev = x && typeof x === "object" ? x : { clientX: x, clientY: y };
+      const r = canvas.getBoundingClientRect();
+      const sx = (ev.clientX - r.left) * (canvas.width / Math.max(1, r.width));
+      const sy = (ev.clientY - r.top) * (canvas.height / Math.max(1, r.height));
+      const hit = pickTile(cam, sx, sy, heightAt, tiles.levels);
+      const el = (() => { try { return document.elementFromPoint(ev.clientX, ev.clientY); } catch { return null; } })();
+      const out = {
+        client: { x: ev.clientX, y: ev.clientY },
+        canvas: { rect: { left: r.left, top: r.top, w: r.width, h: r.height }, bitmap: { w: canvas.width, h: canvas.height } },
+        dpr: { device: globalThis.devicePixelRatio || 1, bitmapPerCss: +(canvas.width / Math.max(1, r.width)).toFixed(4) },
+        pointInCanvas: { x: +sx.toFixed(2), y: +sy.toFixed(2) },
+        mode,
+        cam: { scale: cam.scale, cx: cam.cx, cy: cam.cy, tx: cam.tx, ty: cam.ty, tilt: cam.tilt, dist: cam.dist },
+        levels: tiles.levels,
+        tile: hit ? { row: hit.row, col: hit.col } : null,
+        tileHeight: hit ? heightAt(hit.row, hit.col) : null,
+        pieceAt: (() => { try { const p = pieceAt(sx, sy); return p ? { uid: p.uid, row: p.row, col: p.col } : null; } catch { return "throw"; } })(),
+        overCanvas: (() => { try { const e2 = document.elementFromPoint(ev.clientX, ev.clientY); return !e2 || e2 === canvas; } catch { return "throw"; } })(),
+        topElement: el ? `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${el.className && typeof el.className === "string" ? "." + el.className.split(/\s+/).slice(0, 2).join(".") : ""}` : null,
+      };
+      console.log("[pick]", out);
+      return out;
+    };
+  } catch { /* ignore */ }
   return view;
   } catch (err) {
     if (view) view.destroy();
