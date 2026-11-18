@@ -1207,9 +1207,14 @@ export class SkillFx {
         //     速度 3 格/秒 [ASSUMED，sim 的 wave_speed 在技能黑board 里，fx 载荷没带]
         //     到达终点立刻 stop()              → 不常驻
         //   车道数 = n（载荷里带的就是 b - a + 1），每条车道一个拖尾。
+        // 2026-11-18：改用官方黑board 的真实值（棋子 skchr_oxi_3 的 bb）：
+        //   wave_speed = 2.3 格/秒、wave_exit_distance = 5 格
+        //   normal_half_width = 2 → 5 行；overload_half_width = 6 → 13 行（与技能描述一致）
+        //   WAVE_MAX_BACK = 11 是 kit 常量（PRTS「最远只会尝试在自身身后11格」），不在 bb 里
+        const bb = U.srec?.bb || {};
         const WAVE_MAX_BACK = 11;
-        const SPEED = 3;          // 格/秒 [ASSUMED]
-        const EXIT_PAD = 2;       // 越过边缘的格数 [ASSUMED]
+        const SPEED = Number(bb.wave_speed) > 0 ? Number(bb.wave_speed) : 2.3;
+        const EXIT_PAD = Number.isFinite(Number(bb.wave_exit_distance)) ? Number(bb.wave_exit_distance) : 5;
         const rect = (() => { try { return this.w.ofx.ctx?.fieldRect?.() || null; } catch { return null; } })();
         // 沿行进轴算起止：起点在自身前 WAVE_MAX_BACK 格（夹在场地内），终点在地图边缘外 EXIT_PAD 格
         const atAxis = across ? Math.round(x) : Math.round(y);   // 沿行进轴的那个坐标
