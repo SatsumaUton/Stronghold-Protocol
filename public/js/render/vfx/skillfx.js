@@ -1200,31 +1200,52 @@ export class SkillFx {
         //   oxi_skill_03_trail_01 屏幕占用约 420×284 px = 屏的 5.7%。
         //   之前每条车道铺 4 段 → 20~52 个实例 → 覆盖 114%~296%，必然糊住战场。
         //   官方语义是「每条车道一颗簇火」，所以每条车道只放一个。
-        // ★ 2026-11-18（玩家：塔露拉的动画不对，要与技能数值一致）：
-        //   技能是「每 2.67 秒在 5 行范围内，朝部署方向召唤簇火，簇火碰到敌人时爆炸」——
-        //   所以簇火必须**朝部署方向飞出去**，不是原地一条静止火带。
-        //   每条车道只 spawn 一个拖尾，再用 place() 按节拍沿 dir 推进 1 格。
-        const SWEEP_STEPS = 8;    // 推进格数（覆盖到棋盘边缘）
-        const SWEEP_GAP = 0.1;    // 每格间隔（秒）
+        // ★ 2026-11-18（玩家：火雨的行/列数按地图算，速度更慢，到边缘就消失）：
+        //   与 sim 的 volley/flyShots 对齐：
+        //     WAVE_MAX_BACK = 11（最远在自身身后 11 格）→ 起点
+        //     to = 地图边缘 + 2 格             → 终点
+        //     速度 3 格/秒 [ASSUMED，sim 的 wave_speed 在技能黑board 里，fx 载荷没带]
+        //     到达终点立刻 stop()              → 不常驻
+        //   车道数 = n（载荷里带的就是 b - a + 1），每条车道一个拖尾。
+        const WAVE_MAX_BACK = 11;
+        const SPEED = 3;          // 格/秒 [ASSUMED]
+        const EXIT_PAD = 2;       // 越过边缘的格数 [ASSUMED]
+        const rect = (() => { try { return this.w.ofx.ctx?.fieldRect?.() || null; } catch { return null; } })();
+        // 沿行进轴算起止：起点在自身前 WAVE_MAX_BACK 格（夹在场地内），终点在地图边缘外 EXIT_PAD 格
+        const atAxis = across ? Math.round(x) : Math.round(y);   // 沿行进轴的那个坐标
+        const edge = across
+          ? (sx > 0 ? (rect ? rect.c1 : 20) : (rect ? rect.c0 : 0))
+          : (sy > 0 ? (rect ? rect.r1 : 18) : (rect ? rect.r0 : 0));
+        const span0 = rect ? (across ? rect.c0 : rect.r0) : 0;
+        const span1 = rect ? (across ? rect.c1 : rect.r1) : (across ? 20 : 18);
+        const startAxis = sx > 0 || sy > 0
+          ? Math.max(span0, atAxis - WAVE_MAX_BACK)
+          : Math.min(span1, atAxis + WAVE_MAX_BACK);
+        const endAxis = edge + (sx > 0 || sy > 0 ? EXIT_PAD : -EXIT_PAD);
+        const dist = Math.abs(endAxis - startAxis);
+        const dur = dist > 0 ? dist / SPEED : 0;
+        const STEPS = Math.max(1, Math.ceil(dur / 0.08));
         for (let i = 0; i < lanes; i++) {
           const off = i - half;
-          const px0 = across ? x : x + off;
-          const py0 = across ? y + off : y;
-          const pt0 = this._ground(px0, py0, null);
           for (const k of keys) {
-            const h = this.w.playOn(k, pt0, { important: true });
+            const px0 = across ? startAxis : x + off;
+            const py0 = across ? y + off : startAxis;
+            const h = this.w.playOn(k, this._ground(px0, py0, null), { important: true });
             if (!h) continue;
             drew = true;
-            for (let step = 1; step <= SWEEP_STEPS; step++) {
-              later(this.w.ofx, step * SWEEP_GAP, () => {
+            for (let step = 1; step <= STEPS; step++) {
+              later(this.w.ofx, (step / STEPS) * dur, () => {
                 if (!h.alive) return;
-                const px = px0 + sx * step;
-                const py = py0 + sy * step;
-                // _ground 返回棋盘坐标，必须用 unitPoint 转成世界坐标（不能直接用 pose）
+                const axis = startAxis + (endAxis - startAxis) * (step / STEPS);
+                const px = across ? axis : x + off;
+                const py = across ? y + off : axis;
+                // _ground 返回棋盘坐标，必须用 unitPoint 转成世界坐标
                 const p = unitPoint(null, null, this._ground(px, py, null));
                 h.place({ pos: [p[0], p[1], p[2]] });
               });
             }
+            // 到达终点立刻消失（sim: s.left <= 0 → done），不常驻
+            later(this.w.ofx, dur, () => h.stop());
           }
         }
         return drew;
