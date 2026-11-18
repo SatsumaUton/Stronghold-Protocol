@@ -431,6 +431,9 @@ export class FxWiring {
       return {
         tier: st.tier, available: st.available, effects: st.effects, pending: st.pending,
         particles: st.particles, dropped: st.dropped, systems: st.systems,
+        // ★ 2026-11-18：技能事件计数 —— calls 为 0 就是事件根本没到特效层；
+        //   calls > 0 而 units 里 on 仍是 null 就是 of(v) 取不到单位（看 last 里的 key）。
+        skill: this._dbgSkill || { calls: 0, on: 0, off: 0, noV: 0, noIdx: 0, noUnit: 0, last: [] },
         indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
         preloaded: (this._dbgKeys || []).length,
         preloadedKeys: this._dbgKeys || [],
@@ -1533,7 +1536,15 @@ export class FxWiring {
 
   /** b.ev ['skill', id, on] (SkillFx.skill): true when the official layer shows the skill (no procedural burst / aura). */
   skill(v, on) {
-    if (!v || !this.idx) return false;
+    // ★ 2026-11-18 诊断：技能事件有没有真正到达特效层。
+    //   玩家的数据里三个单位的 on 全是 null、loopsHeld 全是 0 —— plan 却完全正确，
+    //   说明 skill() 可能根本没被调到（或 of(v) 取不到单位）。计数存下来给 __SP_FX_DEBUG__ 读。
+    this._dbgSkill = this._dbgSkill || { calls: 0, on: 0, off: 0, noV: 0, noIdx: 0, noUnit: 0, last: [] };
+    this._dbgSkill.calls++;
+    if (on) this._dbgSkill.on++; else this._dbgSkill.off++;
+    if (!v) { this._dbgSkill.noV++; return false; }
+    if (!this.idx) { this._dbgSkill.noIdx++; return false; }
+    if (this._dbgSkill.last.length < 12) this._dbgSkill.last.push({ id: v.id ?? v.info?.id ?? null, on: !!on, key: this.unitKeyOf(v) });
     const drew = this.skills.skill(v, !!on);
     this.talents.skill(v, !!on);   // the talents a skill start casts (ON_SKILL_START)
     this.funnels.skill(v, !!on);   // the floating units of the skill's mode (render/vfx/funnelfx.js)

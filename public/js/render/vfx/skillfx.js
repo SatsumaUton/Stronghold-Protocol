@@ -432,8 +432,12 @@ export class SkillFx {
       //   技能切到它自己的 mode 时，官方**放一次**该 mode 的 cast 行（skills.js 的 plan.modeCast）。
       //   以前这些行根本没进 plan；放进 each.cast 会变成每击重播。这里在开启那一帧播一次，
       //   走 _play 同一套位置/朝向/皮肤替换，但**不 _keep**（它不是持续持有的循环）。
+      //   ★ 2026-11-18（玩家实测：动作与 plan 都对，但看不到）：
+      //   important: true 会绕过 system.js 的 LATE_START（0.6 s）—— 没预加载到的 prefab 走 pending，
+      //   超过 0.6 秒就静默 return（不计数）。而 modeCast 里 svash2_skill_03_combat_start_02 有 428 KB 贴图 /
+      //   11 个粒子系统，最容易超时。标 important 后它一定会播。
       for (const e of uniq(U.plan.modeCast || [])) {
-        if (this._play(e, v)) drew = true;
+        if (this._play(e, v, { important: true })) drew = true;
       }
       // an instant skill: what its kit hits in this frame without an attack are its attack's hits (kit hits)
       if (U.plan.kind === 'instant' && perAttack(U.plan).attacks.length) this._open(U, null, true);
