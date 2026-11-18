@@ -400,7 +400,43 @@ export class FxWiring {
     const keys = this.keysFor(views);
     const n = await this.ofx.lib.preload(keys, { half: this.ofx.lite });
     this.ofx.warm?.(keys);
+    this._dbgKeys = keys;
+    // ★ 2026-11-18（维护者/玩家：银灰 S3、遥的技能特效「还是看不到」）：
+    //   素材 / 数据 / plan / 预加载四层都验证过了，剩下的只能从运行现场看。
+    //   玩家在控制台执行 __SP_FX_DEBUG__() 就能拿到：特效档位（tier，关掉就什么都看不到）、
+    //   丢弃计数、每个单位的 plan 桶与已持有的循环句柄数、以及这次战斗预加载了哪些 key。
+    this._installDebug();
     return n;
+  }
+
+  /** Console probe: __SP_FX_DEBUG__() → the live effect state (see begin()). */
+  _installDebug() {
+    if (typeof globalThis === 'undefined' || globalThis.__SP_FX_DEBUG__) return;
+    globalThis.__SP_FX_DEBUG__ = () => {
+      const ofx = this.ofx;
+      const st = typeof ofx.stats === 'function' ? ofx.stats() : {};
+      const units = [];
+      for (const [id, U] of this.skills.units) {
+        if (!U) continue;
+        units.push({
+          id, key: U.key, skillId: U.skillId, on: U.on, kind: U.plan?.kind, mode: U.plan?.mode, modeName: U.plan?.modeName,
+          modeCast: (U.plan?.modeCast || []).map((e) => e.key),
+          start: (U.plan?.start || []).map((e) => e.key),
+          loop: (U.plan?.loop || []).map((e) => e.key),
+          targets: (U.plan?.targets || []).map((e) => e.key),
+          loopsHeld: U.loops?.length ?? 0,
+          tHit: (U.tHit || []).map((e) => e.key),
+        });
+      }
+      return {
+        tier: st.tier, available: st.available, effects: st.effects, pending: st.pending,
+        particles: st.particles, dropped: st.dropped, systems: st.systems,
+        indexVersion: this.idx?.version, unitCount: this.idx ? Object.keys(this.idx.units || {}).length : 0,
+        preloaded: (this._dbgKeys || []).length,
+        preloadedKeys: this._dbgKeys || [],
+        units,
+      };
+    };
   }
 
   /** Units that joined the battle (spawn events): their prefabs not loaded yet load now, without blocking. */
