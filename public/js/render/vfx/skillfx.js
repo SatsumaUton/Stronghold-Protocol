@@ -1189,13 +1189,25 @@ export class SkillFx {
       if (lanes > 1) {
         const d = Number(extra.dir) | 0;
         const across = (d === 0 || d === 2);
+        // 朝向的步进：0=右(+x) 1=下(+y) 2=左(−x) 3=上(−y)
+        const sx = d === 0 ? 1 : d === 2 ? -1 : 0;
+        const sy = d === 1 ? 1 : d === 3 ? -1 : 0;
         const half = (lanes - 1) / 2;
+        // ★ 2026-11-18（玩家：火雨的呈现方式不对）：不只是车道起点点一下，
+        //   而是沿朝向逐步点亮 —— 0 / 0.12 / 0.24 / 0.36 秒各推进 1 格，形成向前蔓延的火带。
+        const STEPS = 4;
+        const GAP = 0.12;
         for (let i = 0; i < lanes; i++) {
           const off = i - half;
-          const px = across ? x : x + off;
-          const py = across ? y + off : y;
-          const pt = this._ground(px, py, null);
-          for (const k of keys) if (this.w.playOn(k, pt, { important: true })) drew = true;
+          for (let step = 0; step < STEPS; step++) {
+            const px = (across ? x : x + off) + sx * step;
+            const py = (across ? y + off : y) + sy * step;
+            const fire = () => {
+              const pt = this._ground(px, py, null);
+              for (const k of keys) this.w.playOn(k, pt, { important: true });
+            };
+            if (step === 0) { fire(); drew = true; } else later(this.w.ofx, step * GAP, fire);
+          }
         }
         return drew;
       }

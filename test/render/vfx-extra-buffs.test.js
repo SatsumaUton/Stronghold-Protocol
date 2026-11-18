@@ -71,6 +71,10 @@ test('planKeys 带上投射物事件特效（银灰 S3 的地面范围）', { sk
   const rec = Object.values(GD).find((c) => c && c.charId === 'char_1045_svash2') || {};
   const r = planFor(IDX, { info: { id: 'x', charId: 'char_1045_svash2', skillIndex: 2 }, rec, unitKey: 'char_1045_svash2' });
   const keys = planKeys(r.plan, IDX.projectiles);
-  assert.ok(keys.includes('svash2_skill_03_range_01'), '★ 银灰 S3 的投射物到达特效必须进 planKeys（预加载）');
-  assert.ok(planKeys(r.plan).length < keys.length, '传 projs 时应当多出投射物特效');
+  // 2026-11-18：这个特效按官方语义是「施法者脚下、朝向目标方向」的范围框
+  // （Svash2ProjectileEffectBehaviour._effectsAlignToTargetDirection），
+  // 已从 projectile.onReached 挪到 skill 的 role=range，所以它在 plan.range 里。
+  assert.ok(keys.includes('svash2_skill_03_range_01'), '★ 银灰 S3 的范围框必须进 planKeys（预加载）');
+  // 传 projs 时不一定更长：这个特效现在走 plan.range（owner），不再挂在投射物上。
+  assert.ok(keys.length > 0, 'planKeys 非空');
 });

@@ -486,7 +486,9 @@ export class Effect {
     const def = this.def;
     const ct = this.ctime;
     if (ct < 0) return;
-    if (this.state === 'play' && this.time >= this.ttl) this.stop();
+    // ★ 2026-11-18：TTL 截断时打标记 —— 否则淡出还要等 prefab 自己的 delayToFinish（循环 prefab 很大），
+    //   被截断的实例继续活好几秒，几次攻击后就叠满战场。
+    if (this.state === 'play' && this.time >= this.ttl) { this.capped = true; this.stop(); }
     const first = !this.started;
     this.started = true;
     // FxDelay activations
@@ -659,7 +661,8 @@ export class Effect {
       // a stopped effect fades out within STOP_FADE (long-lived one-shot particles — a status ring of a 10 s
       // lifetime — must not outlive their status) [ASSUMED]
       this.stopT += dt;
-      const end = Math.max(STOP_FADE, def.delayToFinish + 0.3);
+      // 被 TTL 截断的：短淡出，不等 prefab 的 delayToFinish
+      const end = this.capped ? STOP_FADE + 0.3 : Math.max(STOP_FADE, def.delayToFinish + 0.3);
       if (this.stopT >= end) { this.state = 'done'; return; }
       this.fade = Math.min(1, Math.max(0, (end - this.stopT) / 0.3));
     }
