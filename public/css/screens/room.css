@@ -1327,6 +1327,24 @@
   box-shadow: 0 .1rem .3rem rgba(0, 0, 0, .6);
 }
 .exp-modal .exp-cap__menu button { width: .3rem; }
+/* ★ 2026-11-19（玩家反馈：实验性功能里选 20 人「弹出去」）
+   窄屏：人数下拉不再向右冲出屏幕。
+   桌面那套「9 列 2 行、宽度恒定、预留空间」继续用于宽屏；手机上把它右对齐、宽度收到视口内、
+   列自适应、超高可滚 —— 否则 3.18rem 宽的菜单会在 360px 屏上直接飞出弹窗。 */
+@media (max-width: 700px) {
+  .exp-modal .exp-cap__menu {
+    left: auto;
+    right: 0;
+    width: min(3.18rem, calc(100vw - .48rem));
+    grid-template-columns: repeat(auto-fill, minmax(.26rem, 1fr));
+    max-height: 46vh;
+    overflow: auto;
+  }
+  .exp-modal .exp-cap__menu button { width: auto; }
+}
+/* 任何宽度下的硬上限：菜单绝不越过屏幕 */
+.exp-modal .exp-cap__menu { max-width: calc(100vw - .48rem); }
+
 /* 菜单展开时：内容区不再是滚动容器，菜单就不会把内容撑出滚动条。
    ⚠ 必须用 overflow 简写同时写两个方向：CSS 规定一边 visible、另一边不是时，
    visible 会被计算成 auto。基础规则是 `overflow: hidden auto`，
