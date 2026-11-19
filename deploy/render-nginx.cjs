@@ -1,6 +1,6 @@
 // deploy/render-nginx.cjs —— 把脱敏的 nginx 快照还原成线上配置。
 //
-// `deploy/nginx.conf` 是**快照**：正文里的 `__SP_ROOT__` / `__ASSET_IP__` 是占位符，
+// `deploy/nginx.conf` 是**快照**：正文里的 `__SP_ROOT__` 是占位符（资源站写域名，不写 IP），
 // 头部那一段说明（含当时的 SHA）在还原时丢弃。服务器重装时用这个脚本还原。
 //
 // 用法：
@@ -10,7 +10,6 @@
 //
 // 环境变量：
 //   SP_ROOT       部署根目录（默认：本文件上一级）
-//   SP_ASSET_IP   资源站公网地址（快照里有 __ASSET_IP__ 时**必须**给）
 //
 // 安全约束：占位符没替换干净就拒绝写出 —— 宁可失败，也不要写出一份指向 __SP_ROOT__ 的坏配置。
 'use strict';
@@ -21,7 +20,6 @@ const crypto = require('node:crypto');
 const BODY_MARK = '# ---8<--- 快照正文开始（这一行之前都是说明，还原时丢弃） ---8<---';
 
 const ROOT = process.env.SP_ROOT || path.resolve(__dirname, '..');
-const ASSET_IP = process.env.SP_ASSET_IP || '';
 const TPL = path.join(__dirname, 'nginx.conf');
 const LIVE = path.join(ROOT, 'nginx', 'conf', 'nginx.conf');
 const argv = process.argv.slice(2);
@@ -35,17 +33,12 @@ const tplRaw = fs.readFileSync(TPL, 'utf8');
 const i = tplRaw.indexOf(BODY_MARK);
 const body = i >= 0 ? tplRaw.slice(i + BODY_MARK.length).replace(/^\r?\n/, '') : tplRaw;
 
-// 占位符必须有值可换
-if (body.includes('__ASSET_IP__') && !ASSET_IP) {
-  console.error('快照里有 __ASSET_IP__，必须设环境变量 SP_ASSET_IP（资源站公网地址）');
-  process.exit(2);
-}
 
 // nginx 在 Windows 上两种斜杠都认，但配置里统一写成正斜杠更稳
 const rootPosix = ROOT.split(path.sep).join('/');
-const rendered = body.split('__SP_ROOT__').join(rootPosix).split('__ASSET_IP__').join(ASSET_IP);
+const rendered = body.split('__SP_ROOT__').join(rootPosix);
 
-const leftover = rendered.match(/__SP_ROOT__|__ASSET_IP__/g);
+const leftover = rendered.match(/__SP_ROOT__/g);
 if (leftover) {
   console.error(`占位符未替换：${[...new Set(leftover)].join(', ')}`);
   process.exit(2);
@@ -69,6 +62,17 @@ if (has('--check')) {
 }
 
 if (has('--apply')) {
+  // 保护 ①：必须**显式**给 SP_ROOT。默认值是仓库根，而仓库里也有个 nginx/ 目录（run-nginx.mjs 等），
+  //   只查「有没有 nginx/」是拦不住的 —— 实测就把配置写进了 repo-sync/nginx/conf/。
+  if (!process.env.SP_ROOT) {
+    console.error('--apply 必须显式设 SP_ROOT（部署根，含 repo-sync/ 与 nginx/），不接受默认值');
+    process.exit(2);
+  }
+  // 保护 ②：部署根的形态 —— 同时有 repo-sync/ 与 nginx/conf/。
+  if (!fs.existsSync(path.join(ROOT, 'repo-sync')) || !fs.existsSync(path.join(ROOT, 'nginx', 'conf'))) {
+    console.error(`${ROOT} 不像部署根（缺 repo-sync/ 或 nginx/conf/）—— 检查 SP_ROOT`);
+    process.exit(2);
+  }
   fs.mkdirSync(path.dirname(LIVE), { recursive: true });
   if (fs.existsSync(LIVE)) {
     const bak = `${LIVE}.before-restore-${Date.now()}`;
@@ -83,4 +87,3 @@ if (has('--apply')) {
 
 console.log('用法：node deploy/render-nginx.cjs --check | --apply | --stdout');
 console.log(`  部署根：${ROOT}`);
-console.log(`  资源站：${ASSET_IP || '（未设 SP_ASSET_IP）'}`);

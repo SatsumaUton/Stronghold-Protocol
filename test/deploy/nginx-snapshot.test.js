@@ -30,7 +30,8 @@ test('快照存在，且带正文标记与 SHA 行', () => {
 test('快照里没有本机绝对路径、没有资源站公网 IP', () => {
   const s = readFileSync(TPL, 'utf8');
   assert.equal(/[A-Za-z]:[\\/]Stronghold-Protocol/.test(s), false, '★ 不能残留部署根的本机路径');
-  assert.equal(/\b103\.236\.99\.203\b/.test(s), false, '★ 不能残留资源站公网 IP');
+  assert.equal(/\b103\.236\.99\.203\b/.test(s), false, '★ 不能残留资源站公网 IP（改为写域名）');
+  assert.ok(s.includes('assets.luobomiao.love'), '资源站要写域名 assets.luobomiao.love');
   assert.equal(/Administrator/.test(s), false, '不能残留用户名');
   // 其余盘符绝对路径也不行（排除 Windows 里的注释举例）
   const abs = s.match(/\b[A-Za-z]:[\\/][A-Za-z0-9_.\-\\/]+/g) || [];
@@ -41,14 +42,14 @@ test('渲染后占位符全部消失，且真的换成了给的值', () => {
   const s = readFileSync(TPL, 'utf8');
   const i = s.indexOf(MARK);
   const body = s.slice(i + MARK.length).replace(/^\r?\n/, '');
-  const out = body.split('__SP_ROOT__').join('D:/CI/root').split('__ASSET_IP__').join('1.2.3.4');
-  assert.equal(/__SP_ROOT__|__ASSET_IP__/.test(out), false, '★ 占位符必须能被完全替换');
+  const out = body.split('__SP_ROOT__').join('D:/CI/root');
+  assert.equal(/__SP_ROOT__|__ASSET_IP__/.test(out), false, '★ 占位符必须能被完全替换（只应有 __SP_ROOT__）');
   assert.ok(out.includes('D:/CI/root/'), '渲染结果里应出现替换后的部署根');
 });
 
-test('render-nginx.cjs 在缺 SP_ASSET_IP 时拒绝写入', () => {
+test('render-nginx.cjs 的 --apply 拒绝在没设 SP_ROOT 时写入', () => {
   const s = readFileSync(RENDER, 'utf8');
-  assert.match(s, /SP_ASSET_IP/, '脚本要读 SP_ASSET_IP');
-  assert.match(s, /必须设环境变量 SP_ASSET_IP/, '★ 缺值时要报错而不是写出坏配置');
+  assert.match(s, /必须显式设 SP_ROOT/, '★ --apply 必须要求显式 SP_ROOT');
+  assert.match(s, /不接受默认值/, '★ 不能接受默认值（默认是仓库根，会把配置写进仓库）');
   assert.match(s, /process\.exit\(2\)/, '★ 拒绝时用非 0 退出码');
 });
