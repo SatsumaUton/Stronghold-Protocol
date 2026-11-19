@@ -25,6 +25,8 @@ import android.net.Uri;
 import android.webkit.WebResourceResponse;
 
 import java.io.IOException;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Locale;
@@ -77,6 +79,21 @@ final class AssetBridge {
     }
     if (apkPath == null || mime == null) return null;
 
+    // ---- 2.5 先看应用私有目录里的增量资源（App 内置更新写入；只覆盖 /assets/） ----
+    //   AssetUpdater 把「APK 里没有、或已经变了」的资源下到 filesDir/overlay/sp/assets/…，
+    //   这样玩家不必重下整包也能拿到新素材；命中就从磁盘喂，没命中照旧走 APK → 网络。
+    if (cleaned.startsWith("/assets/")) {
+      try {
+        File inc = AssetUpdater.overlayFile(ctx, apkPath);
+        if (inc.isFile() && inc.length() > 0) {
+          InputStream iin = new FileInputStream(inc);
+          WebResourceResponse ir = new WebResourceResponse(mime, encodingOf(mime), iin);
+          ir.setResponseHeaders(assetHeaders(hasHash(path)));
+          return ir;
+        }
+      } catch (Throwable ignored) { /* 增量坏了就回落到 APK */ }
+    }
+
     // ---- 3. 从 APK 读出来 ----
     InputStream in = null;
     try {
@@ -89,18 +106,22 @@ final class AssetBridge {
     }
 
     WebResourceResponse res = new WebResourceResponse(mime, encodingOf(mime), in);
+    res.setResponseHeaders(assetHeaders(hasHash(path)));
+    return res;
+  }
+
+  /** 素材响应的公共头（APK 与增量目录两处共用）。 */
+  static Map<String, String> assetHeaders(boolean hashed) {
     Map<String, String> headers = new HashMap<String, String>();
     // 带哈希段的内容永远不变（server/assetPaths.js 就是为此设计的），可以放心长缓存；
     // 不带哈希段的沿用站点同路径的 1 天。
-    headers.put("Cache-Control", hasHash(path) ? "public, max-age=31536000, immutable" : "public, max-age=86400");
+    headers.put("Cache-Control", hashed ? "public, max-age=31536000, immutable" : "public, max-age=86400");
     // 资源站（assets.luobomiao.love）对页面（stronghold.luobomiao.love）是跨域：清单里可能是绝对地址，
     // 客户端用 fetch/XHR 取的时候会走 CORS。这里是我们替服务器回的，必须自己补上 CORS 头，
     // 否则一路「被拦截的请求」在控制台里静默失败、图全是空的。素材本来就是公开只读，`*` 足够。
     headers.put("Access-Control-Allow-Origin", "*");
     headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-    // 预检请求（带 Range 或自定义头时会有）也可能被拦到，直接回空 200。
-    res.setResponseHeaders(headers);
-    return res;
+    return headers;
   }
 
   /** 只认我们自己的主机（含子域），其余一律交给网络。 */

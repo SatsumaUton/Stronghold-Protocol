@@ -134,3 +134,11 @@ if ($LASTEXITCODE) { throw 'apksigner 失败' }
 $mb = [math]::Round((Get-Item $out).Length / 1MB, 2)
 Write-Host "完成：$out（$mb MB）"
 
+# ---- 刷新「增量资源清单」基线（App 内置更新用；见 tools/build-android-assets.mjs） ----
+try {
+  $node = if ($env:NODE_EXE) { $env:NODE_EXE } else { "node" }
+  Push-Location $repo
+  & $node "tools/build-android-assets.mjs"
+  Pop-Location
+} catch { Write-Host "增量清单生成失败（不影响打包）：$_" }
+

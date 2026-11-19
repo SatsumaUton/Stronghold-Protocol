@@ -99,6 +99,7 @@ public class MainActivity extends Activity {
     }
     hideSystemBars();
     checkForUpdate(false);
+    AssetUpdater.maybeStart(this);   // 内置增量资源更新：只下 APK 里没有/变了的素材，不重下整包
   }
 
   // -------------------------------------------------------------------------------------------------------------------
