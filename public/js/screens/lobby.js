@@ -1078,6 +1078,7 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
  * `busy` 用 `run()` 的 'quick' 键；`onStart` 收到 `{ difficulty, seats, rules }`。
  */
 export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, busy, online, createLocked = false,
+  guestLocked = false,   // 游客：匹配按钮直接禁用（服务端仍会拦，见 quickMatch）
   difficulties = DIFFICULTIES, scope = MATCH_SCOPE_DEFAULT, onScope = () => {},
   searching = false, elapsed = 0, onCancel = () => {}, queue = null, variant = null }) {
   const info = difficultyInfo('coop', difficulty);
@@ -1152,7 +1153,9 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
               ${variant === 'deepecho' ? null : html`<${MatchRules} />`}
             </div>
             <p class="proto-hint" data-testid="match-hint">
-              ${!online
+              ${guestLocked
+                ? t('游客不能参与多人匹配，请先登录')
+                : !online
                 ? html`<${Spinner} size="sm" label="CONNECTING" /> ${t('正在连接服务器…')}`
                 : createLocked
                   ? t('服务器暂时关闭了创建房间，请稍后再试')
@@ -1161,7 +1164,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
                     : matchHint(scope)}
             </p>
             <button type="button" class="proto-start" data-testid="match-start"
-              disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
+              disabled=${!online || working || createLocked || guestLocked} aria-busy=${working ? 'true' : 'false'}
               onClick=${() => onStart({
                 difficulty,
                 ...(variant === 'deepecho' ? { seats: 'four', rules: 'standard' } : matchScopeRequest(scope)),
@@ -1229,6 +1232,7 @@ export function EchoKeyRow({ code = '', onCode = null, codeOk = false, online = 
 }
 
 export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, quickBusy = false,
+  guestLocked = false,
   // 「进别人的房」那一行（维护者 2026-11-07）：房号 + 加入深潜 / 观战深潜，和同盟界面的「加入同盟」同一套状态
   code = '', onCode = null, codeOk = false, online = true, busy = null, onJoin = null, onSpectate = null }) {
   // 记住上次选的深潜难度（维护者 2026-11-03：重开大厅不该跳回默认档）。
@@ -1408,7 +1412,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
               onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房（进房仍需深潜资格）；想公开自己的房，进房后打开「公开深潜」')}>
               <span class="proto-start__label"><${Icon} name="link" />${t('公开深潜')}</span>
             </button>
-            <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy}
+            <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy || guestLocked}
               onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
               <span class="proto-start__label"><${Icon} name="search" />${t('开始多人匹配')}</span>
             </button>
@@ -2022,7 +2026,7 @@ export function LobbyScreen() {
       onBrowse=${() => setBrowseOpen(true)}
       onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchVariant(null); setMatchOpen(true); }} />` : null}
     ${/* 「深渊回响」专属整屏（只有管理员能打开）：骨架照 多人匹配，样式天然一致 */ null}
-    ${echoOpen ? html`<${EchoSelect} onClose=${() => setEchoOpen(false)}
+    ${echoOpen ? html`<${EchoSelect} guestLocked=${guest} onClose=${() => setEchoOpen(false)}
       onStart=${({ difficulty: pickedDifficulty }) => {
         setEchoOpen(false);
         create('coop', 'deepecho', { difficulty: pickedDifficulty });
@@ -2056,7 +2060,7 @@ export function LobbyScreen() {
       onClose=${() => { setMatchOpen(false); setMatchSearch(null); setMatchVariant(null); setQuickVariant(null); }}
       onStart=${(req) => quickMatch(req)}
       busy=${busy && (matchVariant === 'deepecho' ? quickVariant === 'deepecho' : quickVariant !== 'deepecho') ? busy : null}
-      online=${online} createLocked=${!createOpen} difficulties=${coop}
+      online=${online} createLocked=${!createOpen} guestLocked=${guest} difficulties=${coop}
       scope=${matchScopeState} onScope=${pickScope} variant=${matchVariant}
       searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null}
       onCancel=${() => {

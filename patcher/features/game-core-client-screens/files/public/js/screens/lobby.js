@@ -42,6 +42,8 @@ import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_S
 import { PLAYER_CAPACITIES } from '../../../shared/playerCapacity.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';
 import { Sprite, Img } from '../ui/gameComponents.js';
+// 本服独有：深渊回响的跨版本战场池（data/echo-stages.json）
+import { ECHO_STAGES_FILE, echoStagePool } from '../ui/echoStages.js';
 import { uiUrl, medalIconUrl } from '../ui/assetUrls.js';
 import { peekStatsRecords, trophyMedalOf, aggregateStats, recordsOfSeason, bestEchoDepth } from '../ui/stats.js';
 import { levelProgress, levelOf } from './settle.js';
@@ -65,6 +67,7 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { FeedbackNotice } from '../ui/feedbackNotice.js';
+import { AndroidAppPrompt } from '../ui/androidApp.js';
 import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
 // 搜寻中面板：直接用同盟模拟里「匹配队友」那套界面（品牌行 + 像素侦察兵 + 轮换提示 + 停止搜寻）
 import { SearchPanel } from '../ui/matchFlow.js';
@@ -179,14 +182,19 @@ const MAX_HUB_LINES = 3;
 
 /**
  * Text for a difficulty card, preferring data/config.json.
+ *
+ * `generic: true`（维护者 2026-11-16）：**忽略当前版本** config.json 里的模式文案，用通用难度文案
+ * （MODE_TEXT）。深渊回响用它 —— 否则页面停在「规程·序列Ⅰ」时会显示规程专用的解锁提示
+ * （「追加更多盟约，解锁时可开放至【规程等级3】」），而深潜的 DE-1/2/3 跟规程等级没有关系。
  * @param {'solo'|'coop'} roomMode
  * @param {string} difficulty
+ * @param {{ generic?: boolean }} [opts]
  * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string }}
  */
-export function difficultyInfo(roomMode, difficulty) {
+export function difficultyInfo(roomMode, difficulty, opts = {}) {
   const fallback = MODE_TEXT[roomMode === 'solo' ? 'single' : 'multi'][difficulty] || { code: '', desc: '', effects: [] };
   // modeIdFor() lower-cases the difficulty: never call it with a value the server did not validate.
-  const m = DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
+  const m = !opts.generic && DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
   const effects = Array.isArray(m?.effectDescList)
     ? m.effectDescList.map((e) => String(e).replace(/^[·•・･\s]+/, '')).filter(Boolean)
     : fallback.effects.map((e) => t(e));
@@ -522,7 +530,15 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect, disabled = f
  * 深潜只开三档，沿用 AC 编号（从 2 起）会让人以为漏了第一档（维护者 2026-11-03）。
  */
 function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
-  const info = difficultyInfo('coop', difficulty);
+  // 深潜的战场池**按难度分**（data/echo-stages.json 的 pools，险境/绝境/深渊各是各的图），
+  // 用该难度实际会抽的池子算「共 N 张」，别让按钮上的数字跟对局里真抽的对不上
+  // （维护者 2026-11-16 第二次反馈）。
+  useData(ECHO_STAGES_FILE);
+  // generic：用通用难度文案，不读当前版本（规程）的模式文案 —— 深潜的 DE-1/2/3 与「规程等级」无关
+  const info = difficultyInfo('coop', difficulty, { generic: true });
+  const modeId = modeIdFor('coop', difficulty);
+  const pool = echoStagePool(modeId);
+  const shown = pool && pool.length ? { ...info, stageNote: stageNote(pool) } : info;
   return html`<button type="button" class=${`pcard diff-card${selected ? ' is-on is-selected' : ''}`}
       style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`}
       onClick=${() => onSelect(difficulty)} aria-pressed=${selected ? 'true' : 'false'}>
@@ -535,7 +551,7 @@ function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
     <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
     <span class="pcard__meta">
       <span class="num">${'DE'}-${index + 1}</span>
-      <${DifficultyRounds} info=${info} endless=${true} />
+      <${DifficultyRounds} info=${shown} endless=${true} />
     </span>
     <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
   </button>`;
@@ -1062,6 +1078,7 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
  * `busy` 用 `run()` 的 'quick' 键；`onStart` 收到 `{ difficulty, seats, rules }`。
  */
 export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, busy, online, createLocked = false,
+  guestLocked = false,   // 游客：匹配按钮直接禁用（服务端仍会拦，见 quickMatch）
   difficulties = DIFFICULTIES, scope = MATCH_SCOPE_DEFAULT, onScope = () => {},
   searching = false, elapsed = 0, onCancel = () => {}, queue = null, variant = null }) {
   const info = difficultyInfo('coop', difficulty);
@@ -1136,7 +1153,9 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
               ${variant === 'deepecho' ? null : html`<${MatchRules} />`}
             </div>
             <p class="proto-hint" data-testid="match-hint">
-              ${!online
+              ${guestLocked
+                ? t('游客不能参与多人匹配，请先登录')
+                : !online
                 ? html`<${Spinner} size="sm" label="CONNECTING" /> ${t('正在连接服务器…')}`
                 : createLocked
                   ? t('服务器暂时关闭了创建房间，请稍后再试')
@@ -1145,7 +1164,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
                     : matchHint(scope)}
             </p>
             <button type="button" class="proto-start" data-testid="match-start"
-              disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
+              disabled=${!online || working || createLocked || guestLocked} aria-busy=${working ? 'true' : 'false'}
               onClick=${() => onStart({
                 difficulty,
                 ...(variant === 'deepecho' ? { seats: 'four', rules: 'standard' } : matchScopeRequest(scope)),
@@ -1213,6 +1232,7 @@ export function EchoKeyRow({ code = '', onCode = null, codeOk = false, online = 
 }
 
 export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, quickBusy = false,
+  guestLocked = false,
   // 「进别人的房」那一行（维护者 2026-11-07）：房号 + 加入深潜 / 观战深潜，和同盟界面的「加入同盟」同一套状态
   code = '', onCode = null, codeOk = false, online = true, busy = null, onJoin = null, onSpectate = null }) {
   // 记住上次选的深潜难度（维护者 2026-11-03：重开大厅不该跳回默认档）。
@@ -1252,7 +1272,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
     const recent = (rows || []).filter((r) => (r.at || 0) >= since);
     return recent.length ? Math.max(...recent.map((r) => r.depth)) : null;
   }, [rows]);
-  const info = difficultyInfo('coop', difficulty);
+  // generic：左下角那段说明也用通用难度文案（不要规程专属的「解锁时可开放至【规程等级 N】」）
+  const info = difficultyInfo('coop', difficulty, { generic: true });
   // 深潜自己的关卡编号：**用简称 `DE`**（DEEP ECHO 的缩写，和右上角副标题一致），从 1 开始。
   // 不用原版的 AC-x：那是全模式共用的编号，深潜只有三档，从 2 起会让人以为漏了第一档。
   const ECHO_CODE_PREFIX = 'DE';
@@ -1391,7 +1412,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
               onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房（进房仍需深潜资格）；想公开自己的房，进房后打开「公开深潜」')}>
               <span class="proto-start__label"><${Icon} name="link" />${t('公开深潜')}</span>
             </button>
-            <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy}
+            <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy || guestLocked}
               onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
               <span class="proto-start__label"><${Icon} name="search" />${t('开始多人匹配')}</span>
             </button>
@@ -1947,6 +1968,8 @@ export function LobbyScreen() {
   return html`<div class="screen lobby-screen lobby-hub" data-season=${season}>
     <${HubBackdrop} season=${season} />
       <${FeedbackNotice} />
+      ${/* 安卓浏览器首次进入：弹一次「要不要装 APP」（ui/androidApp.js，问过就记在 localStorage） */ null}
+      <${AndroidAppPrompt} />
     <header class="topbar">
       <div class="topbar__left">
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>
@@ -2003,7 +2026,7 @@ export function LobbyScreen() {
       onBrowse=${() => setBrowseOpen(true)}
       onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchVariant(null); setMatchOpen(true); }} />` : null}
     ${/* 「深渊回响」专属整屏（只有管理员能打开）：骨架照 多人匹配，样式天然一致 */ null}
-    ${echoOpen ? html`<${EchoSelect} onClose=${() => setEchoOpen(false)}
+    ${echoOpen ? html`<${EchoSelect} guestLocked=${guest} onClose=${() => setEchoOpen(false)}
       onStart=${({ difficulty: pickedDifficulty }) => {
         setEchoOpen(false);
         create('coop', 'deepecho', { difficulty: pickedDifficulty });
@@ -2037,7 +2060,7 @@ export function LobbyScreen() {
       onClose=${() => { setMatchOpen(false); setMatchSearch(null); setMatchVariant(null); setQuickVariant(null); }}
       onStart=${(req) => quickMatch(req)}
       busy=${busy && (matchVariant === 'deepecho' ? quickVariant === 'deepecho' : quickVariant !== 'deepecho') ? busy : null}
-      online=${online} createLocked=${!createOpen} difficulties=${coop}
+      online=${online} createLocked=${!createOpen} guestLocked=${guest} difficulties=${coop}
       scope=${matchScopeState} onScope=${pickScope} variant=${matchVariant}
       searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null}
       onCancel=${() => {
