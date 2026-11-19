@@ -28,11 +28,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
   static final String HOME = "https://stronghold.luobomiao.love/";
   static final int FILE_PICKER = 1001;
 
+  long apkDownloadId = -1L;      // 正在进行/已完成的「本 App 更新包」下载 id
+  ApkDone apkReceiver;           // 下载完成广播（应用内更新）
   WebView web;
   ProgressBar bar;
   FrameLayout rootView;
@@ -85,6 +88,10 @@ public class MainActivity extends Activity {
     cm.setAcceptCookie(true);
     if (Build.VERSION.SDK_INT >= 21) cm.setAcceptThirdPartyCookies(web, true);
 
+    // ---- 应用内下载（维护者 2026-11-19）：点「下载安卓版 / 下载更新」不再什么都不发生 ----
+    //   WebView 自己渲染不了 .apk，会回调 DownloadListener；交给系统的 DownloadManager：
+    //   通知栏显示进度，下完点通知直接进安装器（它自己产出 content:// URI，不需要 FileProvider）。
+    web.setDownloadListener(new Dl(this));
     web.setWebViewClient(new SiteClient(this));
     web.setWebChromeClient(new SiteChrome(this));
 
@@ -99,7 +106,14 @@ public class MainActivity extends Activity {
     }
     hideSystemBars();
     checkForUpdate(false);
-    AssetUpdater.maybeStart(this);   // 内置增量资源更新：只下 APK 里没有/变了的素材，不重下整包
+    AssetUpdater.maybeStart(this);
+    // 应用内更新的下载完成广播（Android 13+ 必须显式声明导出标志）
+    try {
+      apkReceiver = new ApkDone(this);
+      android.content.IntentFilter f = new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+      if (Build.VERSION.SDK_INT >= 33) registerReceiver(apkReceiver, f, android.content.Context.RECEIVER_EXPORTED);
+      else registerReceiver(apkReceiver, f);
+    } catch (Throwable ignored) { }   // 内置增量资源更新：只下 APK 里没有/变了的素材，不重下整包
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -195,20 +209,75 @@ public class MainActivity extends Activity {
     }
   }
 
-  /** 「下载更新」的实际动作（需要 Activity context 去 startActivity）。 */
+  /** 「立即更新」：**在 App 内下载**（DownloadManager），下完由 ApkDone 弹安装。 */
   static final class DownloadClick2 implements android.content.DialogInterface.OnClickListener {
     final MainActivity act;
     DownloadClick2(MainActivity a) { act = a; }
     @Override public void onClick(android.content.DialogInterface d, int w) {
-      try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL))); } catch (Throwable ignored) { }
       d.dismiss();
+      try {
+        act.startDownload(APK_URL, null, null, "application/vnd.android.package-archive");
+      } catch (Throwable e) {
+        // 没有 DownloadManager（理论上不会）：退回浏览器，别让玩家点了没反应
+        try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL))); } catch (Throwable ignored) { }
+      }
+    }
+  }
+
+  /** 下载完成广播：是我们自己的更新包就弹「立即安装」。 */
+  static final class ApkDone extends android.content.BroadcastReceiver {
+    final MainActivity act;
+    ApkDone(MainActivity a) { this.act = a; }
+    @Override public void onReceive(android.content.Context c, Intent i) {
+      try {
+        if (i == null) return;
+        long id = i.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+        if (id < 0 || id != act.apkDownloadId) return;
+        act.askInstall(id);
+      } catch (Throwable ignored) { }
+    }
+  }
+
+  /** 「立即安装」：把下载好的包交给系统安装器（DownloadManager 自带 content:// 授权）。 */
+  static final class InstallClick implements android.content.DialogInterface.OnClickListener {
+    final MainActivity act;
+    final long id;
+    InstallClick(MainActivity a, long i) { act = a; id = i; }
+    @Override public void onClick(android.content.DialogInterface d, int w) {
+      d.dismiss();
+      act.installApk(id);
+    }
+  }
+
+  void askInstall(final long id) {
+    try {
+      new android.app.AlertDialog.Builder(this)
+          .setTitle("新版本已下载")
+          .setMessage("点「立即安装」覆盖安装即可，账号与存档不会丢。")
+          .setPositiveButton("立即安装", new InstallClick(this, id))
+          .setNegativeButton("稍后", null)
+          .show();
+    } catch (Throwable ignored) { }
+  }
+
+  void installApk(long id) {
+    try {
+      android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+      Uri uri = dm == null ? null : dm.getUriForDownloadedFile(id);
+      if (uri == null) { Toast.makeText(this, "安装包读取失败，请到下载页手动安装", Toast.LENGTH_LONG).show(); return; }
+      Intent i = new Intent(Intent.ACTION_VIEW);
+      i.setDataAndType(uri, "application/vnd.android.package-archive");
+      i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+      startActivity(i);
+    } catch (Throwable e) {
+      Toast.makeText(this, "无法调起安装器，请到下载页手动安装", Toast.LENGTH_LONG).show();
     }
   }
 
   void askUpdate(final int remote, String name, int mine) {
     try {
       String msg = "萝卜喵服 · 卫戍协议  " + (name.isEmpty() ? ("v" + remote) : ("v" + name))
-          + "\n当前版本 v" + mine + "，点「下载更新」会打开下载页（装完覆盖安装即可，数据不会丢）。";
+          + "\n当前版本 v" + mine + "，点「立即更新」会在 App 内下载，下完直接安装（覆盖安装即可，账号与存档不会丢）。";
       new android.app.AlertDialog.Builder(this)
           .setTitle("发现新版本")
           .setMessage(msg)
@@ -256,6 +325,76 @@ public class MainActivity extends Activity {
     super.onActivityResult(req, res, data);
   }
 
+  /**
+   * DownloadListener 的命名静态实现。
+   * 必须用**命名**类而不是匿名内部类：d8（R8 8.2.2）处理本工程的匿名内部类会内部 NPE。
+   */
+  static final class Dl implements android.webkit.DownloadListener {
+    final MainActivity act;
+    Dl(MainActivity a) { this.act = a; }
+    @Override public void onDownloadStart(String url, String ua, String cd, String mime, long len) {
+      try {
+        act.startDownload(url, ua, cd, mime);
+      } catch (Throwable e) {
+        // 兜底：交给浏览器下载，别让玩家点了没反应
+        try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Throwable ignored) { }
+      }
+    }
+  }
+
+  /** 交给系统 DownloadManager 下载（APK 下完点通知即可安装）。 */
+  long startDownload(String url, String ua, String cd, String mime) {
+    android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+    if (dm == null) throw new IllegalStateException("no DownloadManager");
+    String name = android.webkit.URLUtil.guessFileName(url, cd, mime);
+    android.app.DownloadManager.Request r = new android.app.DownloadManager.Request(Uri.parse(url));
+    if (ua != null && ua.length() > 0) r.addRequestHeader("User-Agent", ua);
+    if (mime != null && mime.length() > 0) r.setMimeType(mime);
+    r.setTitle(name);
+    r.setDescription("卫戍协议 · 萝卜喵服");
+    r.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+    r.setAllowedOverMetered(true);
+    r.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, name);
+    long id = dm.enqueue(r);
+    // 记住「这是我们自己发起的 APK 下载」：下完由 ApkDone 判断并弹安装
+    if (mime != null && mime.indexOf("android.package-archive") >= 0) apkDownloadId = id;
+    Toast.makeText(this, "开始下载，完成后会提示安装", Toast.LENGTH_LONG).show();
+    return id;
+  }
+
+  // ---- 画面适配的保命出口（2026-11-19，玩家：打开异形屏适配后点不到设置，改不回来） ----
+  //   长按返回键 1.2 秒：清掉本机的 sp.pref.screenFit（四个边缘偏移 + 界面大小），刷新页面。
+  //   正常轻按返回键的行为不变（onKeyUp 判定时长，短的照旧交给 onBackPressed）。
+  static final long RESET_HOLD_MS = 1200L;
+  long backDownAt = 0L;
+
+  @Override
+  public boolean onKeyDown(int code, android.view.KeyEvent e) {
+    if (code == android.view.KeyEvent.KEYCODE_BACK) backDownAt = android.os.SystemClock.uptimeMillis();
+    return super.onKeyDown(code, e);
+  }
+
+  @Override
+  public boolean onKeyUp(int code, android.view.KeyEvent e) {
+    if (code == android.view.KeyEvent.KEYCODE_BACK && backDownAt > 0L) {
+      long held = android.os.SystemClock.uptimeMillis() - backDownAt;
+      backDownAt = 0L;
+      if (held >= RESET_HOLD_MS) { resetScreenFit(); return true; }
+    }
+    return super.onKeyUp(code, e);
+  }
+
+  /** 复位画面适配（异形屏适配 + 界面大小），然后刷新。 */
+  void resetScreenFit() {
+    try {
+      if (web != null) {
+        web.evaluateJavascript(
+            "try{localStorage.removeItem('sp.pref.screenFit');}catch(e){};location.reload();", null);
+      }
+      Toast.makeText(this, "已复位画面适配，正在刷新…", Toast.LENGTH_LONG).show();
+    } catch (Throwable ignored) { }
+  }
+
   @Override
   public void onBackPressed() {
     if (customView != null) {
@@ -293,6 +432,7 @@ public class MainActivity extends Activity {
 
   @Override
   protected void onDestroy() {
+    try { if (apkReceiver != null) unregisterReceiver(apkReceiver); } catch (Throwable ignored) { }
     if (web != null) {
       rootView.removeView(web);
       web.destroy();

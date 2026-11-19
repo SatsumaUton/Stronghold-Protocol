@@ -66,17 +66,45 @@ export const uiAllowed = (textSize) => textSize == null || textSize === 'sm';
 /** The size on screen: the stored one at 小, 100 at 中 and above. */
 export const effectiveUi = (ui, textSize) => (uiAllowed(textSize) ? sanitizeUi(ui) : 100);
 
+/**
+ * 把适配框钳制到「仍然可用」的尺寸（2026-11-19，玩家反馈：打开异形屏适配后点不到设置）。
+ * 四个边缘是 inset：正值把该边往里收，负值往外扩。收得太多时 .app-root 会被压得极小，
+ * 面板与按钮挤成一团甚至被裁掉 → 玩家既看不到也点不到「设置」，改不回来。
+ * 这里保证框体不小于 min(320, 55% 宽) × min(240, 45% 高)：只按比例收正值，不动负值（那是本功能的用途）。
+ * 阈值是保护性的 [ASSUMED]，不改变正常范围的观感。
+ */
+export function clampFitToViewport(f) {
+  const w = Number(globalThis.innerWidth) || 0;
+  const h = Number(globalThis.innerHeight) || 0;
+  if (!w || !h) return f;
+  const pair = (a, b, total, min) => {
+    const boxAt = (k) => total - (a > 0 ? a * k : a) - (b > 0 ? b * k : b);
+    if (boxAt(1) >= min) return [a, b];
+    if (Math.max(0, a) + Math.max(0, b) <= 0) return [a, b];
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const m = (lo + hi) / 2;
+      if (boxAt(m) >= min) lo = m; else hi = m;
+    }
+    return [a > 0 ? Math.round(a * lo) : a, b > 0 ? Math.round(b * lo) : b];
+  };
+  const [l, r] = pair(f.l, f.r, w, Math.min(320, w * 0.55));
+  const [t, b] = pair(f.t, f.b, h, Math.min(240, h * 0.45));
+  return { ...f, l, r, t, b };
+}
+
 /** Put the offsets and the size on <html> (no attribute while all four are 0, no --sp-ui at 100 %: the page as before). */
 export function applyFit(f, textSize = settingsStore.get().textSize) {
   const el = globalThis.document?.documentElement;
   if (!el) return;
-  const ui = effectiveUi(f.ui, textSize);
+  const g = clampFitToViewport(f);   // 保命：适配框永远保持可用尺寸
+  const ui = effectiveUi(g.ui, textSize);
   if (ui !== 100) el.style.setProperty('--sp-ui', String(ui / 100));
   else el.style.removeProperty('--sp-ui');
-  const on = FIT_SIDES.some((k) => f[k] !== 0);
+  const on = FIT_SIDES.some((k) => g[k] !== 0);
   if (on) {
     el.dataset.fit = '';
-    for (const k of FIT_SIDES) el.style.setProperty(`--fit-${k}`, `${f[k]}px`);
+    for (const k of FIT_SIDES) el.style.setProperty(`--fit-${k}`, `${g[k]}px`);
   } else {
     delete el.dataset.fit;
     for (const k of FIT_SIDES) el.style.removeProperty(`--fit-${k}`);

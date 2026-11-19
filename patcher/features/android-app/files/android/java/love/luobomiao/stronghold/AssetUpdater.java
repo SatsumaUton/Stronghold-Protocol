@@ -52,11 +52,28 @@ final class AssetUpdater {
     return new File(overlayRoot(ctx), p);
   }
 
+  /** 当前是否在计费网络（移动数据 / 计费热点）上。 */
+  static boolean metered(Context ctx) {
+    try {
+      android.net.ConnectivityManager cm =
+          (android.net.ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+      if (cm == null) return false;
+      if (cm.isActiveNetworkMetered()) return true;
+      android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+      return ni != null && ni.getType() == android.net.ConnectivityManager.TYPE_MOBILE;
+    } catch (Throwable e) {
+      return false;
+    }
+  }
+
   static void maybeStart(Activity act) {
     try {
       SharedPreferences sp = act.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
       long now = System.currentTimeMillis();
       if (now - sp.getLong(KEY_LAST, 0L) < EVERY_MS) return;
+      // 计费网络（移动数据）不自动补资源：增量可能有几十 MB，等玩家回到 Wi-Fi 再说。
+      // 下一次启动还会进来（KEY_LAST 没写），所以回到 Wi-Fi 后自动接着补。
+      if (metered(act)) { Log.i(TAG, "metered network: skip asset top-up"); return; }
       sp.edit().putLong(KEY_LAST, now).apply();
       new Thread(new Run(act)).start();
     } catch (Throwable ignored) { /* 资源更新永远不能影响启动 */ }
