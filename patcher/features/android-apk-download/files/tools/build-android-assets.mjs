@@ -96,6 +96,8 @@ const doc = {
   version: ver.code,
   name: ver.name,
   base: BASE,
+  // 多源兜底：资源站优先，主站兜底（AssetUpdater 逐个试，下完校验字节数）
+  bases: [BASE, 'https://stronghold.luobomiao.love/assets/'],
   note: '只列 APK 内置资源中没有或大小不一致的文件；App 拉这个清单增量补齐，不重下整包。由 tools/build-android-assets.mjs 生成。',
   generatedAt: new Date().toISOString().slice(0, 10),
   counts: { assetsInApk: zip.size, assetsOnDisk: files.length, added, changed, total: Object.keys(need).length },

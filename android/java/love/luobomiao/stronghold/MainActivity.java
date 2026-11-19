@@ -127,6 +127,10 @@ public class MainActivity extends Activity {
   // -------------------------------------------------------------------------------------------------------------------
   static final String VERSION_URL = "https://stronghold.luobomiao.love/download/android-version.json";
   static final String APK_URL = "https://stronghold.luobomiao.love/download/stronghold-android.apk";
+  /** 兜底候选：主 URL 在前，`android-version.json` 的 `mirrors` 追加在后（相对主站路径会补全）。 */
+  static final java.util.List<String> apkUrls = new java.util.ArrayList<String>();
+  static { apkUrls.add(APK_URL); }
+  int apkUrlIdx = 0;
   static final String PREFS = "sp-app";
   static final String KEY_SKIP = "skipVersionCode";
   static final String KEY_LAST_CHECK = "lastUpdateCheck";
@@ -167,6 +171,16 @@ public class MainActivity extends Activity {
         org.json.JSONObject j = new org.json.JSONObject(buf.toString("UTF-8"));
         remote = j.optInt("code", 0);
         name = j.optString("name", "");
+        // 兜底下载源（维护者 2026-11-19）：数组元素可以是绝对地址，也可以是以 / 开头的站内路径。
+        org.json.JSONArray mir = j.optJSONArray("mirrors");
+        if (mir != null) {
+          for (int i = 0; i < mir.length(); i++) {
+            String mu = mir.optString(i, "");
+            if (mu.length() == 0) continue;
+            if (mu.startsWith("/")) mu = "https://stronghold.luobomiao.love" + mu;
+            if (!apkUrls.contains(mu)) apkUrls.add(mu);
+          }
+        }
       } catch (Throwable ignored) {
         return;   // 没网 / 站点没那份文件：安静跳过，不打扰玩家
       }
@@ -216,7 +230,8 @@ public class MainActivity extends Activity {
     @Override public void onClick(android.content.DialogInterface d, int w) {
       d.dismiss();
       try {
-        act.startDownload(APK_URL, null, null, "application/vnd.android.package-archive");
+        act.apkUrlIdx = 0;
+        act.startDownload(apkUrls.get(0), null, null, "application/vnd.android.package-archive");
       } catch (Throwable e) {
         // 没有 DownloadManager（理论上不会）：退回浏览器，别让玩家点了没反应
         try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL))); } catch (Throwable ignored) { }
@@ -233,6 +248,7 @@ public class MainActivity extends Activity {
         if (i == null) return;
         long id = i.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
         if (id < 0 || id != act.apkDownloadId) return;
+        if (!act.downloadSucceeded(id)) { act.retryNextMirror(); return; }
         act.askInstall(id);
       } catch (Throwable ignored) { }
     }
@@ -246,6 +262,39 @@ public class MainActivity extends Activity {
     @Override public void onClick(android.content.DialogInterface d, int w) {
       d.dismiss();
       act.installApk(id);
+    }
+  }
+
+  /** 这次下载成功了吗（失败/被暂停都算没成功 → 换源）。 */
+  boolean downloadSucceeded(long id) {
+    android.database.Cursor c = null;
+    try {
+      android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+      if (dm == null) return false;
+      c = dm.query(new android.app.DownloadManager.Query().setFilterById(id));
+      if (c == null || !c.moveToFirst()) return false;
+      int st = c.getInt(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+      return st == android.app.DownloadManager.STATUS_SUCCESSFUL;
+    } catch (Throwable e) {
+      return false;
+    } finally {
+      if (c != null) { try { c.close(); } catch (Throwable ignored) { } }
+    }
+  }
+
+  /** 换下一个兜底源重下；候选用完就提示去下载页。 */
+  void retryNextMirror() {
+    apkUrlIdx++;
+    if (apkUrlIdx >= apkUrls.size()) {
+      Toast.makeText(this, "所有下载源都失败了，请到下载页手动安装", Toast.LENGTH_LONG).show();
+      apkDownloadId = -1L;
+      return;
+    }
+    try {
+      Toast.makeText(this, "换个下载源重试…", Toast.LENGTH_SHORT).show();
+      startDownload(apkUrls.get(apkUrlIdx), null, null, "application/vnd.android.package-archive");
+    } catch (Throwable e) {
+      retryNextMirror();
     }
   }
 

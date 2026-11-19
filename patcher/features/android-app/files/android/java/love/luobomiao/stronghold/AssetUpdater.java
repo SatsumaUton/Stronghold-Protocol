@@ -88,7 +88,20 @@ final class AssetUpdater {
       long bytes = 0;
       try {
         JSONObject m = new JSONObject(get(MANIFEST_URL));
+        // 多源兜底：bases 优先（base 兼容旧清单），主站永远是最后一个候选
+        java.util.List<String> bases = new java.util.ArrayList<String>();
+        org.json.JSONArray ba = m.optJSONArray("bases");
+        if (ba != null) {
+          for (int i = 0; i < ba.length(); i++) {
+            String b0 = ba.optString(i, "");
+            if (b0.length() > 0 && !bases.contains(b0)) bases.add(b0);
+          }
+        }
         String base = m.optString("base", "https://assets.luobomiao.love/assets/");
+        if (base.length() > 0 && !bases.contains(base)) bases.add(base);
+        if (!bases.contains("https://stronghold.luobomiao.love/assets/")) {
+          bases.add("https://stronghold.luobomiao.love/assets/");
+        }
         JSONObject files = m.optJSONObject("files");
         if (files == null) return;
         List<String> todo = new ArrayList<String>();
@@ -104,8 +117,23 @@ final class AssetUpdater {
           File dst = new File(overlayRoot(act), key);
           File dir = dst.getParentFile();
           if (dir != null && !dir.isDirectory() && !dir.mkdirs()) continue;
+          long want = files.optLong(key, -1);
           File part = new File(dst.getPath() + ".part");
-          if (!download(base + key, part)) { delete(part); continue; }
+          // 多源兜底：某个源下不到、或下到的字节数不对（说明那个源还是旧版本）= 换下一个源
+          boolean okOne = false;
+          for (int bi = 0; bi < bases.size(); bi++) {
+            String b = bases.get(bi);
+            if (b == null || b.length() == 0) continue;
+            if (!download(b + key, part)) { delete(part); continue; }
+            if (want > 0 && part.length() != want) {
+              Log.w(TAG, "size mismatch from " + b + ": " + part.length() + " != " + want);
+              delete(part);
+              continue;
+            }
+            okOne = true;
+            break;
+          }
+          if (!okOne) { Log.w(TAG, "all mirrors failed: " + key); continue; }
           if (dst.exists() && !dst.delete()) { delete(part); continue; }
           if (!part.renameTo(dst)) { delete(part); continue; }
           got++;
