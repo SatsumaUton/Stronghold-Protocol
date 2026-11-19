@@ -310,11 +310,19 @@ describe('HUD clearance of the prep views (user playtest #5 item 9)', () => {
         assert.ok(cam.cy <= off.cy && off.cy - cam.cy < 3, `bossPrep/${side} ${w}×${h}: nudge ${off.cy - cam.cy}`);
       }
     }
-    // other camera kinds ignore the HUD bands; the fitted (portrait) prep camera too
+    // other camera kinds ignore the HUD bands (they have no keep band and no prep bench)
     for (const kind of ['normal', 'unite', 'boss', 'pen']) {
       assert.deepEqual(presetCamera(kind, { width: 844, height: 390 }, { hud: hudAt(844, 390) }).params(), presetCamera(kind, { width: 844, height: 390 }).params(), kind);
     }
-    assert.deepEqual(presetCamera('prep', { width: 390, height: 844 }, { hud: hudAt(390, 844) }).params(), presetCamera('prep', { width: 390, height: 844 }).params(), 'portrait');
+    // ★ 2026-11-19 改了策略：拟合（竖屏 / 自定义 rect）的 prep 相机**也要**把 HUD 留白算进去。
+    //   以前它完全忽略 hud，只有按比例的 padding（顶 10% / 底 24%），真实 HUD 更高时棋盘底几行
+    //   会钻到商店栏底下（那片 canvas 收不到点击 = 玩家说的「那里点不到」）。
+    //   所以这里从「两者相等」改成「hud 确实影响了取景」，并且棋盘仍在带内（见 camera-hud-band.test.js）。
+    const portraitHud = hudAt(390, 844);
+    const withHud = presetCamera('prep', { width: 390, height: 844 }, { hud: portraitHud }).params();
+    const without = presetCamera('prep', { width: 390, height: 844 }).params();
+    assert.notDeepEqual(withHud, without, 'portrait: 拟合相机应当把 HUD 留白算进去');
+    assert.ok(withHud.scale <= without.scale + 1e-12, 'portrait: 让位给 HUD 只会缩小或不变');
   });
 
   test('clearHud: unchanged when clear, pan when the band fits, zoom about the centre when it does not; garbage-safe', () => {

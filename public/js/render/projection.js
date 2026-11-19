@@ -314,6 +314,26 @@ export function normRect(rect, rows = 19, cols = 21) {
  * @param {{ tilt?, dist?, margin?: number, headroom?: number, maxTilePx?: number, minTilePx?: number }} [opts]
  *   margin (tiles) around the rect; headroom (tiles) of vertical space kept above the far row for units.
  */
+/**
+ * 把 HUD 留白并进 viewport.padding（取两者较大值），给 fitCamera 用。
+ * `hud` = { top, bottom }（CSS px，HUD 占掉的上/下高度）；缺省或全 0 时原样返回。
+ */
+function withHudPadding(viewport, hud) {
+  if (!hud || typeof hud !== 'object') return viewport;
+  const top = Math.max(0, finite(hud.top, 0));
+  const bottom = Math.max(0, finite(hud.bottom, 0));
+  if (!(top > 0) && !(bottom > 0)) return viewport;
+  const pad = (viewport && viewport.padding) || {};
+  return {
+    ...viewport,
+    padding: {
+      ...pad,
+      top: Math.max(finite(pad.top, 0), top),
+      bottom: Math.max(finite(pad.bottom, 0), bottom),
+    },
+  };
+}
+
 export function fitCamera(rect, viewport, options) {
   const opts = options && typeof options === 'object' ? options : {};
   const R = normRect(rect);
@@ -477,7 +497,12 @@ export function presetCamera(kind, viewport, options) {
   // a narrow rect (e.g. a solo boss half) keeps the normal optics; wide ones use the preset's wider lens
   const wide = rect.c1 - rect.c0 >= 14;
   const base = wide ? preset : CAMERA_PRESETS[k === 'prep' || k === 'bossPrep' ? 'prep' : 'normal'];
-  return fitCamera(rect, viewport, {
+  // ★ 2026-11-19（「部分地图部分地区点不到」）：拟合分支以前**完全不看 opts.hud**，
+  //   而调用方给的 padding 只是按比例的近似（prep: 顶 10% / 底 24%）。真实 HUD 更高时
+  //   （矮横屏、大字号、商店展开）棋盘会有几行钻到顶栏/商店栏底下 —— 那片 canvas 收不到点击。
+  //   这里把 hud 并进 padding，取较大值；官方分支仍由 clearHud + keep 波段处理，不受影响。
+  const fitViewport = withHudPadding(viewport, opts.hud);
+  return fitCamera(rect, fitViewport, {
     tilt: finite(opts.tilt, base.tilt), dist: finite(opts.dist, base.dist),
     margin: finite(opts.margin, preset.margin), headroom: finite(opts.headroom, preset.headroom),
     maxTilePx: opts.maxTilePx, minTilePx: opts.minTilePx,
