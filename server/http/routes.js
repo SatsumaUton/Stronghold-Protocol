@@ -268,6 +268,7 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/api/dive/board') {
       let limit = 50;
       let difficulty = 'HARD';
+      let version = DEFAULT_VERSION;
       try {
         const q = new URLSearchParams(parts.query || '');
         const v = Number(q.get('limit'));
@@ -275,10 +276,13 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
         // 榜按难度分开（险境 / 绝境 / 终极）；非法值退回默认档，不报错
         const d = String(q.get('difficulty') || '').toUpperCase();
         if (ECHO_BOARD_DIFFICULTIES.includes(d)) difficulty = d;
+        // ★ 2026-11-20：榜单按版本分（规程·序列Ⅰ 与 第二期下半 各一张）
+        const vq = String(q.get('version') || '');
+        if (vq) version = vq;
       } catch { /* 参数坏了就用默认值 */ }
       const store = health && health.lobby ? health.lobby.persistence?.store ?? null : null;
-      const rows = await readEchoBoard(store, { limit, difficulty });
-      sendJson(req, res, 200, { ok: true, limit, difficulty, rows });
+      const rows = await readEchoBoard(store, { limit, difficulty, version });
+      sendJson(req, res, 200, { ok: true, limit, difficulty, version, rows });
       return;
     }
     // 本服：后台维护开关的只读状态，大厅据此把「创建房间」等入口置灰并说明原因。

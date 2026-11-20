@@ -1257,11 +1257,18 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   /** 「深渊图鉴」浮层（维护者 2026-11-06：入口在顶部右侧，局内放大镜不加） */
   const [codexOpen, setCodexOpen] = useState(false);
   const [best] = useState(() => echoReadBest());
+  // ★ 2026-11-20（维护者：榜单按版本分）：深潜榜跟着大厅选中的版本走。
+  const boardVersion = (() => {
+    try {
+      const v = globalThis.localStorage?.getItem('sp.pref.lobby.version');
+      return typeof v === 'string' && v ? v : 'act2autochess';
+    } catch { return 'act2autochess'; }
+  })();
   useEffect(() => {
     let alive = true;
     setRows(null);
     setOpenRow(null);
-    fetch(`/api/dive/board?limit=20&difficulty=${boardDiff}`, { cache: 'no-store' })
+    fetch(`/api/dive/board?limit=20&difficulty=${boardDiff}&version=${encodeURIComponent(boardVersion)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => { if (alive) setRows(Array.isArray(j?.rows) ? j.rows : []); })
       .catch(() => { if (alive) { setRows([]); setFailed(true); } });

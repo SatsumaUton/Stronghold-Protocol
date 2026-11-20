@@ -3831,6 +3831,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       seed: m.seed,
       // 榜按难度分开存（深度跨难度不可比），所以这条必须带上
       difficulty: room.difficulty,
+      // ★ 2026-11-20：规程也能深潜，榜还要按**版本**分开（深度跨版本同样不可比）
+      version: room.version,
     });
     if (entry) {
       recordEchoBoard(store, entry).catch(() => {});
