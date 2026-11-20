@@ -1478,6 +1478,8 @@ export function RoomScreen() {
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
             <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
+            /* ★ 2026-11-21：难度色必须由**胶囊自己**带（房间根不再写行内 --d-color），否则深潜房里会跟着主题变紫 */
+            style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
               onClick=${echoRoom ? (facts.isHost ? () => setOpts(true) : () => {}) : openProto}
               title=${echoRoom ? t('深渊回响难度（DE-1 / DE-2 / DE-3）：在深潜设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${room.modeId ? info.name : DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
