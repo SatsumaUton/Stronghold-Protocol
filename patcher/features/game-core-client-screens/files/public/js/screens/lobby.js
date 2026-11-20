@@ -1743,7 +1743,9 @@ export function LobbyScreen() {
     }
     return run('create', async () => {
       const answer = await net.request('room.create', {
-        mode, difficulty, ...(testMode && asTest ? { test: true } : {}), ...(!variant && versions ? { version } : {}),   // 深潜房不带版本：服务端把它钉在 DEFAULT_VERSION（第二期下半）
+        mode, difficulty, ...(testMode && asTest ? { test: true } : {}), // ★ 2026-11-21（维护者：在第二期下半大厅建房却变成规程）：深潜房**也**要带大厅版本 ——
+      //   服务端用 shared/versions.js 的 ECHO_VERSIONS 白名单校验，不在白名单才退回默认版本。
+      ...(versions ? { version } : {}),
         ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
         // 「深渊回响」：第三个模式，底层仍是 coop，靠 variant 区分（协议只接受 'deepecho'）。
         // 它不支持实验性功能（服务端会拒），所以这里一个 experimental 都不带。
