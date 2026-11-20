@@ -597,6 +597,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const currentCap = Number(room?.capacity) || Number(exp.playerCapacity) || 4;
   // 卡池编辑器的座位表：按座位号排好，空位留 null（编辑器自己画「空席」）
   const myId = useStore((s) => s.me.playerId);
+  // ★ 2026-11-20（维护者：观战者不需要看到这个按钮）：观战时整块「作弊控制台」不渲染 ——
+  //   服务端对观战者是拒绝的（room.watcherOf / ERR.SPECTATOR），客户端也只在有座位时给控制台入口，
+  //   所以这个开关对观战者只是噪音。
+  const amSpectator = isSpectating(room, myId);
   const seatsForPools = (() => {
     const out = new Array(currentCap).fill(null);
     for (const s of Array.isArray(room?.seats) ? room.seats : []) {
@@ -757,7 +761,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${uniteFirst ? 'is-on' : ''} />${t('AI 联防置后')}
         </button>
       <//>
-      <${Tooltip} text=${t('打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中')}>
+      ${amSpectator ? null : html`<${Tooltip} text=${t('打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中')}>
         <button type="button" role="switch" aria-checked=${cheatConsole ? 'true' : 'false'} data-testid="exp-cheat-console"
             class=${`dpick__opt ailast__opt${cheatConsole ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
             onClick=${() => {
@@ -782,6 +786,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${cheatConsole ? 'is-on' : ''} />${t('作弊控制台')}
         </button>
       <//>
+      `}
       </div>
       <div class="exp-modal__muls">
         <div class="exp-mul">
