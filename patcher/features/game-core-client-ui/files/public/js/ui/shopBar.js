@@ -165,6 +165,15 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
     aria-hidden="true" style=${outline ? `--repeat-art:url("${outline}")` : null}></span>` : null;
   const bonds = Array.isArray(c?.bonds) ? c.bonds : [];
   const face = reg ? faceModel : null;
+  // ★ 2026-11-20（玩家：商店卡盟约与背景颜色相近 / 像乱码）：
+  //   解包数据 shop/autochess_shop_card_item 的**底板与文字色每套主题都不一样**：
+  //     ac_n_initial  bkg sprite=bg_black（黑底）  char_name #FFFFFF
+  //     ac_n_iron     bkg 无                     char_name #EFEBDF
+  //     ac_s_closur   bkg color=#FFFFFF（白底）    char_name #000000（黑字）
+  //   盟约原来用写死的 #B7B7B7，在可露希尔的白底卡面上没有对比。
+  //   这里沿用卡面自己的名字色（face.name.color），图标也同色（maskGlyph）。
+  //   注意：htm 模板里**不能内联对象字面量**（`${…{…}…}` 会被第一个 } 截断），所以先算成变量。
+  const bondStyle = face?.bonds || (face?.name?.color ? { color: face.name.color } : null);
   const tierView = regCardTierView(face, facePack, still);
   const disabled = !!reason;
   const lo = si ? standInLoadout(si, LOOKUPS.getChess, data.get('backups')) : c ? chessLoadout(c, priv?.loadout, dr ? diyGetter(LOOKUPS.getChess, priv, diyData) : LOOKUPS.getChess, { ops: priv?.ops ?? null, effects: data.get('effects') }) : null;
@@ -198,16 +207,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         <${Img} src=${profMarkUrl(m, c?.profession)} class="scard__prof" fallback=${html`<span class="scard__prof is-pending" aria-hidden="true"></span>`} />
         <span class="scard__name">${c?.name || slot.id}</span>
       </span></span>`}
-      {/* ★ 2026-11-20（玩家：可露希尔主题的商店卡盟约与背景颜色相近看不清）：
-   解包数据 shop/autochess_shop_card_item 的底板与文字色每套主题都不一样：
-     ac_n_initial  bkg sprite=bg_black（黑底）  char_name #FFFFFF
-     ac_n_iron     bkg 无                     char_name #EFEBDF
-     ac_s_closur   bkg color=#FFFFFF（白底）    char_name #000000（黑字）
-   盟约原来用写死的 #B7B7B7，在可露希尔的白底卡面几乎没有对比。
-   改成沿用卡面自己的名字色（face.name.color），图标也同色（maskGlyph）。 */ null}
-${face?.bonds
-  ? regBondLine(bonds, offBonds, face.bonds, true)
-  : regBondLine(bonds, offBonds, face?.name?.color ? { color: face.name.color } : null, true)}
+      ${regBondLine(bonds, offBonds, bondStyle, true)}
       ${repeatFx}
       ${willMerge ? html`<span class="scard__mergetag" title=${hint}>${t('可晋升')}</span>` : null}
       ${frozen ? html`<span class="scard__ice" aria-hidden="true"><${Icon} name="snow" /></span>` : null}
