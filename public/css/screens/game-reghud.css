@@ -389,7 +389,9 @@
   border: 0; background: transparent;
   /* ★ 2026-11-20（玩家：手机上的收起按钮比较小）：这条规则**不带主题选择器**，
      所以所有主题在手机上一样小 —— .15rem 在 844×390 上只有 5.4px。加像素下限（可读性豁免）。 */
-  color: #37e5ca; font-size: max(.15rem, 11px);
+  /* 桌面 rem=100px → .15rem = 15px；手机 rem≈36px 时只有 5.4px。
+     维护者要求「跟电脑一样大」，所以下限取桌面值 15px。 */
+  color: #37e5ca; font-size: max(.15rem, 15px);
   padding: .02rem .04rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
 }
@@ -414,6 +416,10 @@
    wrap is the overflow safety. Touch targets stay at least --tap-min. */
 @media (max-width: 900px) {
   .shopbar--reg .shopbar__cluster { width: 100%; --reg-k-max: 1; }
+  /* ★ 2026-11-20（玩家：刷新/冻结离商店池比较远；维护者选 B「贴近」）：
+     官方把这条控件带右对齐，但手机上的卡牌行是居中的，于是按钮在最右、卡牌在中间。
+     窄屏改成居中 —— 与卡牌行同一条中轴。属**故意偏离官方**（维护者决定）。 */
+  .shopbar--reg .shopbar__tools { justify-content: center; }
   .shopbar--reg .shopbar__row,
   .shopbar--reg .shopbar__cards,
   .shopbar--reg .shopbar__rwcards { flex-wrap: wrap; justify-content: center; }
