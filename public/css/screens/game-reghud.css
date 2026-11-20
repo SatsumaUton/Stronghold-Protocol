@@ -546,3 +546,24 @@ html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__icon { filter: brightnes
 html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__icon { filter: brightness(0); }
 html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__glyph { color: #e3e7e5; }
 html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__glyph { color: #111; }
+
+/* ★ 2026-11-21（玩家：乌萨斯主题下棋盘右上 4–6 格点不到）：
+   主题 HUD 的装饰层（底板、prefab 层、插槽容器）不能吃指针事件，否则会盖住棋盘的点击。
+   这里统一穿透，只把真实的按钮/可交互控件恢复为 auto。 */
+.gtop--pf,
+.gtop--pf .gtop__band,
+.gtop--pf .gtop__frame,
+.gtop--pf .pf,
+.gtop--pf .pf__stage,
+.gtop--pf .pf__root,
+.gtop--pf .pf__n,
+.gtop--pf [data-pf] {
+  pointer-events: none;
+}
+.gtop--pf button,
+.gtop--pf a,
+.gtop--pf [role="button"],
+.gtop--pf .gtop__iconbtn,
+.gtop--pf .readybtn {
+  pointer-events: auto;
+}
