@@ -846,7 +846,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           ${canEdit || atkPlan ? html`<div class="exp-hpplan">
             <button type="button" class=${`dpick__opt ailast__opt${atkPlan ? ' is-active' : ''}`} data-testid="exp-atk-plan-toggle"
                 disabled=${!!busy || !canEdit} onClick=${() => { setCapOpen(false); canEdit && setAtkPlan(atkPlan ? null : [[1, enemyAtk]]); }}>
-              <${Icon} name="check" class=${atkPlan ? 'is-on' : ''} />${t('攻击按回合设置')}
+              <${Icon} name="check" class=${atkPlan ? 'is-on' : ''} />${t('按回合设置')}
             </button>
             ${atkPlan ? html`<span class="exp-hpplan__rows">
               ${atkPlan.map(([from, mul], i) => html`<span key=${i} class="exp-hpplan__row">
