@@ -1531,3 +1531,15 @@ html.sp-deepecho .rs .rs-go.is-ready { background: linear-gradient(180deg, #b8a2
 .rs--deepecho .seat__title { color: #e8dcff; }
 .rs--deepecho .cardpick__op { color: #cbb2ff; }
 .rs--deepecho .dpick__opt.is-active { color: #e8dcff; }
+/* ★ 2026-11-21（玩家：深潜设置面板与「公开深潜」确认框还是橙/红）：
+   这两处是**浮层**，渲染在 .rs--deepecho 之外，拿不到房间根节点上的变量。
+   用页面级 html.sp-deepecho 兜住：选项的图标/选中态用紫，确认框的主按钮用紫。 */
+html.sp-deepecho .dpick__opt { --d-color: #b79cff; }
+html.sp-deepecho .dpick__opt.is-active { color: #e8dcff; border-color: #9d7bff; background: rgba(157, 123, 255, .12); }
+html.sp-deepecho .dpick__opt.is-active .icon { filter: drop-shadow(0 0 5px #b79cff); }
+html.sp-deepecho .btn--danger {
+  background: linear-gradient(180deg, #9b7cf0, #6a49c4);
+  border-color: #6a49c4;
+  color: #f6f1ff;
+}
+html.sp-deepecho .btn--danger:hover:not(:disabled) { filter: brightness(1.1); }
