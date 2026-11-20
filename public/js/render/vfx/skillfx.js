@@ -100,6 +100,9 @@ import { UF, ANIM } from '../../../../shared/constants.js';
 /** A world-placed effect's root keeps no rotation of its own (the flights of wiring.js `_fly`). */
 const ID_ROT = Object.freeze([0, 0, 0, 1]);
 
+/** 车道拖尾的统一缩放（塔露拉 heatwave：缩小后 4 条车道不再叠成一条厚火带）。 */
+const LANE_SCALE = 0.5;
+
 /** Battle seconds a held (non-oneshot) row of a skill's single cast lasts (FxWiring's CAST_LOOP_S for attacks). */
 export const SKILL_CAST_S = 0.6;
 /**
@@ -1243,7 +1246,10 @@ export class SkillFx {
           for (const k of keys) {
             const px0 = across ? startAxis : x + off;
             const py0 = across ? y + off : startAxis;
-            const h = this.w.playOn(k, this._ground(px0, py0, null), { important: true });
+            // ★ 2026-11-20（玩家：塔露拉 S3 变成一条火雨）：每条拖尾实测 ≈4.2×2.8 格，而车道只隔 1 格，
+        //   纵向重叠 ~64% → 4 条并成一条厚火带。按官方「簇火」是一颗火球而不是长条，把每条缩到 0.5 倍：
+        //   横向 ≈1.4 格（重叠降到 ~29%），4 条重新看得出是 4 条。
+        const h = this.w.playOn(k, this._ground(px0, py0, null), { important: true, scale: LANE_SCALE });
             if (!h) continue;
             drew = true;
             for (let step = 1; step <= STEPS; step++) {

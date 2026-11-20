@@ -278,6 +278,7 @@ export class Effect {
     this.linePts = new Map();                          // node → [[x,y,z]…] overrides (beams, chains: set by the game)
     this.anchor = [0, 0, 0];
     this.yaw = 0; this.pitch = 0; this.roll = 0;
+    this.scale = 1;   // 统一缩放（1 = prefab 原尺寸）；只作用于根矩阵
     this.mirror = false;
     this.flipY = false;                                // FLIP_TWO_SIDE with a `_rotationY` helper
     this.mountRot = null;                              // the mount point's world rotation on the root ([x,y,z,w]) or null
@@ -327,7 +328,7 @@ export class Effect {
     this.hier.fill(0); this.prevHier.fill(0); this.actAt.fill(-1); this.forcedOff.fill(0);
     this.matOv.clear(); this.rendOv.clear(); this.trails.clear(); this.linePts.clear();
     this.anchor[0] = this.anchor[1] = this.anchor[2] = 0;
-    this.yaw = 0; this.pitch = 0; this.roll = 0; this.mirror = false; this.flipY = false; this.groundZ = 0; this.mountRot = null; this.rootRot = null;
+    this.yaw = 0; this.pitch = 0; this.roll = 0; this.mirror = false; this.flipY = false; this.groundZ = 0; this.scale = 1; this.mountRot = null; this.rootRot = null;
     this.time = 0;
     this.delay = def.delayToPlay + (def.randomDelay > 0 ? Math.random() * def.randomDelay : 0);
     this.state = 'play'; this.linger = 0; this.started = false; this.track = null; this.hidden = false; this.pausedBy = false; this.owner = null;
@@ -350,6 +351,7 @@ export class Effect {
   place(o) {
     if (o.pos) { this.anchor[0] = o.pos[0]; this.anchor[1] = o.pos[1]; this.anchor[2] = o.pos[2]; }
     if (typeof o.yaw === 'number') this.yaw = o.yaw;
+    if (typeof o.scale === 'number' && o.scale > 0) this.scale = o.scale;
     if (typeof o.pitch === 'number') this.pitch = o.pitch;
     if (typeof o.roll === 'number') this.roll = o.roll;
     if (typeof o.mirror === 'boolean') this.mirror = o.mirror;
@@ -600,6 +602,7 @@ export class Effect {
       // parents to the projectile and resets), not the prefab's own; an effect placed at a map position keeps it
       // (Effect._InitLocation sets only the position)
       if (i === 0) {
+        // 统一缩放在 _frame() 里乘到粒子尺寸上（Local 模式会忽略父级缩放，缩根节点无效）。
         const r = this.rootRot;
         if (r) { _q[0] = r[0]; _q[1] = r[1]; _q[2] = r[2]; _q[3] = r[3]; } else if (def.proj) { _q[0] = 0; _q[1] = 0; _q[2] = 0; _q[3] = 1; }
       }
@@ -638,7 +641,12 @@ export class Effect {
     const s = this.sys[i], w = this.world[i];
     const f = this.__frame || (this.__frame = { m: mat4(), scale: [1, 1, 1] });
     const mode = s.def.scalingMode;
-    if (mode === 0) { f.m.set(w); mat4Scale(w, f.scale); return f; }
+    if (mode === 0) {
+      f.m.set(w);
+      mat4Scale(w, f.scale);
+      if (this.scale !== 1) { f.scale[0] *= this.scale; f.scale[1] *= this.scale; f.scale[2] *= this.scale; }
+      return f;
+    }
     // Local: the node's own scale on the world basis; Shape: no scale (the shape takes the world scale at birth). A
     // mirrored world keeps its reflection: the basis columns are only normalised. A parent's zero scale (野鬃 S2's fan,
     // 835 nodes of the used set: slashes flattened in z) leaves a column empty: it is rebuilt from the other two (their
@@ -652,6 +660,7 @@ export class Effect {
     for (let r = 0; r < 3; r++) { m[r] = B[r] * sx; m[4 + r] = B[3 + r] * sy; m[8 + r] = B[6 + r] * sz; }
     m[3] = 0; m[7] = 0; m[11] = 0; m[12] = w[12]; m[13] = w[13]; m[14] = w[14]; m[15] = 1;
     if (mode === 1) { f.scale[0] = sx; f.scale[1] = sy; f.scale[2] = sz; } else mat4Scale(w, f.scale);
+    if (this.scale !== 1) { f.scale[0] *= this.scale; f.scale[1] *= this.scale; f.scale[2] *= this.scale; }
     return f;
   }
 

@@ -573,6 +573,10 @@ export class FxHandle {
     this.sys = sys;
     this.key = key;
     this.placeArgs = place || {};
+    // 统一缩放：playOn/spawn 的 opts.scale 折进 placeArgs，Effect.place 会读取（塔露拉车道拖尾用）。
+    if (opts && typeof opts.scale === 'number' && opts.scale > 0 && opts.scale !== 1) {
+      this.placeArgs = { ...this.placeArgs, scale: opts.scale };
+    }
     this.opts = opts;
     this.effect = null;
     this.cancelled = false;
