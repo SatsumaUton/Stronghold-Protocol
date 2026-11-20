@@ -211,24 +211,12 @@
 
 /* The card, its tier box, cost anchor and text positions come from layoutPrefab (one prefab unit is .01rem). */
 .shopbar--reg .scard {
-  width: 1.55rem; height: 1.87rem;
-}
-
-/* ★ 2026-11-20（玩家：手机上看对局中商店池界面很小）：规程商店这一整套尺寸只有 rem、没有像素下限。
-   手机横屏 844×390 时 rem ≈ 36.1px → 卡片 1.55rem = 56px 宽、卡内文字 .105rem ≈ 3.8px。
-   全站其它组件都用 max(<rem>, <px>) 兜底（文字 9–13px、触控 ≥32px），这里补齐。
-   桌面端 rem 远大于这些下限，取景与排布不受影响。 */
-.shopbar--reg .scard {
-  /* 尺寸下限 >32px：按项目守卫的写法带 --sp-ui（触控目标永不缩到 32px 以下） */
+  /* ★ 2026-11-20：规程商店尺寸只有 rem、没有像素下限；手机横屏 rem ≈ 36px 时字会小到 4px 以下。
+     尺寸 > 32px 的下限按项目守卫写法带 --sp-ui；文字下限见卡片内的 scard__* 规则。 */
   width: max(1.55rem, 32px, calc(92px * var(--sp-ui, 1)));
   height: max(1.87rem, 32px, calc(112px * var(--sp-ui, 1)));
 }
-.scard.scard--reg .scard__name { font-size: max(.105rem, 11px); }
-.scard.scard--reg .scard__class { font-size: max(.11rem, 10px); }
-.scard.scard--reg .scard__idesc { font-size: max(.11rem, 10px); }
-.scard.scard--reg .scard__bond { font-size: max(.105rem, 10px); line-height: 1.25; }
-.scard.scard--reg .scard__bond .bglyph { width: max(.13rem, 10px); height: max(.13rem, 10px); }
-.scard.scard--reg .scard__cost--free { font-size: max(.14rem, 11px); }
+
 .scard.scard--reg {
   /* not clipped: the portrait's overhang (§37.139), the repeat glow (§37.201), 乌萨斯齐心团's tier icon and the TV reach past the box */
   box-sizing: border-box; padding: 0; overflow: visible;
@@ -277,6 +265,8 @@
 /* char_name / eqiup_name are TextAnchor MiddleLeft: centred in their box's height; the inner span keeps the ellipsis */
 .scard.scard--reg .scard__name {
   position: absolute; display: flex; align-items: center; overflow: hidden;
+  /* 字号下限：手机上 .105rem ≈ 3.8px，中文会糊成「乱码」 */
+  font-size: max(.105rem, 11px);
   line-height: 1.15; font-weight: 500; text-shadow: none;
 }
 .scard.scard--reg .scard__nametxt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -286,12 +276,12 @@
 }
 /* a bond's name and icon share one colour: 卫戍协议终端's bondColor #B7B7B7 by default (the 规程 look is that theme); an
    installed theme's bondColor overrides it (ui-theme.css) */
-.scard.scard--reg .scard__bond { display: flex; align-items: center; min-height: 0; gap: .03rem; font-size: .105rem; line-height: 1.05; white-space: nowrap; color: #B7B7B7; }
-.scard.scard--reg .scard__bond .bglyph { width: .13rem; height: .13rem; flex: none; }
+.scard.scard--reg .scard__bond { display: flex; align-items: center; min-height: 0; gap: .03rem; font-size: max(.105rem, 10px); line-height: 1.25; white-space: nowrap; color: #B7B7B7; }
+.scard.scard--reg .scard__bond .bglyph { width: max(.13rem, 10px); height: max(.13rem, 10px); flex: none; }
 
-.scard.scard--reg .scard__class { font-size: .11rem; }
+.scard.scard--reg .scard__class { font-size: max(.11rem, 10px); }
 .scard.scard--reg .scard__prof { width: .14rem; height: .14rem; }
-.scard.scard--reg .scard__idesc { -webkit-line-clamp: 2; font-size: .11rem; }
+.scard.scard--reg .scard__idesc { -webkit-line-clamp: 2; font-size: max(.11rem, 10px); }
 .scard.scard--reg .scard__itemart { position: absolute; z-index: 2; top: auto; left: auto; width: auto; height: auto; transform: none; }
 .scard.scard--reg .scard__itemart img { width: 100%; height: 100%; object-fit: contain; }
 .scard.scard--reg.scard--item .scard__namebar { z-index: 4; }
