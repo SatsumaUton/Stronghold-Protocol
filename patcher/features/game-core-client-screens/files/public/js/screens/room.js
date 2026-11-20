@@ -749,7 +749,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
             onClick=${() => { setCapOpen(false); canEdit && setLayerCapOff(!layerCapOff); }}>
           <${Icon} name="check" class=${layerCapOff ? 'is-on' : ''} />${t('禁用层数上限')}
         </button>
-          <${Tooltip} text=${t('打开后，带「本回合第 N 次」计数的干员特质（如荒芜拉普拉德的刷新叠层）每次都触发，不再每回合只算一次')}>
+          <${Tooltip} text=${t('打开后取消每回合叠层限制，干员特质每次触发都会叠加')}>
             <button type="button" role="switch" aria-checked=${traitStackOff ? 'true' : 'false'} data-testid="exp-trait-stack"
               class=${`dpick__opt ailast__opt${traitStackOff ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
               onClick=${() => { setCapOpen(false); canEdit && setTraitStackOff(!traitStackOff); }}>

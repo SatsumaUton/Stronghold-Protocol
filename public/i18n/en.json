@@ -3434,5 +3434,5 @@
   "打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中": "Once enabled, ALL players in this room (spectators excluded) can use the console to change data. This match is not recorded, cannot be listed publicly, and cannot be picked by matchmaking.",
   "「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」": "“Abyss Echo” supports only “Season 2 Part 2” and “Regulation · Sequence I”",
   "取消特质每回合叠层限制": "Remove per-round trait stacking limit",
-  "打开后，带「本回合第 N 次」计数的干员特质（如荒芜拉普拉德的刷新叠层）每次都触发，不再每回合只算一次": "While on, operator traits that count \"the Nth time this round\" (e.g. Lappland the Decadenza stacking on refresh) trigger every time instead of once per round."
+  "打开后取消每回合叠层限制，干员特质每次触发都会叠加": "While on, the per-round stacking limit is lifted: every trigger of an operator trait stacks."
 }
