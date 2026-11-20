@@ -1546,3 +1546,28 @@ html.sp-deepecho .btn--danger {
   color: #f6f1ff;
 }
 html.sp-deepecho .btn--danger:hover:not(:disabled) { filter: brightness(1.1); }
+
+/* ★ 2026-11-21：规程季节块之后（room.css 1513 起）还有一整套硬编码红的座位样式，
+   特异性比 .rs--deepecho 高，所以深渊房里立绘框/名条依然是红的。
+   这里放在**文件最后**并用 html.sp-deepecho .rs.rs--deepecho 前缀（(0,5,1) > (0,4,0)）压过去。 */
+html.sp-deepecho .rs.rs--deepecho .rseat.is-lit .rseat__art {
+  border-color: #b79cff;
+  box-shadow: 0 0 .2rem rgba(157, 123, 255, .45);
+}
+html.sp-deepecho .rs.rs--deepecho .rseat.is-lit .rseat__art::after {
+  background: linear-gradient(180deg, transparent, rgba(60, 20, 120, .85));
+}
+html.sp-deepecho .rs.rs--deepecho .rseat.is-lit .rseat__clip,
+html.sp-deepecho .rs.rs--deepecho .rseat.is-lit .rseat__strip { background: #8b6ae0; }
+html.sp-deepecho .rs.rs--deepecho .rseat.is-lit .rseat__strip span { color: #150a2b; }
+html.sp-deepecho .rs.rs--deepecho .seat__content.is-ready { border-color: #e8dcff; color: #e8dcff; }
+/* 季节块的背景红纹也压掉 */
+html.sp-deepecho .rs.rs--deepecho[data-season] {
+  --mint-400: #b79cff;
+  --mint-500: #8b6ae0;
+  --mint-600: #6f4fc4;
+  --mint-glow: #b79cff;
+  --mint-a10: rgba(157, 123, 255, .10);
+  --mint-a20: rgba(157, 123, 255, .22);
+  --mint-a35: rgba(157, 123, 255, .38);
+}
