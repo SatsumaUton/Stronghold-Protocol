@@ -1,0 +1,70 @@
+// test/render/theme-bond-contrast.test.js —— 主题模式下盟约图标必须「黑图标 + 白盘」。
+//
+// 现场（2026-11-20，玩家：用了可露希尔主题包后盟约图标看不清）：
+//   原版数据包 shared/assets/local/themes/*/prefabs.json 的 bondicon/bond_icon_view_item 子节点是
+//     bg_total   #A1A1A1CC（ac_n_initial）/ #535353CC（ac_s_closur）  半透明底板
+//     bg_actual  #FFFFFF                                             **白色圆盘**
+//     icon       #000000                                             **黑色图标**
+//   状态由 img_active / img_inactive 的**环**表达，不靠图标反色。
+//   而我们曾把 `.bond__core` 的主题环替换掉背景（box-shadow: none）丢掉白盘，并把激活图标
+//   `filter: brightness(0) invert(1)` 强制成纯白 —— 可露希尔的 bg_active 实测平均亮度 168/255、
+//   亮像素 65%（原版 119/255、0%），白图标压上去就糊。
+//
+// 这条测试同时盯住**数据包**（官方的颜色约定）和**我们的 CSS**（必须遵守它）。
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const SP = process.env.SP_ROOT || join(ROOT, '..');
+const THEMES = join(SP, 'shared/assets/local/themes');
+const CSS = join(ROOT, 'public/css/screens/game-reghud.css');
+
+/** 读某套主题的 bond_icon_view_item 子节点（name → image） */
+function bondItem(id) {
+  const p = join(THEMES, id, 'prefabs.json');
+  if (!existsSync(p)) return null;
+  const j = JSON.parse(readFileSync(p, 'utf8'));
+  const item = (j.prefabs || j)['bondicon/bond_icon_view_item'];
+  if (!item) return null;
+  const out = {};
+  const walk = (n) => {
+    if (!n) return;
+    if (n.image) out[n.name] = n.image;
+    for (const c of n.children || []) walk(c);
+  };
+  walk(item);
+  return out;
+}
+
+test('数据包：官方 prefab 是「白盘 + 黑图标」（原版与可露希尔一致）', () => {
+  for (const id of ['ac_n_initial', 'ac_s_closur']) {
+    const it = bondItem(id);
+    if (!it) { continue; }
+    assert.equal(String(it.bg_actual?.color).toUpperCase(), '#FFFFFF', `★ ${id}: bg_actual 应为白盘`);
+    assert.equal(String(it.icon?.color).toUpperCase(), '#000000', `★ ${id}: icon 应为黑图标`);
+    assert.ok(it.img_active?.sprite === 'bg_active', `${id}: 激活态由 bg_active 环表达`);
+    assert.ok(it.img_inactive?.sprite === 'bg_inactive', `${id}: 未激活态由 bg_inactive 环表达`);
+  }
+});
+
+test('CSS：pf 模式下保留白盘（主题环之下铺 #fff）', () => {
+  const css = readFileSync(CSS, 'utf8');
+  assert.match(css, /\.gm__bonds--pf \.bond__core \{[^}]*no-repeat #fff;/, '★ 未激活：环 + 白盘');
+  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__core \{[^}]*no-repeat #fff;/, '★ 激活：环 + 白盘');
+});
+
+test('CSS：pf 模式下图标不再反白（brightness(0) 变黑，两个状态都是）', () => {
+  const css = readFileSync(CSS, 'utf8');
+  assert.doesNotMatch(css, /\.gm__bonds--pf[^{]*\.bond__icon \{[^}]*invert\(1\)/, '★ 不能把图标 invert 成纯白');
+  assert.match(css, /\.gm__bonds--pf \.bond__icon \{ filter: brightness\(0\); \}/, '★ 未激活：黑');
+  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__icon \{ filter: brightness\(0\); \}/, '★ 激活：黑');
+});
+
+test('CSS：pf 模式下的文字字形也是深色（白盘上不能是白字）', () => {
+  const css = readFileSync(CSS, 'utf8');
+  assert.doesNotMatch(css, /\.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #fff/, '★ 不能是白字');
+  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #111; \}/, '深色字形');
+});
