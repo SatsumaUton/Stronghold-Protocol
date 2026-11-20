@@ -3435,5 +3435,9 @@
   "取消特质每回合叠层限制": "Remove per-round trait stacking limit",
   "打开后取消每回合叠层限制，干员特质每次触发都会叠加": "While on, the per-round stacking limit is lifted: every trigger of an operator trait stacks.",
   "历史最佳": "All-time best",
-  "排行榜版本": "Leaderboard version"
+  "排行榜版本": "Leaderboard version",
+  "取消叠层限制": "No stacking cap",
+  "更改深潜难度": "Change deep dive difficulty",
+  "选好难度后确认，房间里的所有人都会看到新的深潜难度。": "Pick a difficulty and confirm: everyone in the room sees the new deep dive difficulty.",
+  "确认后，其他人需要重新准备。": "Others must ready up again after you confirm."
 }

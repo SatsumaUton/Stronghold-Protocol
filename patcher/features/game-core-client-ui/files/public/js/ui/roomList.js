@@ -45,6 +45,7 @@ export function expSummary(exp) {
   if (e.disableDuckLord) bits.push(t('禁用鸭爵'));
   if (e.layerCapOff) bits.push(t('关闭层数上限'));
   if (e.hitLimitOff) bits.push(t('关闭命中上限'));
+  if (e.traitStackUnlimited) bits.push(t('取消叠层限制'));
   if (Number(e.enemyHp) > 1) bits.push(t('敌方生命 ×{n}', { n: e.enemyHp }));
   if (Number(e.enemyAtk) > 1) bits.push(t('敌方攻击 ×{n}', { n: e.enemyAtk }));
   if (Array.isArray(e.poolPlan) && e.poolPlan.length) bits.push(t('手动卡池'));
