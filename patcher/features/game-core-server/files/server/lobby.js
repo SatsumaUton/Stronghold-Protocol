@@ -1654,7 +1654,11 @@ case 'room.list': return this.roomList(msg);
     //   而 `DEFAULT_VERSION` 仍是 `act2autochess`。原来这里写 `askedVersion ?? this.defaultVersion()`，
     //   升级后 `defaultVersion()` 返回规程 → 下面那道检查直接把深潜房拒掉，
     //   玩家点「开始深潜」只会看到「只支持第二期下半」。深潜必须自己钉住基础版本。
-    const version = variant ? (askedVersion ?? DEFAULT_VERSION) : (askedVersion ?? this.defaultVersion());
+    // ★ 2026-11-20（维护者：在规程版本开深潜却提示第二期下半）：深潜的默认版本改成**跟着大厅默认版本走**，
+    //   前提是该版本支持深潜（shared/versions.js 的 echoVersionSupported）；不支持才退回 DEFAULT_VERSION。
+    //   以前这里永远钉 DEFAULT_VERSION —— 在规程大厅点「开始深潜」也只会建出第二期下半的房。
+    const echoDefault = echoVersionSupported(this.defaultVersion()) ? this.defaultVersion() : DEFAULT_VERSION;
+    const version = variant ? (askedVersion ?? echoDefault) : (askedVersion ?? this.defaultVersion());
     // ★ 2026-11-20（维护者：规程版本也要支持深渊回响）：允许的版本由 shared/versions.js 的 ECHO_VERSIONS 决定
     if (variant && !echoVersionSupported(version)) {
       return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'));
