@@ -1446,6 +1446,14 @@
    所以不需要复制一份 room.css，也不会漏掉某个角落。普通房间没有 .rs--deepecho，一点不受影响。
    注：确认本局信息 / 选策略 / 对局中 三屏不在这个节点下，它们由 theme.css 的 `html.sp-deepecho` 覆盖。 */
 .rs--deepecho {
+  /* ★ 2026-11-21（玩家：深潜房里还有一堆橙色）：房间的强调色是 --d-color: var(--amber)，
+     所以观战席/人数达标/悬停/立绘框/干员调配徽章都是橙的。这里把它们一并换成深渊紫；
+     难度胶囊自己带行内 --d-color（红/绿），不受影响。 */
+  --d-color: #b79cff;
+  --amber: #b79cff;
+  --amber-a20: rgba(183, 156, 255, .2);
+  --gold: #cbb2ff;
+  --gold-2: #b79cff;
   --mint-400: #b79cff;
   --mint-500: #8b6ae0;
   --mint-600: #6f4fc4;
