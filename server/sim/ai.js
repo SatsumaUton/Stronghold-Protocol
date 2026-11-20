@@ -570,9 +570,21 @@ function legFieldInfo(b, r, c, k) {
  * 离 (r, c) 最近的可行瓦片（按环逐圈扩大搜索，8 邻接优先）。
  * 用于 `out` 分支：敌人站在墙/虚空瓦片上时，先走回可走区域，而不是直线冲终点。
  */
-function nearestWalkable(b, r, c) {
+/**
+ * 离 (r, c) 最近的可行瓦片（按环逐圈扩大搜索，8 邻接优先）。
+ * 用于 `out` 分支：敌人站在墙/虚空瓦片上时，先走回可走区域，而不是直线冲终点。
+ *
+ * `maxRing` 默认 6（与历史行为一致）；传 Infinity 表示搜满整个棋盘 ——
+ * 见 planLeg 里「6 圈内找不到就吸附脱困」那段（深渊回响的深海常比 6 格大）。
+ *
+ * @param {any} b battle
+ * @param {number} r 行
+ * @param {number} c 列
+ * @param {number} [maxRing] 搜索半径（环形），默认 6
+ */
+function nearestWalkable(b, r, c, maxRing = 6) {
   const g = b.grid;
-  for (let d = 1; d <= 6; d++) {
+  for (let d = 1; d <= maxRing && d <= Math.max(g.rows, g.cols); d++) {
     let best = null;
     let bestD = Infinity;
     for (let dr = -d; dr <= d; dr++) {
@@ -650,16 +662,28 @@ function planLeg(b, e, leg) {
     const c0 = Math.round(e.x);
     const onWall = k < 0 ? false : !b.grid.walkable(r0, c0, true);
     if (onWall) {
+      // ★ 2026-11-20（玩家：深渊回响里出现无法移动的小怪）：脚下瓦片不可走是**非法状态**
+      //   （潮汐把瓦片变深海、被推挤、出生压墙）。历史行为：6 圈内找最近的可行瓦片、作为航点走过去；
+      //   6 圈内找不到就 `R.blocked = true` → 该敌人**永久不动**（深海/大片墙体经常比 6 格大）。
+      //   现在：6 圈内照旧（既有场景行为完全不变）；找不到时全盘找回并**吸附**过去再重规划 ——
+      //   不能让它「走过去」：移动是朝航点直线推进、中途不检查逐格可走，隔墙走就是穿墙。
       const nb = nearestWalkable(b, r0, c0);
-      if (!nb) {
-        R.pts = [];
-        R.blocked = true;
-        R.ptIdx = 0;
-        R.version = b.grid.version;
-        R.suffix = new Float64Array(0);
-        return;
+      if (nb) {
+        pts.push({ x: nb.c, y: nb.r });
+      } else {
+        const far = nearestWalkable(b, r0, c0, Infinity);
+        if (!far) {
+          R.pts = [];
+          R.blocked = true;
+          R.ptIdx = 0;
+          R.version = b.grid.version;
+          R.suffix = new Float64Array(0);
+          return;
+        }
+        e.x = far.c;
+        e.y = far.r;
+        return planLeg(b, e, leg);   // 一次性递归：脚下已可走，正常规划
       }
-      pts.push({ x: nb.c, y: nb.r });
     } else {
       const last = pts[pts.length - 1];
       if (!last || last.x !== leg.c || last.y !== leg.r) pts.push({ x: leg.c, y: leg.r });
