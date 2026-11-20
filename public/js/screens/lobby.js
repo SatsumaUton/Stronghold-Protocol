@@ -1258,11 +1258,17 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [codexOpen, setCodexOpen] = useState(false);
   const [best] = useState(() => echoReadBest());
   // ★ 2026-11-20（维护者：榜单按版本分）：深潜榜跟着大厅选中的版本走。
+    // ★ 2026-11-20（玩家：切过版本后两个榜都空）：榜是按**房间版本**写的，所以读也要房间优先；
+  //   只有还没进房（深潜大厅 / 大厅卡片）时才退回大厅偏好。
   const boardVersion = (() => {
     try {
+      const roomVer = store.getState?.().room?.version;
+      if (typeof roomVer === 'string' && roomVer) return roomVer;
       const v = globalThis.localStorage?.getItem('sp.pref.lobby.version');
       return typeof v === 'string' && v ? v : 'act2autochess';
-    } catch { return 'act2autochess'; }
+    } catch {
+      return 'act2autochess';
+    }
   })();
   useEffect(() => {
     let alive = true;
