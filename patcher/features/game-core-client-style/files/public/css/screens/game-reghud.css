@@ -272,6 +272,18 @@
    installed theme's bondColor overrides it (ui-theme.css) */
 .scard.scard--reg .scard__bond { display: flex; align-items: center; min-height: 0; gap: .03rem; font-size: .105rem; line-height: 1.05; white-space: nowrap; color: #B7B7B7; }
 .scard.scard--reg .scard__bond .bglyph { width: .13rem; height: .13rem; flex: none; }
+
+/* ★ 2026-11-20（玩家：可露希尔主题的商店池盟约看不清）：只作用于可露希尔。
+   解包数据 theme.json 的 colors：原版 bondColor #B7B7B7、乌萨斯 #EFEBDF，而可露希尔是 **{}**
+   （一个都没声明）→ 退回默认 #B7B7B7 浅灰。原版背景实测 37/255（91% 暗像素）读得出来，
+   可露希尔明显更亮（preview 平均 100/255、只有 57% 暗像素），浅灰字就没对比了。
+   这里只垫一层深色半透明底并把字提亮 —— 不新造主题色，任何卡面艺术下都读得出来。 */
+html[data-sp-theme="ac_s_closur"] .scard.scard--reg .scard__bonds {
+  padding: .006rem .05rem;
+  background: rgba(0, 0, 0, .55);
+  border-radius: .04rem;
+}
+html[data-sp-theme="ac_s_closur"] .scard.scard--reg .scard__bond { color: #E8EAE9; }
 .scard.scard--reg .scard__class { font-size: .11rem; }
 .scard.scard--reg .scard__prof { width: .14rem; height: .14rem; }
 .scard.scard--reg .scard__idesc { -webkit-line-clamp: 2; font-size: .11rem; }
