@@ -58,15 +58,18 @@ test('CSS：只在可露希尔（ac_s_closur）下铺白盘，其它主题不受
   assert.match(css, /\.gm__bonds--pf \.bond__core \{ background: var\(--pf-bond-off\) center \/ 129% 129% no-repeat; box-shadow: none; \}/, '全局 core 未改');
 });
 
-test('CSS：可露希尔下图标改黑，且按 36/58=62% 缩到官方尺寸', () => {
+test('CSS：可露希尔下图标按状态给 polarity，且按 36/58=62% 缩到官方尺寸', () => {
   const css = readFileSync(CSS, 'utf8');
-  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__icon,[\s\S]{0,200}filter: brightness\(0\);/, '★ 可露希尔：黑图标');
+  // 解包实测：bg_active 168/255（亮）→ 暗图标；bg_inactive 28/255（暗）→ 亮图标
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__icon \{ filter: brightness\(0\) invert\(\.88\); \}/, '★ 未点亮：亮图标（暗盘 28/255）');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond\.is-active \.bond__icon \{ filter: brightness\(0\); \}/, '★ 已点亮：暗图标（亮盘 168/255）');
   assert.match(css, /html\[data-sp-theme="ac_s_closur"\][\s\S]{0,400}width: 62%;/, '★ 可露希尔：62%（解包 icon 36/58）');
   // 其它主题仍是原来的反白（不许被这次改动波及）
   assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__icon \{ filter: brightness\(0\) invert\(1\); \}/, '★ 全局仍是原样');
 });
 
-test('CSS：可露希尔下文字字形也是深色（白盘上不能是白字）', () => {
+test('CSS：可露希尔的字形也分状态（未点亮浅色、已点亮深色）', () => {
   const css = readFileSync(CSS, 'utf8');
-  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__glyph,[\s\S]{0,160}color: #111;/, '可露希尔：深色字形');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__glyph \{ color: #e3e7e5; \}/, '未点亮：浅色字形（暗盘 28/255）');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #111; \}/, '已点亮：深色字形（亮盘 168/255）');
 });

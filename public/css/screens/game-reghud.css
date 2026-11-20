@@ -503,7 +503,11 @@ html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__icon,
 html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__icon {
   width: 62%;
   height: 62%;
-  filter: brightness(0);
 }
-html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__glyph,
+/* ★ 2026-11-20（玩家：可露希尔主题盟约颜色和背景很接近）：两个 state 的盘亮度差得很远，
+   必须分开给 polarity —— bg_active 平均 168/255（亮）→ 暗图标；bg_inactive 28/255（暗）→ 亮图标。
+   以前两个都写黑，在 28/255 的未点亮盘上就是黑压黑。 */
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__icon { filter: brightness(0) invert(.88); }
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__icon { filter: brightness(0); }
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__glyph { color: #e3e7e5; }
 html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__glyph { color: #111; }
