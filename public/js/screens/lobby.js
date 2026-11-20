@@ -1801,7 +1801,7 @@ export function LobbyScreen() {
     return run('quick', async () => {
       try {
         // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
-        const ask = () => net.request('room.quickMatch', { difficulty: d, seats, rules, ...(req?.variant === 'deepecho' ? { variant: 'deepecho' } : {}) });
+        const ask = () => net.request('room.quickMatch', { difficulty: d, seats, rules, version: lobbyVersion(), ...(req?.variant === 'deepecho' ? { variant: 'deepecho' } : {}) });
         let reply;
         try {
           reply = (await ask()) || {};

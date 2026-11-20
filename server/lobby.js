@@ -3027,7 +3027,7 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    *   参考版还有服务端队列与 30 秒确认入场，我们这边没有（见上面那段说明），
    *   所以这里只做「筛 + 自己开」，不做队列。
    */
-  quickMatch(session, { difficulty, seats, rules, variant } = {}) {
+  quickMatch(session, { difficulty, seats, rules, variant, version } = {}) {
     // 「深渊回响」（深潜）：自己的匹配池。深潜房只和深潜房配，普通房永远进不来（反之亦然）。
     const wantVariant = variant === 'deepecho' ? 'deepecho' : null;
     if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
@@ -3069,7 +3069,11 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     //    维护者 2026-11-02 明确要求：没人匹配时玩家就停在多人匹配界面等人，
     //    不要给他开一间房让他在房间里等 —— 那样看起来像「已经在房间里了」，
     //    而且他会看不到自己在所有节点里排第几位。
-    const queued = this.quickEnqueue(session, { difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental, variant: wantVariant });
+    // ★ 2026-11-21：把建房者大厅选的版本带进队列（房间默认版本 = 他所在大厅的版本）
+    const queued = this.quickEnqueue(session, {
+      difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental, variant: wantVariant,
+      version: typeof version === 'string' && version ? version : null,
+    });
     // 排队失败（游客 / 维护开关）要原样返回，不能套进 reply，否则前端只看得到 ok:true
     if (queued && queued.error) return queued;
     return { ok: true, reply: queued };
@@ -3084,7 +3088,7 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    * 不能再让一个人无限等下去）。成形后由第一个人当房主建房，其余人加入，然后**立刻开局**
    * （`forceStartMatchmaking`），这样玩家点完确认就直接进对局，不用再在房间里点开始。
    */
-  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental, variant = null }) {
+  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental, variant = null, version = null }) {
     // 以前靠 create() 顺带拒绝游客；现在没人匹配时不再建房，所以这里要自己拦一道，
     // 否则游客会排进队列、等 2 分钟超时才发现开不了局。
     //
@@ -3107,6 +3111,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       rules: rules ?? null,
       // 「深渊回响」（深潜）：池键多一维，深潜与普通同盟不混坐
       variant: variant === 'deepecho' ? 'deepecho' : null,
+      // ★ 2026-11-21：建房者大厅选的版本（建房时作为 askedVersion 用）
+      version: typeof version === 'string' && version ? version : null,
       // 池键：难度 + 人数 + 规则。'standard' / 'experimental' 不能混坐（规则不一样打不了）。
       capacity,
       standard: !wantExperimental,
@@ -3201,7 +3207,7 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     const experimental = wantCapacity
       ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity })
       : (host.standard ? null : experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, revivalEnabled: true }));
-    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental, variant: host.variant || null });
+    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental, variant: host.variant || null, ...(host.version ? { version: host.version } : {}) });
     if (made && made.error) {
       // 建房失败（维护开关关掉了建房、账号冲突……）：**把这一组放掉**，不要留在队列里
       // 每秒重试 —— 那只会刷日志，而玩家永远等不到房间。用 quickDone 告诉前端原因。
