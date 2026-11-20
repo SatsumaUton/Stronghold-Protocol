@@ -617,8 +617,8 @@ test('official versions (DESIGN §35.23): the cards of the version shown, the wa
   assert.equal(byId(failed, 'proto-loading').length, 0, 'no spinner');
   assert.ok(byClass(failed, 'diff-card').every((c) => c.props.disabled === true));
   // the lobby: the version only on a server that enables versions; the shown difficulty (the fallback) is the one sent
-  // — create() resolves it into `difficulty` (深潜 rooms leave the version off: the server pins them to the default)
-  assert.match(lobbySrc, /mode, difficulty, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(!variant && versions \? \{ version \} : \{\}\),[^\n]*\n\s+\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),/);
+  // — create() resolves it into `difficulty` (深潜房也带 version（服务端用 ECHO_VERSIONS 白名单校验）)
+  assert.match(lobbySrc, /mode, difficulty, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\),[\s\S]{0,240}?\.\.\.\(versions \? \{ version \} : \{\}\)/);
   assert.match(lobbySrc, /: \(mode === 'solo' \? shownSolo : shownCoop\);/);
   assert.match(lobbySrc, /const shownSolo = fallbackDifficulty\(solo, difficulty\);/);
   assert.match(lobbySrc, /const pickDifficulty = \(d\) => \{ setDifficulty\(d\); savePref\('lobby\.difficulty', d\); \};/, 'the pref changes only on a pick');
