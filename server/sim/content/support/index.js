@@ -423,7 +423,10 @@ export function gainLayers(battle, { playerId, bonds, n, requireActive = true, s
   const k0 = Math.floor(num(n, 0));
   if (!(k0 > 0)) return 0;
   const list = Array.isArray(bonds) ? bonds : [bonds];
-  const caps = capKey != null && Number.isFinite(cap) ? battleStore(battle, 'support:layerCaps', () => new Map()) : null;
+  // ★ 2026-11-20（维护者：所有被限制的都取消）：实验开关打开时不设「每场作战层数上限」——
+  //   伺夜「前 3 次击倒」、塑心「每场至多 10 层」这类都走 cap/capKey，这里统一放行。
+  const noCap = !!(battle.flags && battle.flags.traitStackUnlimited === true);
+  const caps = !noCap && capKey != null && Number.isFinite(cap) ? battleStore(battle, 'support:layerCaps', () => new Map()) : null;
   let total = 0;
   for (const b of list) {
     if (typeof b !== 'string' || !b) continue;

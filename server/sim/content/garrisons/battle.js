@@ -291,7 +291,9 @@ export function fireGain(battle, it) {
   // bond_actived_maxstack (塑心 garrison_90 "当前已激活且层数最多的盟约层数+1（每场作战至多10层）"): the cap is the instance's
   // own over the battle, whichever bond is the highest at each gain — per (instance, bond) a change of the highest bond
   // granted a fresh 10 (PR #178 review). The base amount counts toward it (魔王's extra does not, as in gainLayers).
-  const whole = it.bbStr.bond_type === 'bond_actived_maxstack' && Number.isFinite(it.cap);
+  // ★ 2026-11-20：实验开关打开时，整场上限同样取消。
+  const noCap = !!(battle.flags && battle.flags.traitStackUnlimited === true);
+  const whole = !noCap && it.bbStr.bond_type === 'bond_actived_maxstack' && Number.isFinite(it.cap);
   if (whole) {
     n = Math.min(Math.floor(n), Math.max(0, Math.floor(it.cap) - (it.wholeUsed ?? 0)));
     if (!(n > 0)) return 0;
