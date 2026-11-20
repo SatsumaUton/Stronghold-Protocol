@@ -1654,9 +1654,11 @@ case 'room.list': return this.roomList(msg);
     //   而 `DEFAULT_VERSION` 仍是 `act2autochess`。原来这里写 `askedVersion ?? this.defaultVersion()`，
     //   升级后 `defaultVersion()` 返回规程 → 下面那道检查直接把深潜房拒掉，
     //   玩家点「开始深潜」只会看到「只支持第二期下半」。深潜必须自己钉住基础版本。
-    // ★ 2026-11-20：深潜房**默认仍钉第二期下半**（维护者：改跟大厅版本后，房间界面变成了规程配色，
-    //   玩家看不到原来的深渊紫）。想玩规程深潜仍可在房间内用「版本」行手动切换（服务端已放行）。
-    const version = variant ? (askedVersion ?? DEFAULT_VERSION) : (askedVersion ?? this.defaultVersion());
+    // ★ 2026-11-20（维护者：深渊房要跟大厅版本，同时保持深渊紫）：默认版本跟着大厅默认版本走，
+    //   前提是该版本支持深潜（shared/versions.js 的 echoVersionSupported）；不支持才退回 DEFAULT_VERSION。
+    //   房间配色与版本无关（见 room.css 的 .rs--deepecho），所以规程深潜房依然是紫的。
+    const echoDefault = echoVersionSupported(this.defaultVersion()) ? this.defaultVersion() : DEFAULT_VERSION;
+    const version = variant ? (askedVersion ?? echoDefault) : (askedVersion ?? this.defaultVersion());
     // ★ 2026-11-20（维护者：规程版本也要支持深渊回响）：允许的版本由 shared/versions.js 的 ECHO_VERSIONS 决定
     if (variant && !echoVersionSupported(version)) {
       return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'));
