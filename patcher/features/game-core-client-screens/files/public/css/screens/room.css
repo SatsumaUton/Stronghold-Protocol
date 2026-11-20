@@ -1462,6 +1462,20 @@
   background: linear-gradient(180deg, #9b7cf0, #6a49c4);
   color: #f6f1ff;
 }
+/* ★ 2026-11-21（玩家：深渊房的大按钮还是规程配色）：base 用的是 --mint-s6 / --mint-s12，
+   深渊房只覆盖了 --mint-*，而且原覆盖同特异性会被压掉。这里用页面级选择器（提高特异性，不使用强制优先级）兜住：
+   只要页面是深渊回响（html.sp-deepecho），房间里的 .proto-start 一律紫色。 */
+html.sp-deepecho .rs .proto-start,
+html.sp-deepecho .rs .proto-start.rs-go {
+  background-image: none;
+  background: linear-gradient(180deg, #9b7cf0, #6a49c4);
+  border-color: #121313;
+  color: #f6f1ff;
+}
+html.sp-deepecho .rs .proto-start__label { color: #f6f1ff; }
+html.sp-deepecho .rs .proto-start__mark { color: rgba(246, 241, 255, .72); }
+html.sp-deepecho .rs .proto-start:hover:not(:disabled) { filter: brightness(1.08); }
+html.sp-deepecho .rs .rs-go.is-ready { background: linear-gradient(180deg, #b8a2ff, #8b6ae0); color: #17092b; }
 .rs--deepecho .proto-start__label { color: #f6f1ff; }
 .rs--deepecho .proto-start__mark { color: rgba(246, 241, 255, .72); }
 .rs--deepecho .proto-start__deco { opacity: .5; }
