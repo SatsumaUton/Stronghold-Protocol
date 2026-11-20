@@ -76,10 +76,12 @@ test('diveWords：两个分支都写在 t(…) 字面量里（三元里的字符
   assert.ok((code.match(/'[^']*深潜[^']*'/g) || []).length >= 15, '深潜分支的字面量要够');
 });
 
-test('房间页：深潜房没有版本胶囊、也没有版本切换入口', () => {
+test('房间页：深潜房有版本入口，但只列支持的版本（第二期下半 / 规程·序列Ⅰ）', () => {
   const src = read('public/js/screens/room.js');
-  assert.match(src, /const showVersion = !echoRoom && \(Array\.isArray\(versions\) \|\| curVersion !== DEFAULT_VERSION\);/, '深潜房不显示版本');
-  assert.match(src, /\$\{echoRoom \? null : html`<\$\{VersionTag\} room=\$\{room\} class="rs-clock__ver" \/>`\}/, '版本胶囊包在 echoRoom 之外');
+  // ★ 2026-11-20（维护者：深渊回响要能切版本）：胶囊/入口不再对深潜隐藏
+  assert.match(src, /const showVersion = Array\.isArray\(versions\) \|\| curVersion !== DEFAULT_VERSION;/, '深潜房也显示版本');
+  // ★ 选择器只列允许表里的版本，其余版本按钮不出现
+  assert.match(src, /versions=\$\{\(echoRoom \? \(versions \|\| \[\]\)\.filter\(\(v\) => ECHO_VERSIONS\.includes\(v\.id\)\) : versions\)/, '深潜房只列 ECHO_VERSIONS');
 });
 
 test('服务端：深潜房不能切版本（建房拒、进房后 proposeVersion 也要拒）', () => {

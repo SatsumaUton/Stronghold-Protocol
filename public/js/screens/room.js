@@ -1370,7 +1370,7 @@ export function RoomScreen() {
   // （维护者 2026-11-08：VersionTag 在深潜房里要不要显示 → 不显示）。
   const vote = versionVoteOf(room);
   const curVersion = roomVersion(room);
-  const showVersion = !echoRoom && (Array.isArray(versions) || curVersion !== DEFAULT_VERSION);
+  const showVersion = Array.isArray(versions) || curVersion !== DEFAULT_VERSION;
   const versionWhy = !online ? t('连接中断，请稍候重试')
     : vote ? t('切换版本投票进行中，请等投票结束')
     : !Array.isArray(versions) || versions.length < 2 ? t('本服务器只启用了这一个版本') : null;
