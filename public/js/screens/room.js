@@ -1399,7 +1399,9 @@ export function RoomScreen() {
   };
 
   // the room wears its version's season look like the lobby (规程: data-season="act3autochess", room.css)
-  return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}${room.variant === 'deepecho' ? ' rs--deepecho' : ''}`} data-season=${seasonOf(roomVersion(room))} style=${`--d-color:${room.modeId ? info.color : DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; --n:${facts.seats.length}`}>
+// ★ 2026-11-21（玩家：深潜房整片变成规程配色）：深潜房**不写行内 --d-color** ——
+//   行内值优先级最高，CSS 里怎么覆盖都没用（原来写的是规程红 #ff0024），交给 .rs--deepecho 决定。
+  return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}${room.variant === 'deepecho' ? ' rs--deepecho' : ''}`} data-season=${seasonOf(roomVersion(room))} style=${`${room.variant === 'deepecho' ? '' : `--d-color:${room.modeId ? info.color : DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; `}--n:${facts.seats.length}`}>
     <div class="rs__bg" aria-hidden="true"></div>
     <header class="topbar rs-top">
       <div class="topbar__left rs-top__left">

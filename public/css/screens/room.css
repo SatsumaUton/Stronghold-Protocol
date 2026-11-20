@@ -1445,7 +1445,10 @@
    房间里所有用 var(--mint-*) 的元素（顶栏、按钮、选中态、就绪点、分隔线……）自动跟着变，
    所以不需要复制一份 room.css，也不会漏掉某个角落。普通房间没有 .rs--deepecho，一点不受影响。
    注：确认本局信息 / 选策略 / 对局中 三屏不在这个节点下，它们由 theme.css 的 `html.sp-deepecho` 覆盖。 */
-.rs--deepecho {
+/* ★ 2026-11-21（DevTools 证据）：版本季节会把房间的 --mint-* 整套换成规程红 ——
+   `.rs[data-season="act3autochess"]`(0,2,0) 压过 html.sp-deepecho(0,1,1)。
+   这里用 html.sp-deepecho .rs.rs--deepecho（0,3,1）把深潜配色提到最高。 */
+html.sp-deepecho .rs.rs--deepecho {
   /* ★ 2026-11-21（玩家：深潜房里还有一堆橙色）：房间的强调色是 --d-color: var(--amber)，
      所以观战席/人数达标/悬停/立绘框/干员调配徽章都是橙的。这里把它们一并换成深渊紫；
      难度胶囊自己带行内 --d-color（红/绿），不受影响。 */
