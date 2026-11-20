@@ -384,7 +384,13 @@
 .brief--reg .reg-factions .brief-faction__text { grid-column: 2; min-width: 0; text-align: center; }
 .brief--reg .reg-factions .brief-faction__text b { font-size: calc(.16 * var(--t)); overflow-wrap: anywhere; }
 .brief--reg .reg-loadout { width: 100%; min-width: 0; }
-.brief--reg .reg-ready { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: .06rem; min-width: 0; }
+/* ★ 2026-11-21（玩家：隐藏怪物信息后这几个组件位置不对）：右列是 flex column，
+   MatchEnemies 不渲染时下面三块整体上移、和底边对不齐。用 margin-top:auto 把
+   「已就绪 + 准备就绪」始终压在列底，干员调配紧贴其上方 —— 与是否有敌情无关。 */
+.brief--reg .reg-ready {
+  flex: none; display: flex; flex-direction: column; align-items: stretch; gap: .06rem; min-width: 0;
+  margin-top: auto;
+}
 .brief--reg .reg-ready .brief-ready { max-width: 100%; }
 .brief--reg .reg-ready .brief-ready__txt { flex-wrap: wrap; justify-content: center; font-size: calc(.18 * var(--t)); }
 .brief--reg .reg-ready .brief-ready__txt b { font-size: calc(.32 * var(--t)); }
