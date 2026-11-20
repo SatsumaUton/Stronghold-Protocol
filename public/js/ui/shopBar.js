@@ -173,7 +173,11 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
   //   盟约原来用写死的 #B7B7B7，在可露希尔的白底卡面上没有对比。
   //   这里沿用卡面自己的名字色（face.name.color），图标也同色（maskGlyph）。
   //   注意：htm 模板里**不能内联对象字面量**（`${…{…}…}` 会被第一个 } 截断），所以先算成变量。
-  const bondStyle = face?.bonds || (face?.name?.color ? { color: face.name.color } : null);
+  // 几何用 prefab 的 bond_list 盒子（face.bonds），**颜色**用官方卡面文字色（char_name.color）：
+  // 原版 #FFFFFF / 乌萨斯 #EFEBDF / 可露希尔 #000000。以前 face.bonds 存在会短路掉颜色，
+  // 退回 CSS 的 #B7B7B7 —— 在可露希尔的白卡上就与背景相近。
+  const bondInk = face?.name?.color || null;
+  const bondStyle = face ? { ...(face.bonds || null), ...(bondInk ? { color: bondInk } : null) } : null;
   const tierView = regCardTierView(face, facePack, still);
   const disabled = !!reason;
   const lo = si ? standInLoadout(si, LOOKUPS.getChess, data.get('backups')) : c ? chessLoadout(c, priv?.loadout, dr ? diyGetter(LOOKUPS.getChess, priv, diyData) : LOOKUPS.getChess, { ops: priv?.ops ?? null, effects: data.get('effects') }) : null;

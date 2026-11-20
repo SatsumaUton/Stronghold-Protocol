@@ -466,8 +466,21 @@ export function regShopCardFaceModel(pack, opts = {}) {
     } : null,
     // the box AND its layout group: the rows stack from the bottom-left (LowerLeft), not from the top; the rows' own inset
     // from the card edge (BOND_ROW_INSET) keeps the icons inside the frame
-    bonds: bonds && { ...boxCss(bonds, card), ...layoutGroupCss(bonds.node?.layout),
-      paddingLeft: `${Math.max(BOND_ROW_INSET, Number(bonds.node?.layout?.pad?.[0]) || 0) / 100}rem` },
+    // ★ 2026-11-20（玩家：盟约与干员名字重叠）：boxCss 给的是 top + height 百分比，把 height 改成 auto
+    //   之后盒子会**向下**生长，压到下面的名字栏。这里改成**底边锚定**（bottom 固定、top: auto），
+    //   高度向上生长，行数变多也不会盖住名字。
+    bonds: bonds && (() => {
+      const box = boxCss(bonds, card) || {};
+      const top = parseFloat(box.top) || 0;
+      const height = parseFloat(box.height) || 0;
+      return {
+        ...box,
+        top: 'auto',
+        bottom: `${Number((100 - top - height).toFixed(4))}%`,
+        ...layoutGroupCss(bonds.node?.layout),
+        paddingLeft: `${Math.max(BOND_ROW_INSET, Number(bonds.node?.layout?.pad?.[0]) || 0) / 100}rem`,
+      };
+    })(),
     item,
     layers,
     backing,

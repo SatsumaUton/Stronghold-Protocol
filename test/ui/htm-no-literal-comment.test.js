@@ -45,7 +45,7 @@ test('public/js 里没有「缺少 $ 的 {/* … */}」字面注释（htm 会把
 
 test('shopBar.js 的盟约行用 precomputed 的 bondStyle（不内联对象字面量）', () => {
   const src = readFileSync(join(JS, 'ui/shopBar.js'), 'utf8');
-  assert.match(src, /const bondStyle = face\?\.bonds \|\|/, '★ 先算 bondStyle');
+  assert.match(src, /const bondStyle = face \? \{/, '★ 先算 bondStyle（合并 prefab 几何与官方文字色）');
   assert.match(src, /\$\{regBondLine\(bonds, offBonds, bondStyle, true\)\}/, '★ 模板里只插变量');
   assert.doesNotMatch(src, /\$\{face\?\.bonds\s*\n/, '不再内联三元 + 对象字面量');
 });

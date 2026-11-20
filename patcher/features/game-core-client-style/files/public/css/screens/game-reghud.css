@@ -284,7 +284,14 @@
 }
 /* a bond's name and icon share one colour: 卫戍协议终端's bondColor #B7B7B7 by default (the 规程 look is that theme); an
    installed theme's bondColor overrides it (ui-theme.css) */
-.scard.scard--reg .scard__bond { display: flex; align-items: center; min-height: 0; gap: .03rem; font-size: max(.105rem, 10px); line-height: 1.25; white-space: nowrap; color: #B7B7B7; }
+/* 盟约的图标与名字同色（官方约定）。颜色来自 prefab 的 char_name.color（每套主题不同：
+   原版 #FFFFFF / 乌萨斯 #EFEBDF / 可露希尔 #000000），由 ui/shopBar.js 以行内 style 传入；
+   #B7B7B7 只是拿不到 face 模型时的兜底。 */
+.scard.scard--reg .scard__bond {
+  display: flex; align-items: center; min-height: 0; gap: .03rem;
+  font-size: max(.105rem, 10px); line-height: 1.25; white-space: nowrap;
+  color: #B7B7B7;
+}
 .scard.scard--reg .scard__bond .bglyph { width: max(.13rem, 10px); height: max(.13rem, 10px); flex: none; }
 
 .scard.scard--reg .scard__class { font-size: max(.11rem, 10px); }
