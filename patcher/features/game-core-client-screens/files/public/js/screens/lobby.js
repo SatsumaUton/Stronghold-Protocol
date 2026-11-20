@@ -605,7 +605,7 @@ export function pickCardFit(overflows) {
  * whenever a font finishes loading (a web font that arrives late — after a resize, say — makes the lines taller). A level
  * only changes what the cards show, never the list's box, so measuring cannot loop.
  */
-function ProtoFit() {
+export function ProtoFit() {
   const ref = useRef(null);
   const fit = () => {
     const body = ref.current?.closest('.proto__body');
@@ -818,7 +818,7 @@ function HubTitle({ season = null }) {
 const PROTOCOL_ART = { FUNNY: 'funny', NORMAL: 'normal', HARD: 'hard', ABYSS: 'abyss' };
 
 /** The selected difficulty's scene (ui/protocolScene.js): the official picture on the drawn grid, squares and cable. */
-function ProtocolArt({ difficulty, season = null }) {
+export function ProtocolArt({ difficulty, season = null }) {
   useData('assets', 'local');
   // 规程: its season key art (the 乌萨斯 monument) where 盟约 shows Rhodes Island's 选择模拟协议 picture, when extracted
   const reg = season === REGULATION ? localAsset(REGULATION_ART, 'bg_season_on') : null;
@@ -827,7 +827,7 @@ function ProtocolArt({ difficulty, season = null }) {
 }
 
 /** The ‹ + dotted rook plate at the top left of the full-screen dialogs: back to the hub (or the dialog below). */
-function BackPlate({ onClick, class: cls = '' }) {
+export function BackPlate({ onClick, class: cls = '' }) {
   return html`<button type="button" class=${`proto-back ${cls}`} onClick=${onClick} title=${t('返回')} aria-label=${t('返回')}>
     <${Icon} name="chevronLeft" /><span class="proto-back__home"><${Icon} name="rook" /></span>
   </button>`;

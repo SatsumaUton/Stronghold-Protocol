@@ -75,7 +75,7 @@ import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
-import { difficultyInfo, modeInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES, EchoDifficultyCard } from './lobby.js';
+import { difficultyInfo, modeInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES, EchoDifficultyCard, ProtoFit, ProtocolArt, BackPlate } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
 // 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
@@ -1528,10 +1528,9 @@ export function RoomScreen() {
         data-season=${seasonOf(roomVersion(room))}
         style=${`--d-color:${DIFFICULTY_COLORS[echoDiffPick || room.difficulty] || 'var(--amber)'}`}>
         <div class="proto__bg" aria-hidden="true"></div>
+        <${ProtoFit} />
         <header class="proto-top">
-          <button type="button" class="proto__back" aria-label=${t('返回')} onClick=${() => setEchoDiffOpen(false)}>
-            <${Icon} name="exit" />
-          </button>
+          <${BackPlate} onClick=${() => setEchoDiffOpen(false)} class="proto__back" />
           <div class="proto-title">
             <h2 class="modal__title">${t('深潜难度')}</h2>
             <span class="proto-title__mode"><${Icon} name="book" />${t('深渊回响')}<i>DEEP DIVE</i></span>
@@ -1539,6 +1538,9 @@ export function RoomScreen() {
         </header>
         <div class="proto-body">
           <section class="proto-stage">
+            <div key=${echoDiffPick || room.difficulty} class="proto__pic">
+              <${ProtocolArt} difficulty=${echoDiffPick || room.difficulty} season=${seasonOf(roomVersion(room))} />
+            </div>
             <div class="proto-brief">
               <b class="proto-brief__name">DE-${DEEP_ECHO_DIFFICULTIES.indexOf(echoDiffPick || room.difficulty) + 1} · ${t(DIFFICULTY_NAMES[echoDiffPick || room.difficulty] || (echoDiffPick || room.difficulty))}</b>
               <p>${t('选好难度后确认，房间里的所有人都会看到新的深潜难度。')}</p>
