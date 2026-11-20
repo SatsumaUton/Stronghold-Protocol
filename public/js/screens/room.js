@@ -933,6 +933,7 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
       <span class="rs-opts__k">${echoRoom ? t('深潜难度') : t('模拟难度')}</span>
       ${room?.variant === 'deepecho' && isHost && onSetDifficulty ? html`<select class="rs-opts__diff" disabled=${!!busy}
+        style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
           title=${t('深渊回响难度（DE-1 / DE-2 / DE-3）')}
           onChange=${(e) => onSetDifficulty(e.target.value)}>
         ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d}>
