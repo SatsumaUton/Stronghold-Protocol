@@ -932,13 +932,11 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     <h4>${title}</h4>
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
       <span class="rs-opts__k">${echoRoom ? t('深潜难度') : t('模拟难度')}</span>
-      ${room?.variant === 'deepecho' && isHost && onSetDifficulty ? html`<select class="rs-opts__diff" disabled=${!!busy}
+      ${room?.variant === 'deepecho' && isHost && onDifficulty ? html`<button type="button" class="rs-opts__diff"
         style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
-          title=${t('深渊回响难度（DE-1 / DE-2 / DE-3）')}
-          onChange=${(e) => onSetDifficulty(e.target.value)}>
-        ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d} style=${`color:${DIFFICULTY_COLORS[d] || 'var(--amber)'}`}>
-          DE-${i + 1} · ${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</option>`)}
-      </select>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
+        disabled=${isHost && !!busy} onClick=${() => { onDifficulty(); }}>
+        DE-${DEEP_ECHO_DIFFICULTIES.indexOf(room.difficulty) + 1} · ${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty}
+      </button>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
           title=${isHost ? t(echoRoom ? '更改深潜难度' : '更改模拟难度') : t('由创建者选择')}>
         <${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span>
         ${isHost ? html`<em>${t('更改')}</em>` : null}
@@ -1354,7 +1352,10 @@ export function RoomScreen() {
   };
   // the difficulties the room's version offers (its config's modes, versions.js) — the page shows that version's data
   // once it is loaded; until then (or for a gameplay plugin room's own modes) all four
-  const protoDifficulties = offeredDifficulties(pageVersion() === roomVersion(room) ? getConfig() : null, room.mode);
+  // ★ 2026-11-21（维护者：深潜难度要和同盟一样弹选择界面）：深潜只有三档，直接给协议选择器这三档。
+  const protoDifficulties = echoRoom
+    ? DEEP_ECHO_DIFFICULTIES
+    : offeredDifficulties(pageVersion() === roomVersion(room) ? getConfig() : null, room.mode);
   const protoHint = pluginMode
     ? t('确认后将退出插件模式「{name}」', { name: pluginMode })
     : facts.humans.length > 1 ? t('更改难度后，其他博士需要重新准备就绪') : '';
@@ -1480,8 +1481,8 @@ export function RoomScreen() {
         <div class="rs-pill">
             <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
             style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
-              onClick=${echoRoom ? (facts.isHost ? () => setOpts(true) : () => {}) : openProto}
-              title=${echoRoom ? t('深渊回响难度（DE-1 / DE-2 / DE-3）：在深潜设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${room.modeId ? info.name : DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
+              onClick=${facts.isHost ? openProto : () => {}}
+              title=${facts.isHost ? (echoRoom ? t('更改深潜难度') : t('更改模拟难度')) : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${room.modeId ? info.name : DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')} aria-label=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')}
