@@ -461,20 +461,32 @@
 .pf__spine canvas { display: block; }
 
 /* 规程 bond discs with the pack's own rings (bondicon/bond_icon_view_item: bg_active / bg_inactive, 75 units on the
-   58-unit disc); the glyph is the pack's own #000000 on the white bg_actual disc — the state reads from the ring */
-.gm__bonds--pf .bond__core {
-  /* 主题环在最上层，其下铺白盘（border-radius:50% 裁成圆）—— 原版 prefab 的 bg_actual #FFFFFF */
-  background: var(--pf-bond-off) center / 129% 129% no-repeat #fff;
-  box-shadow: none;
+   58-unit disc); the active glyph is light on the pack's disc, as the theme previews show.
+   （可露希尔的亮盘上这样看不清，所以下面另有一段只针对 ac_s_closur 的覆盖 —— 见那里的说明） */
+.gm__bonds--pf .bond__core { background: var(--pf-bond-off) center / 129% 129% no-repeat; box-shadow: none; }
+.gm__bonds--pf .bond.is-active .bond__core { background: var(--pf-bond-on) center / 129% 129% no-repeat; box-shadow: none; }
+.gm__bonds--pf .bond.is-active .bond__icon { filter: brightness(0) invert(1); }
+.gm__bonds--pf .bond.is-active .bond__glyph { color: #fff; }
+
+/* ★ 2026-11-20（玩家：可露希尔主题下盟约图标看不清）：**只针对可露希尔**（维护者要求）。
+   解包数据（shared/assets/local/themes/ac_s_closur/prefabs.json 的 bondicon/bond_icon_view_item）：
+     圆盘 root 58×58；bg_actual 75×75 #FFFFFF（白盘）；icon 36×36 #000000（黑图标）；
+     img_active/inactive 75×75（主题圆盘，实测 bg_active 平均亮度 168/255、亮像素 65%，
+     原版 ac_n_initial 只有 119/255、0%）。
+   所以只在可露希尔下：铺白盘 + 图标改黑、按 36/58 = 62% 缩到官方尺寸。
+   其它主题（含原版、乌萨斯）保持原样，不受影响。 */
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__core,
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__core {
+  background-position: center;
+  background-size: 129% 129%;
+  background-repeat: no-repeat;
+  background-color: #fff;
 }
-.gm__bonds--pf .bond.is-active .bond__core {
-  background: var(--pf-bond-on) center / 129% 129% no-repeat #fff;
-  box-shadow: none;
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__icon,
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__icon {
+  width: 62%;
+  height: 62%;
+  filter: brightness(0);
 }
-/* ★ 2026-11-20（玩家：可露希尔主题下盟约图标看不清）：原版 prefab 的 icon 是 #000000，
-   状态由 bg_active/bg_inactive 的环表达，不靠图标反色。以前这里强制 invert 成纯白，
-   而可露希尔的 bg_active 平均亮度 168/255、亮像素 65%（原版 119/255、0%）→ 白图标糊在亮环上。 */
-.gm__bonds--pf .bond__icon { filter: brightness(0); }
-.gm__bonds--pf .bond.is-active .bond__icon { filter: brightness(0); }
-.gm__bonds--pf .bond__glyph { color: #111; }
-.gm__bonds--pf .bond.is-active .bond__glyph { color: #111; }
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond__glyph,
+html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__glyph { color: #111; }

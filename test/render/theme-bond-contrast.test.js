@@ -50,21 +50,23 @@ test('数据包：官方 prefab 是「白盘 + 黑图标」（原版与可露希
   }
 });
 
-test('CSS：pf 模式下保留白盘（主题环之下铺 #fff）', () => {
+test('CSS：只在可露希尔（ac_s_closur）下铺白盘，其它主题不受影响', () => {
   const css = readFileSync(CSS, 'utf8');
-  assert.match(css, /\.gm__bonds--pf \.bond__core \{[^}]*no-repeat #fff;/, '★ 未激活：环 + 白盘');
-  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__core \{[^}]*no-repeat #fff;/, '★ 激活：环 + 白盘');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__core,/, '★ 选择器限定到可露希尔');
+  assert.match(css, /background-color: #fff;/, '★ 可露希尔下铺白盘（解包 bg_actual #FFFFFF）');
+  // 全局规则保持原样（其它主题仍是环 + invert 白图标）
+  assert.match(css, /\.gm__bonds--pf \.bond__core \{ background: var\(--pf-bond-off\) center \/ 129% 129% no-repeat; box-shadow: none; \}/, '全局 core 未改');
 });
 
-test('CSS：pf 模式下图标不再反白（brightness(0) 变黑，两个状态都是）', () => {
+test('CSS：可露希尔下图标改黑，且按 36/58=62% 缩到官方尺寸', () => {
   const css = readFileSync(CSS, 'utf8');
-  assert.doesNotMatch(css, /\.gm__bonds--pf[^{]*\.bond__icon \{[^}]*invert\(1\)/, '★ 不能把图标 invert 成纯白');
-  assert.match(css, /\.gm__bonds--pf \.bond__icon \{ filter: brightness\(0\); \}/, '★ 未激活：黑');
-  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__icon \{ filter: brightness\(0\); \}/, '★ 激活：黑');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__icon,[\s\S]{0,200}filter: brightness\(0\);/, '★ 可露希尔：黑图标');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\][\s\S]{0,400}width: 62%;/, '★ 可露希尔：62%（解包 icon 36/58）');
+  // 其它主题仍是原来的反白（不许被这次改动波及）
+  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__icon \{ filter: brightness\(0\) invert\(1\); \}/, '★ 全局仍是原样');
 });
 
-test('CSS：pf 模式下的文字字形也是深色（白盘上不能是白字）', () => {
+test('CSS：可露希尔下文字字形也是深色（白盘上不能是白字）', () => {
   const css = readFileSync(CSS, 'utf8');
-  assert.doesNotMatch(css, /\.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #fff/, '★ 不能是白字');
-  assert.match(css, /\.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #111; \}/, '深色字形');
+  assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__glyph,[\s\S]{0,160}color: #111;/, '可露希尔：深色字形');
 });

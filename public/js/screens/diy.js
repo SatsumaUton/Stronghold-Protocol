@@ -56,7 +56,7 @@ function KindTag({ proto }) {
 
 /** Bond chips (the bonds derived from the operator's factions; 协防 when none matches). */
 function Bonds({ bonds }) {
-  return html`<span class="diy-bonds">${(bonds || []).map((b) => html`<span key=${b} class="diy-bond"><${BondGlyph} bondId=${b} /><span>${bondName(b)}</span></span>`)}</span>`;
+  return html`<span class="diy-bonds">${(bonds || []).map((b) => html`<span key=${b} class="diy-bond"><${BondGlyph} bondId=${b} mask /><span>${bondName(b)}</span></span>`)}</span>`;
 }
 
 /** One slot: the pick (operator, class, bonds, skill, module, an owned pick's 潜能 / 练度) or an empty slot to fill. */

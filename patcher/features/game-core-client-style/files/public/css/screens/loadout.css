@@ -496,7 +496,15 @@
 .diy-tag--proto { color: var(--ice-900); background: var(--ice); }
 .diy-tag--own { color: var(--text-on-mint); background: var(--mint-500); }
 .diy-bonds { display: flex; flex-wrap: wrap; gap: .03rem .06rem; }
-.diy-bond { display: inline-flex; align-items: center; gap: .03rem; font-size: max(calc(.12 * var(--t)), 9px); color: var(--text-md); }
+.diy-bond {
+  display: inline-flex; align-items: center; gap: .03rem;
+  /* ★ 2026-11-20（玩家：商店池卡片上的盟约文字看不清）：以前 --text-md 的 9px 小字 + 薄荷色图标，
+     两者不同色又都偏暗。官方约定是「图标与名字同一颜色」（BondGlyph 的 mask 变体就是为此），
+     所以图标改用 mask 取 currentColor，文字提到 --text-hi 并加一点字重；字号不动（有专门的下限规则）。 */
+  font-size: max(calc(.12 * var(--t)), 9px);
+  font-weight: 600;
+  color: var(--text-hi);
+}
 .diy-bond .bglyph, .diy-bond img { width: max(.16rem, 11px); height: max(.16rem, 11px); }
 /* the picker covers the tab: the roster's own list on the left and its detail on the right (screens/loadoutSections.js
    draws the sections; below 1000 px the detail slides over the list like the roster's) */
