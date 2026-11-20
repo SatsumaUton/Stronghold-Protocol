@@ -387,7 +387,10 @@
   position: absolute; z-index: 2; left: 0; right: 0; bottom: .02rem;
   justify-content: center;
   border: 0; background: transparent;
-  color: #37e5ca; font-size: .15rem;
+  /* ★ 2026-11-20（玩家：手机上的收起按钮比较小）：这条规则**不带主题选择器**，
+     所以所有主题在手机上一样小 —— .15rem 在 844×390 上只有 5.4px。加像素下限（可读性豁免）。 */
+  color: #37e5ca; font-size: max(.15rem, 11px);
+  padding: .02rem .04rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
 }
 .shopbar--reg .funds__collapse:hover { color: #b8fff2; }
