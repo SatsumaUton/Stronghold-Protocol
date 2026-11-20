@@ -412,7 +412,12 @@
   .shopbar--reg .shopbar__row {
     max-height: 46vh; overflow-x: hidden; overflow-y: auto;
   }
-  .shopbar--reg .scard { width: 1.2rem; height: 1.45rem; }
+  /* ★ 2026-11-20（玩家：手机版商店池还是很小）：这条覆盖原来只写裸 rem，把上面的像素下限盖掉了。
+     手机横屏 1rem ≈ 36px → 1.2rem 只有 43px。补同样的下限（> 32px 的尺寸带 32px + --sp-ui）。 */
+  .shopbar--reg .scard {
+    width: max(1.2rem, 32px, calc(88px * var(--sp-ui, 1)));
+    height: max(1.45rem, 32px, calc(106px * var(--sp-ui, 1)));
+  }
   /* the upgrade stage at the cards' height (1.45 / 1.9) */
   .shopbar--reg .lvcard.lvcard--up { --up-k: .763; }
   .shopbar--reg .funds.funds--reg { --fw: 1.4rem; --fh: 1.6rem; }
