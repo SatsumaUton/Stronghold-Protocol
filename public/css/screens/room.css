@@ -1452,19 +1452,7 @@
   --mint-700: #553ba0;
   --text-on-mint: #f4efff;
 }
-/* ★ 2026-11-20：规程版本下的深渊房也要紫 —— 版本会换整套规程排版，界面因此变得不像深渊。
-   这里在房间根节点上**再断言一次**并加 !important：无论当前是哪个版本、装了哪个主题包，
-   深渊回响的房间始终是紫的一套（数值与上面的 .rs--deepecho 完全一致，只是优先级更高）。 */
-html.sp-deepecho .rs,
-html.sp-deepecho .rs--deepecho,
-html.sp-deepecho .rs .rs-pill,
-html.sp-deepecho .rs .proto-start {
-  --mint-400: #b79cff !important;
-  --mint-500: #8b6ae0 !important;
-  --mint-600: #6f4fc4 !important;
-  --mint-700: #553ba0 !important;
-  --text-on-mint: #f4efff !important;
-}
+
 /* 背景**保持原版不动**（维护者 2026-11-03：整块换成紫色不好看，原来的背景更好）。
    这里只改组件配色，不碰 .rs__bg。 */
 

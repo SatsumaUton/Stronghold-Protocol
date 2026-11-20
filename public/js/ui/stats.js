@@ -486,10 +486,17 @@ export function highestBondRecord(records) {
  * @param {any[]} records
  * @returns {number|null}
  */
-export function bestEchoDepth(records) {
+/**
+ * 「我的最佳」深度，**按版本**统计（维护者 2026-11-21：切换榜单版本后最佳记录也要跟着变）。
+ * @param {any[]} records 对局记录
+ * @param {string} [version] 只统计该版本（记录没写 version 的算默认版本）
+ */
+export function bestEchoDepth(records, version = DEFAULT_VERSION) {
   let best = 0;
   for (const rec of Array.isArray(records) ? records : []) {
     if (!rec || rec.variant !== 'deepecho' || rec.test === true) continue;
+    // ★ 2026-11-21：版本过滤（旧记录没有 version 字段 = 默认版本）
+    if ((rec.version || DEFAULT_VERSION) !== version) continue;
     if (Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) continue;
     const d = Math.floor(Number(rec.echoDepth));
     if (Number.isFinite(d) && d > best) best = d;

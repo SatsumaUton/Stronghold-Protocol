@@ -486,10 +486,17 @@ export function highestBondRecord(records) {
  * @param {any[]} records
  * @returns {number|null}
  */
-export function bestEchoDepth(records) {
+/**
+ * 「我的最佳」深度，**按版本**统计（维护者 2026-11-21：切换榜单版本后最佳记录也要跟着变）。
+ * @param {any[]} records 对局记录
+ * @param {string} [version] 只统计该版本（记录没写 version 的算默认版本）
+ */
+export function bestEchoDepth(records, version = DEFAULT_VERSION) {
   let best = 0;
   for (const rec of Array.isArray(records) ? records : []) {
     if (!rec || rec.variant !== 'deepecho' || rec.test === true) continue;
+    // ★ 2026-11-21：版本过滤（旧记录没有 version 字段 = 默认版本）
+    if ((rec.version || DEFAULT_VERSION) !== version) continue;
     if (Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) continue;
     const d = Math.floor(Number(rec.echoDepth));
     if (Number.isFinite(d) && d > best) best = d;
@@ -587,7 +594,8 @@ export function buildRecord(res, ctx = {}) {
  * (the server tells the others at the settlement, a leaver nothing).
  * @returns {{ active: boolean, test: boolean, startedAt: number, sawStart: boolean, aliveRound: number|null }}
  */
-export const createLiveMatch = () => ({ active: false, test: false, startedAt: 0, sawStart: false, aliveRound: null });
+// cheat：本局开了「作弊控制台」（m.public.experimental.cheatConsole）—— 与 test 一样**不写记录**
+export const createLiveMatch = () => ({ active: false, test: false, cheat: false, startedAt: 0, sawStart: false, aliveRound: null });
 
 /** The module's own tracker (fed by installStatsRecorder, read by recordQuit). */
 export const liveMatch = createLiveMatch();
@@ -604,6 +612,7 @@ export function observeMatch(live, state, now = Date.now()) {
   if (!inMatch) {
     live.active = false;
     if (!pub && state?.room?.test !== true) live.test = false;
+    if (!pub) live.cheat = false;
     return live;
   }
   const round = Number(pub.round) || 0;
@@ -613,8 +622,10 @@ export function observeMatch(live, state, now = Date.now()) {
     live.sawStart = round <= 1;
     live.aliveRound = null;
     live.test = false;
+    live.cheat = false;
   }
   live.test ||= pub.test === true || state.room?.test === true;
+  live.cheat ||= pub.experimental?.cheatConsole === true;
   const me = Array.isArray(pub.players) ? pub.players.find((p) => isObj(p) && p.playerId === state.me?.playerId) : null;
   if (me && me.alive !== false) live.aliveRound = Math.max(live.aliveRound ?? 0, round);
   return live;
@@ -649,7 +660,8 @@ export function buildQuitRecord(state, ctx = {}) {
   const now = int(ctx.now, Date.now());
   const pub = state?.match?.public;
   const myId = str(state?.me?.playerId);
-  if (pub?.test === true || state.room?.test === true || live.test === true || !pub || !myId || state.match.result || !live.active) return null;
+  if (pub?.test === true || state.room?.test === true || live.test === true || live.cheat === true
+    || pub?.experimental?.cheatConsole === true || !pub || !myId || state.match.result || !live.active) return null;
   const row = Array.isArray(pub.players) ? pub.players.find((p) => isObj(p) && p.playerId === myId) : null;
   if (!row) return null; // a spectator seat is no player of the match
   const alive = row.alive !== false;
@@ -763,7 +775,8 @@ function storeRecord(rec) {
  * @returns {any|null}
  */
 export function recordResult(res, ctx = {}) {
-  if (liveMatch.test === true) return null;
+  // 测试局与作弊局都不写记录（维护者 2026-11-17：作弊局不记入对局记录）
+  if (liveMatch.test === true || liveMatch.cheat === true) return null;
   return storeRecord(buildRecord(res, ctx));
 }
 
@@ -886,7 +899,7 @@ export function roundsOf(rec) {
 export function countsTowardStats(rec) {
   if (!isObj(rec)) return false;
   // Legacy test records never count. There is no switch that counts it (DESIGN §34.8).
-  if (rec.test === true || Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) return false;
+  if (rec.test === true || rec.cheat === true || Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) return false;
   if (rec.end !== 'quit') return true;
   const self = selfRowOf(rec);
   if (!self) return false;

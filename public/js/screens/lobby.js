@@ -1190,8 +1190,8 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
  * 于是这个数字是**账号级**的：换设备、清缓存、换浏览器登录同一个账号，最佳成绩都不变。
  */
 const PAD_LABEL = '占位';  // i18n-ignore: 列表补齐用的纯视觉占位（aria-hidden）
-const echoReadBest = () => {
-  try { return bestEchoDepth(peekStatsRecords()); } catch { return null; }
+const echoReadBest = (version) => {
+  try { return bestEchoDepth(peekStatsRecords(), version); } catch { return null; }
 };
 
 /**
@@ -1256,7 +1256,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [boardOpen, setBoardOpen] = useState(true);
   /** 「深渊图鉴」浮层（维护者 2026-11-06：入口在顶部右侧，局内放大镜不加） */
   const [codexOpen, setCodexOpen] = useState(false);
-  const [best] = useState(() => echoReadBest());
+  // ★ 2026-11-21：跟着榜单版本重算（切换版本时「我的最佳」也要变）
+  const best = useMemo(() => echoReadBest(boardVersion), [boardVersion]);
   // ★ 2026-11-20（维护者：榜单按版本分）：深潜榜跟着大厅选中的版本走。
     // ★ 2026-11-20（维护者：排行榜可以直接查看其它版本）：
   //   初值 = 房间版本优先（榜按房间版本写入），否则大厅偏好；玩家可以在榜单头部**手动切换**版本。
@@ -1280,10 +1281,11 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
       .catch(() => { if (alive) { setRows([]); setFailed(true); } });
     return () => { alive = false; };
   }, [boardDiff, boardVersion]);
-  const weekBest = useMemo(() => {
-    const since = Date.now() - 7 * 24 * 3600 * 1000;
-    const recent = (rows || []).filter((r) => (r.at || 0) >= since);
-    return recent.length ? Math.max(...recent.map((r) => r.depth)) : null;
+  // ★ 2026-11-21（维护者：榜不是每周更新的）：原来是「7 天内那几条的最大值」，
+  //   既不代表本周、也小于榜首。改成整张榜（当前版本/难度）的最高层数。
+  const bestDepth = useMemo(() => {
+    const list = rows || [];
+    return list.length ? Math.max(...list.map((r) => Number(r.depth) || 0)) : null;
   }, [rows]);
   // generic：左下角那段说明也用通用难度文案（不要规程专属的「解锁时可开放至【规程等级 N】」）
   const info = difficultyInfo('coop', difficulty, { generic: true });
@@ -1425,7 +1427,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
           </div>
           <div class="echo-stats">
             <div class="echo-stat"><span class="echo-stat__k">${t('我的最佳')}</span><b class="echo-stat__v">${best == null ? '—' : best}</b></div>
-            <div class="echo-stat"><span class="echo-stat__k">${t('本周最佳')}</span><b class="echo-stat__v">${weekBest == null ? '—' : weekBest}</b></div>
+            <div class="echo-stat"><span class="echo-stat__k">${t('历史最佳')}</span><b class="echo-stat__v">${bestDepth == null || bestDepth <= 0 ? '—' : bestDepth}</b></div>
           </div>
           <div class="proto-foot proto-foot--match proto-foot--triple">
             <button type="button" class="proto-start proto-start--alt" data-testid="echo-public"
