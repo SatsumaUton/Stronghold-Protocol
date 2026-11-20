@@ -14,7 +14,7 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 // 
 // revivalAnyDonor：救援不要求联防（维护者 2026-11-05，默认 true）—— 必须在这里登记，
 // 否则 isExperimental 会把它判成非法键，导致**断点恢复对局失败**（invalid experimental options）。
-const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor', 'uniteHumansFirst',
+const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'traitStackUnlimited', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor', 'uniteHumansFirst',
   // 作弊控制台（维护者 2026-11-17）：房间级开关，打开后房主在对局里能用测试控制台（g.test），
   // 且这一局**不记入对局记录、不进深渊回响排行榜**。只在 coop 房出现（单人房没有「记录」可言，也开不了）。
   'cheatConsole']);

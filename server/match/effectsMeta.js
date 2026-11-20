@@ -551,6 +551,8 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     // （玩家 2026-11-08 反馈「重启后给了很多维多利亚锤子」，见 bonds/core.js payHammers 的注释）。
     // 普通房给 Infinity = 原版行为，一字不差。
     bondLayerCoinCap: m.layerCapOff ? BOND_LAYER_CAP : Infinity,
+    // ★ 2026-11-20：实验房「取消特质每回合叠层限制」—— 带「本回合第 N 次」计数的特质据此每次触发。
+    traitStackUnlimited: m.traitStackUnlimited === true,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
     layers: (id) => ps.layers[id] || 0,
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),

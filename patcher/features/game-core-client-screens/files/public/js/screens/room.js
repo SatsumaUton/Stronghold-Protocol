@@ -563,6 +563,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const [stackDuck, setStackDuck] = useState(false);
   // 实验性战斗规则（任意模式、任意容量都能开，与人数无关）
   const [layerCapOff, setLayerCapOff] = useState(false);
+  const [traitStackOff, setTraitStackOff] = useState(false);
   const [hitLimitOff, setHitLimitOff] = useState(false);
   // 【AI 联防置后】：联防优先真人，AI 队友 / 托管中的博士排后
   const [uniteFirst, setUniteFirst] = useState(false);
@@ -636,6 +637,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setRepeat(exp.allowRepeat === true);
       setStackDuck(exp.stackDuckLord === true);
       setLayerCapOff(exp.disableLayerCap === true);
+      setTraitStackOff(exp.traitStackUnlimited === true);
       setHitLimitOff(exp.disableHitLimit === true);
       setUniteFirst(exp.uniteHumansFirst === true);
       setCheatConsole(exp.cheatConsole === true);
@@ -662,6 +664,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(capacity > 4 && repeat && stackDuck ? { stackDuckLord: true } : {}),
       // 实验性战斗规则：关闭时一个键都不写（房间指纹与旧房间保持一致）
       ...(layerCapOff ? { disableLayerCap: true } : {}),
+      ...(traitStackOff ? { traitStackUnlimited: true } : {}),
       ...(hitLimitOff ? { disableHitLimit: true } : {}),
       ...(uniteFirst ? { uniteHumansFirst: true } : {}),
       ...(cheatConsole ? { cheatConsole: true } : {}),
@@ -746,6 +749,13 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
             onClick=${() => { setCapOpen(false); canEdit && setLayerCapOff(!layerCapOff); }}>
           <${Icon} name="check" class=${layerCapOff ? 'is-on' : ''} />${t('禁用层数上限')}
         </button>
+          <${Tooltip} text=${t('打开后，带「本回合第 N 次」计数的干员特质（如荒芜拉普拉德的刷新叠层）每次都触发，不再每回合只算一次')}>
+            <button type="button" role="switch" aria-checked=${traitStackOff ? 'true' : 'false'} data-testid="exp-trait-stack"
+              class=${`dpick__opt ailast__opt${traitStackOff ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
+              onClick=${() => { setCapOpen(false); canEdit && setTraitStackOff(!traitStackOff); }}>
+              <${Icon} name="check" class=${traitStackOff ? 'is-on' : ''} />${t('取消特质每回合叠层限制')}
+            </button>
+          <//>
       <//>
       <${Tooltip} text=${t('对敌方领袖的单次 30 万以上伤害不再被取消')}>
         <button type="button" role="switch" aria-checked=${hitLimitOff ? 'true' : 'false'} data-testid="exp-hit-limit"

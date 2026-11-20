@@ -549,6 +549,8 @@ export class Match {
     // 注意：**不含**深潜。深潜只在真正进入深潜回合后才解除层数上限（见 layerCapOff），
     // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
+    // ★ 2026-11-20（维护者：取消干员特质的每回合叠层限制）：特质脚本按 ctx.traitStackUnlimited 放行
+    this.traitStackUnlimited = this.experimental.traitStackUnlimited === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
     /** 【AI 联防置后】(维护者 2026-11-06)：联防优先真人，AI 队友与托管中的博士排后（unite.js helperOrder）。 */
     this.uniteHumansFirst = this.experimental.uniteHumansFirst === true;

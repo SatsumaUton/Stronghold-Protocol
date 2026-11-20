@@ -279,7 +279,10 @@ H.SERVER_GAIN_BOND_LAYER_BY_REFRESH_CNT = {
     if (ev && ev.trigger) return;
     const { bb, bbStr, garrison, piece } = ctx.source;
     if (!piece || !Number.isInteger(piece.uid) || piece.uid <= 0) return;
-    if (ctx.incPieceCounter(piece.uid, REFRESH_CNT_KEY) !== num(bb.refresh_cnt, 1)) return;
+    // ★ 2026-11-20（维护者：取消特质的每回合叠层限制）：实验开关打开时不过滤「本回合第 N 次」，
+    //   每次主动刷新都加层（计数器照常自增，保持其它依赖它的逻辑不变）。
+    const nth = ctx.incPieceCounter(piece.uid, REFRESH_CNT_KEY);
+    if (!ctx.traitStackUnlimited && nth !== num(bb.refresh_cnt, 1)) return;
     addAll(ctx, ids(bbStr.bond), num(bb.layer), requireActiveOf(garrison));
   },
 };
