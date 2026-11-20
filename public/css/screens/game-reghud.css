@@ -213,6 +213,22 @@
 .shopbar--reg .scard {
   width: 1.55rem; height: 1.87rem;
 }
+
+/* ★ 2026-11-20（玩家：手机上看对局中商店池界面很小）：规程商店这一整套尺寸只有 rem、没有像素下限。
+   手机横屏 844×390 时 rem ≈ 36.1px → 卡片 1.55rem = 56px 宽、卡内文字 .105rem ≈ 3.8px。
+   全站其它组件都用 max(<rem>, <px>) 兜底（文字 9–13px、触控 ≥32px），这里补齐。
+   桌面端 rem 远大于这些下限，取景与排布不受影响。 */
+.shopbar--reg .scard {
+  /* 尺寸下限 >32px：按项目守卫的写法带 --sp-ui（触控目标永不缩到 32px 以下） */
+  width: max(1.55rem, 32px, calc(92px * var(--sp-ui, 1)));
+  height: max(1.87rem, 32px, calc(112px * var(--sp-ui, 1)));
+}
+.scard.scard--reg .scard__name { font-size: max(.105rem, 11px); }
+.scard.scard--reg .scard__class { font-size: max(.11rem, 10px); }
+.scard.scard--reg .scard__idesc { font-size: max(.11rem, 10px); }
+.scard.scard--reg .scard__bond { font-size: max(.105rem, 10px); line-height: 1.25; }
+.scard.scard--reg .scard__bond .bglyph { width: max(.13rem, 10px); height: max(.13rem, 10px); }
+.scard.scard--reg .scard__cost--free { font-size: max(.14rem, 11px); }
 .scard.scard--reg {
   /* not clipped: the portrait's overhang (§37.139), the repeat glow (§37.201), 乌萨斯齐心团's tier icon and the TV reach past the box */
   box-sizing: border-box; padding: 0; overflow: visible;
