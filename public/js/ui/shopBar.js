@@ -536,22 +536,49 @@ function FundsChar({ character }) {
  * so the cluster never runs under the bottom-left corner buttons (.gm__corner): five operator slots, the equipment slot,
  * the level box and the character card are wider than 1.3× allows at 16:9. A narrow screen keeps its own --reg-k-max (1).
  */
+/**
+ * 窄屏把「冻结 + 刷新」对齐到**商店池（卡牌组）的水平中心**（维护者 2026-11-20：
+ * 「以商店池的位置来放置相对的冻结和刷新按钮，而不是默认在屏幕最右边」）。
+ * 只写一个 --reg-tools-shift，CSS 负责 transform（窄屏媒体查询里才生效）。
+ * @param {HTMLElement} el `.shopbar__cluster`
+ * @param {number} k 当前 --reg-k（cluster 的 transform: scale）
+ */
+function fitTools(el, k) {
+  const tools = el.querySelector('.shopbar__tools');
+  if (!tools) return;
+  tools.style.removeProperty('--reg-tools-shift');
+  const narrow = typeof matchMedia === 'function' ? matchMedia('(max-width: 900px)').matches : false;
+  if (!narrow) return;
+  const pool = el.querySelector('.shopbar__cards') || el.querySelector('.shopbar__row');
+  if (!pool) return;
+  const c = pool.getBoundingClientRect(), t = tools.getBoundingClientRect();
+  if (!c.width || !t.width) return;
+  // 元素坐标系里的位移 = 屏幕位移 / k（整个 cluster 被 scale(k) 缩放）
+  const shift = ((c.left + c.width / 2) - (t.left + t.width / 2)) / (k || 1);
+  tools.style.setProperty('--reg-tools-shift', `${shift.toFixed(1)}px`);
+}
+
 function useRegFit(clusterRef, on) {
   useLayoutEffect(() => {
     const el = clusterRef.current;
     if (!on || !el) return undefined;
     const fit = () => {
+      let k = 1;
       try {
         const kMax = parseFloat(getComputedStyle(el).getPropertyValue('--reg-k-max')) || 1;
         const corner = document.querySelector('.gm__corner');
         const host = el.parentElement;
         const w = el.offsetWidth;
-        if (kMax <= 1 || !corner || !host || !w) { el.style.removeProperty('--reg-k'); return; }
-        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 100;
-        const right = host.getBoundingClientRect().right - (parseFloat(getComputedStyle(host).paddingRight) || 0);
-        const avail = right - corner.getBoundingClientRect().right - 0.12 * rem;
-        el.style.setProperty('--reg-k', String(Math.max(1, Math.min(kMax, avail / w)).toFixed(3)));
+        if (kMax <= 1 || !corner || !host || !w) el.style.removeProperty('--reg-k');
+        else {
+          const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 100;
+          const right = host.getBoundingClientRect().right - (parseFloat(getComputedStyle(host).paddingRight) || 0);
+          const avail = right - corner.getBoundingClientRect().right - 0.12 * rem;
+          k = Math.max(1, Math.min(kMax, avail / w));
+          el.style.setProperty('--reg-k', String(k.toFixed(3)));
+        }
       } catch { /* layout not ready */ }
+      try { fitTools(el, k); } catch { /* layout not ready */ }
     };
     fit();
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
