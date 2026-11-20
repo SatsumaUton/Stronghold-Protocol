@@ -272,6 +272,8 @@
 .scard.scard--reg .scard__nametxt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .scard.scard--reg .scard__bonds {
   position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: flex-start;
+  /* 兜底色：拿不到 face 模型（非规程外观）时用；规程外观由 ui/shopBar.js 的行内 style 覆盖 */
+  color: #B7B7B7;
   gap: .005rem; margin: 0; padding: 0;
   /* ★ 2026-11-20（玩家：所有主题的商店卡盟约都像乱码）：盒子来自解包 prefab
      （bond_list 154×58 单位 = 0.58rem），手机 rem≈36px 时只有 21px 高，而三行 10px 文字
@@ -290,7 +292,9 @@
 .scard.scard--reg .scard__bond {
   display: flex; align-items: center; min-height: 0; gap: .03rem;
   font-size: max(.105rem, 10px); line-height: 1.25; white-space: nowrap;
-  color: #B7B7B7;
+  /* ★ 不能再写死颜色：父级 .scard__bonds 带着官方色（char_name.color），
+    这里写死任何值都会把它盖掉（图标 mask 用 currentColor，跟着一起变灰）。 */
+  color: inherit;
 }
 .scard.scard--reg .scard__bond .bglyph { width: max(.13rem, 10px); height: max(.13rem, 10px); flex: none; }
 

@@ -73,3 +73,13 @@ test('CSS：可露希尔的字形也分状态（未点亮浅色、已点亮深�
   assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond__glyph \{ color: #e3e7e5; \}/, '未点亮：浅色字形（暗盘 28/255）');
   assert.match(css, /html\[data-sp-theme="ac_s_closur"\] \.gm__bonds--pf \.bond\.is-active \.bond__glyph \{ color: #111; \}/, '已点亮：深色字形（亮盘 168/255）');
 });
+
+test('商店卡：盟约颜色必须继承父级（CSS 写死任何颜色都会盖掉行内的官方色）', () => {
+  const css = readFileSync(join(ROOT, 'public/css/screens/game-reghud.css'), 'utf8');
+  const bond = /\.scard\.scard--reg \.scard__bond \{[^}]*\}/.exec(css);
+  assert.ok(bond, '要有 .scard__bond 规则');
+  assert.match(bond[0], /color: inherit;/, '★ 必须是 inherit：官方色由 .scard__bonds 的行内 style 传入');
+  assert.doesNotMatch(bond[0], /color: #/, '★ 子元素不能写死颜色（图标 mask 用 currentColor，会一起变灰）');
+  const box = /\.scard\.scard--reg \.scard__bonds \{[^}]*\}/.exec(css);
+  assert.ok(box && /color: #B7B7B7;/.test(box[0]), '父级 .scard__bonds 提供兜底色');
+});
