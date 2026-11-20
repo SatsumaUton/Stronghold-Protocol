@@ -1256,8 +1256,6 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [boardOpen, setBoardOpen] = useState(true);
   /** 「深渊图鉴」浮层（维护者 2026-11-06：入口在顶部右侧，局内放大镜不加） */
   const [codexOpen, setCodexOpen] = useState(false);
-  // ★ 2026-11-21：跟着榜单版本重算（切换版本时「我的最佳」也要变）
-  const best = useMemo(() => echoReadBest(boardVersion), [boardVersion]);
   // ★ 2026-11-20（维护者：榜单按版本分）：深潜榜跟着大厅选中的版本走。
     // ★ 2026-11-20（维护者：排行榜可以直接查看其它版本）：
   //   初值 = 房间版本优先（榜按房间版本写入），否则大厅偏好；玩家可以在榜单头部**手动切换**版本。
@@ -1271,6 +1269,9 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
       return 'act2autochess';
     }
   });
+
+  // ★ 2026-11-21：跟着榜单版本重算（切换版本时「我的最佳」也要变）
+  const best = useMemo(() => echoReadBest(boardVersion), [boardVersion]);
   useEffect(() => {
     let alive = true;
     setRows(null);
