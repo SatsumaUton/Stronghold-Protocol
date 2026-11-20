@@ -2281,7 +2281,9 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         const taken = room.seats.filter(Boolean);
         rows.push({ code: room.code, host: room.seatOf(room.hostId).name, humans: room.activeHumans().length,
           filled: taken.length, capacity: room.capacity, difficulty: room.difficulty,
-          ...(room.version !== DEFAULT_VERSION ? { version: room.version } : {}),
+          // ★ 2026-11-21（维护者：公开同盟 / 公开深潜要跨版本显示并带版本号）：
+        //   以前默认版本（第二期下半）不带 version → 列表里那一行没有版本徽章。现在一律带上。
+        version: room.version,
           // 「深渊回响」（深潜）：列表里要能认出深潜房（维护者 2026-11-06 的「公开深潜」）
           ...(room.variant ? { variant: room.variant } : {}),
           experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
