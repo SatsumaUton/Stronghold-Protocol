@@ -272,7 +272,15 @@
 .scard.scard--reg .scard__nametxt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .scard.scard--reg .scard__bonds {
   position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: flex-start;
-  gap: .005rem; margin: 0; padding: 0; overflow: hidden;
+  gap: .005rem; margin: 0; padding: 0;
+  /* ★ 2026-11-20（玩家：所有主题的商店卡盟约都像乱码）：盒子来自解包 prefab
+     （bond_list 154×58 单位 = 0.58rem），手机 rem≈36px 时只有 21px 高，而三行 10px 文字
+     需要约 38px —— overflow: hidden 把每行裁成一条，看起来就是乱码。
+     位置仍跟 prefab（绝对定位），高度改由内容决定并留出三行下限，且不再裁切。
+     prefab 的 height 是行内样式，必须 !important 才压得住。 */
+  height: auto !important;
+  min-height: max(.58rem, 32px, calc(40px * var(--sp-ui, 1)));
+  overflow: visible;
 }
 /* a bond's name and icon share one colour: 卫戍协议终端's bondColor #B7B7B7 by default (the 规程 look is that theme); an
    installed theme's bondColor overrides it (ui-theme.css) */
