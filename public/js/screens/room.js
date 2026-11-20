@@ -1522,18 +1522,18 @@ export function RoomScreen() {
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
           online=${online} readOnly=${true} difficulties=${protoDifficulties} ladder=${ladder} modeId=${room.modeId || null} season=${seasonOf(roomVersion(room))} />` : null}
     ${/* ★ 2026-11-21：深潜难度选择（整屏，和同盟模拟的 ProtocolSelect 同一套骨架，内容用深潜难度卡） */ null}
-    ${echoDiffOpen ? html`<${Modal} open=${true} onClose=${() => setEchoDiffOpen(false)} class="proto" veilClass="proto-veil">
+    ${echoDiffOpen ? html`<${Modal} open=${true} onClose=${() => setEchoDiffOpen(false)} class="proto proto--match" veilClass="proto-veil">
       <div class="proto__body" data-mode="deepecho" data-fit="full"
         data-difficulty=${echoDiffPick || room.difficulty}
         data-season=${seasonOf(roomVersion(room))}
-        style=${`--d-color:${DIFFICULTY_COLORS[echoDiffPick || room.difficulty] || 'var(--amber)'}`}>
+        style="--d-color:#b79cff">
         <div class="proto__bg" aria-hidden="true"></div>
         <${ProtoFit} />
         <header class="proto-top">
           <${BackPlate} onClick=${() => setEchoDiffOpen(false)} class="proto__back" />
           <div class="proto-title">
-            <h2 class="modal__title">${t('深潜难度')}</h2>
-            <span class="proto-title__mode"><${Icon} name="book" />${t('深渊回响')}<i>DEEP DIVE</i></span>
+            <h2 class="modal__title">${t('深渊回响')}</h2>
+            <span class="proto-title__mode"><${Icon} name="book" />${t('深渊回响')}<i>DEEP ECHO</i></span>
           </div>
         </header>
         <div class="proto-body">
