@@ -529,7 +529,7 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect, disabled = f
  * 描述、要点列表、「已选定」印章），只有一处不同 —— 编号是「深潜-1/2/3」而不是全模式共用的 `AC-x`。
  * 深潜只开三档，沿用 AC 编号（从 2 起）会让人以为漏了第一档（维护者 2026-11-03）。
  */
-function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
+export function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
   // 深潜的战场池**按难度分**（data/echo-stages.json 的 pools，险境/绝境/深渊各是各的图），
   // 用该难度实际会抽的池子算「共 N 张」，别让按钮上的数字跟对局里真抽的对不上
   // （维护者 2026-11-16 第二次反馈）。

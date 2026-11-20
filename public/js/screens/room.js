@@ -75,7 +75,7 @@ import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
-import { difficultyInfo, modeInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES } from './lobby.js';
+import { difficultyInfo, modeInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES, EchoDifficultyCard } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
 // 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
@@ -903,7 +903,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 }
 
 
-function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
+function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onEchoDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
   listed = false, onToggleListed = () => {}, cheat = false }) {
   // 「深渊回响」：同一个开关，深潜房叫「公开深潜」（列表也是深潜专属的）
   const echoRoom = room.variant === 'deepecho';
@@ -932,9 +932,9 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     <h4>${title}</h4>
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
       <span class="rs-opts__k">${echoRoom ? t('深潜难度') : t('模拟难度')}</span>
-      ${room?.variant === 'deepecho' && isHost && onDifficulty ? html`<button type="button" class="rs-opts__diff"
+      ${room?.variant === 'deepecho' && isHost && onEchoDifficulty ? html`<button type="button" class="rs-opts__diff"
         style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
-        disabled=${isHost && !!busy} onClick=${() => { onDifficulty(); }}>
+        disabled=${isHost && !!busy} onClick=${() => { onEchoDifficulty(); }}>
         DE-${DEEP_ECHO_DIFFICULTIES.indexOf(room.difficulty) + 1} · ${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty}
       </button>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
           title=${isHost ? t(echoRoom ? '更改深潜难度' : '更改模拟难度') : t('由创建者选择')}>
@@ -1138,6 +1138,9 @@ export function RoomScreen() {
   // 选择模拟协议 over the room — open, and the host's pick before 确认 (the others read it: the room's difficulty) — and
   // the ⚙ menu
   const [protoOpen, setProtoOpen] = useState(false);
+  // ★ 2026-11-21（维护者：深渊回响改难度要和同盟一样弹选择界面，但用**深潜自己的难度卡**）
+  const [echoDiffOpen, setEchoDiffOpen] = useState(false);
+  const [echoDiffPick, setEchoDiffPick] = useState(null);
   const [protoPick, setProtoPick] = useState(null);
   const [opts, setOpts] = useState(false);
   // the host's change of difficulty, told to the others (see the header); never on entering a room or switching rooms
@@ -1331,6 +1334,8 @@ export function RoomScreen() {
   // a laddered room (规程's solo) picks its official mode (room.modeId) instead of a difficulty
   const ladder = room.modeId ? ladderModes(pageVersion() === roomVersion(room) ? getConfig() : null, room.mode) : null;
   const openProto = () => { setOpts(false); setProtoPick(ladder ? room.modeId : room.difficulty); setProtoOpen(true); };
+  /** 深潜改难度：打开深潜专用的难度卡浮层（和深潜大厅同一套卡片）。 */
+  const openEchoDiff = () => { setOpts(false); setEchoDiffPick(room.difficulty); setEchoDiffOpen(true); };
   const closeProto = () => { setProtoOpen(false); setProtoPick(null); };
   const pluginMode = room.content?.modeId ? (room.content.modes || []).find((m) => m.id === room.content.modeId)?.name || room.content.modeId : null;
   const confirmDifficulty = async () => {
@@ -1481,14 +1486,14 @@ export function RoomScreen() {
         <div class="rs-pill">
             <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
             style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
-              onClick=${facts.isHost ? openProto : () => {}}
+              onClick=${facts.isHost ? (echoRoom ? openEchoDiff : openProto) : () => {}}
               title=${facts.isHost ? (echoRoom ? t('更改深潜难度') : t('更改模拟难度')) : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${room.modeId ? info.name : DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')} aria-label=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
-            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onClose=${() => setOpts(false)} version=${versionCtl}
+            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onEchoDifficulty=${openEchoDiff} onClose=${() => setOpts(false)} version=${versionCtl}
               listed=${room.listed === true} onToggleListed=${setListed} cheat=${room.experimental?.cheatConsole === true} />` : null}
         </div>
       </div>
@@ -1516,6 +1521,19 @@ export function RoomScreen() {
           ladder=${ladder} modeId=${ladder ? protoPick || room.modeId : null} onMode=${setProtoPick} season=${seasonOf(roomVersion(room))} />`
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
           online=${online} readOnly=${true} difficulties=${protoDifficulties} ladder=${ladder} modeId=${room.modeId || null} season=${seasonOf(roomVersion(room))} />` : null}
+    ${/* ★ 2026-11-21：深潜难度选择（深潜自己的难度卡，和深潜大厅一致） */ null}
+    ${echoDiffOpen ? html`<${Modal} open=${true} class="echodiff" micro="DEEP DIVE // DIFFICULTY" title=${t('深潜难度')}
+      width="min(9.6rem, 96vw)" onClose=${() => setEchoDiffOpen(false)}
+      actions=${html`<${Button} variant="ghost" onClick=${() => setEchoDiffOpen(false)}>${t('取消')}<//>
+        <${Button} variant="primary" disabled=${!echoDiffPick || echoDiffPick === room.difficulty || !!busy}
+          onClick=${async () => { if (await setDifficulty(echoDiffPick)) setEchoDiffOpen(false); }}>${t('确认')}<//>`}>
+      <div class="proto__body" data-mode="deepecho" style=${`--d-color:${DIFFICULTY_COLORS[echoDiffPick || room.difficulty]}`}>
+        <div class="echodiff__cards">
+          ${DEEP_ECHO_DIFFICULTIES.map((d, i) => html`<${EchoDifficultyCard} key=${d} difficulty=${d} index=${i}
+            selected=${(echoDiffPick || room.difficulty) === d} onSelect=${setEchoDiffPick} />`)}
+        </div>
+      </div>
+    <//>` : null}
     ${versionOpen && versionCtl ? html`<${VersionPicker} mode="room" versions=${(echoRoom ? (versions || []).filter((v) => ECHO_VERSIONS.includes(v.id)) : versions) || [{ id: curVersion, roomModes: [room.mode] }]} current=${curVersion}
       serverDefault=${serverDefault} roomMode=${room.mode} editable=${versionEditable && !versionWhy} busy=${busy === 'version'}
       note=${versionEditable ? versionWhy || (facts.humans.length > 1 ? t('其他博士同意后才会切换；切换后需要重新准备。') : null) : t('由创建者发起')}
