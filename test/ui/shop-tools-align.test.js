@@ -17,6 +17,7 @@ test('shopBar.js 有 fitTools，按商店池中心算位移', () => {
   assert.match(js, /function fitTools\(el, k\)/, '★ 要有 fitTools');
   assert.match(js, /\.shopbar__cards'\) \|\| el\.querySelector\('\.shopbar__row'\)/, '★ 以卡牌组为准（没有则退回行）');
   assert.match(js, /--reg-tools-shift/, '★ 写 --reg-tools-shift');
+  assert.match(js, /\(c\.left \+ c\.width\) - \(t\.left \+ t\.width\)/, '★ 右边缘对齐（商店池右上角）');
   assert.match(js, /\/(\s*\(\s*k\s*\|\|\s*1\s*\))/, '★ 位移要除以 --reg-k（cluster 被 scale）');
   assert.match(js, /fitTools\(el, k\)/, '★ 在 fit() 里调用');
 });

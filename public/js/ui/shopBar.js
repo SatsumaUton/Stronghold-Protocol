@@ -553,9 +553,30 @@ function fitTools(el, k) {
   if (!pool) return;
   const c = pool.getBoundingClientRect(), t = tools.getBoundingClientRect();
   if (!c.width || !t.width) return;
-  // 元素坐标系里的位移 = 屏幕位移 / k（整个 cluster 被 scale(k) 缩放）
-  const shift = ((c.left + c.width / 2) - (t.left + t.width / 2)) / (k || 1);
+  // ★ 维护者 2026-11-20：「冻结/刷新放在商店池的右上角，参考 PC 版」→ 右边缘对齐（此前是中心对齐）。
+  //   元素坐标系里的位移 = 屏幕位移 / k（整个 cluster 被 scale(k) 缩放）。
+  const shift = ((c.left + c.width) - (t.left + t.width)) / (k || 1);
   tools.style.setProperty('--reg-tools-shift', `${shift.toFixed(1)}px`);
+}
+
+/**
+ * 升级卡的缩放：内层舞台 .rup 是 1.12rem × 1.9rem 再乘 --up-k，所以外框高度是
+ * 1.9rem × --up-k。手机把外框撑到 --reg-card-h 之后必须同步 --up-k，否则框大内容小。
+ * CSS 里做不到「长度 ÷ 长度」得无单位数，所以在这一并算。
+ * @param {HTMLElement} el `.shopbar__cluster`
+ * @param {number} k 当前 --reg-k
+ */
+function fitUpgrade(el, k) {
+  const up = el.querySelector('.lvcard--up');
+  if (!up) return;
+  const narrow = typeof matchMedia === 'function' ? matchMedia('(max-width: 900px)').matches : false;
+  if (!narrow) { up.style.removeProperty('--up-k'); return; }
+  const card = el.querySelector('.scard');
+  if (!card) return;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 100;
+  const h = card.getBoundingClientRect().height / (k || 1);
+  if (!(h > 0)) return;
+  up.style.setProperty('--up-k', String(Math.max(0.5, Math.min(3, h / (1.9 * rem))).toFixed(3)));
 }
 
 function useRegFit(clusterRef, on) {
@@ -579,6 +600,7 @@ function useRegFit(clusterRef, on) {
         }
       } catch { /* layout not ready */ }
       try { fitTools(el, k); } catch { /* layout not ready */ }
+      try { fitUpgrade(el, k); } catch { /* layout not ready */ }
     };
     fit();
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
