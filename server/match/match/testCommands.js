@@ -48,7 +48,7 @@ import { OK, fail } from './common.js';
 import { echoBlessingById } from './echoBlessing.js';
 import { echoCurseById } from './echoCurse.js';
 import { echoWordById } from './echoWords.js';
-import { echoProjectionById } from './echoProjection.js';
+import { projectionsForGd } from './echoProjection.js';
 import { ECHO_SAFE_ROUND } from './echo.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 
@@ -559,7 +559,7 @@ export class MatchTestCommands {
       this.markPublic();
       return OK;
     }
-    if (!echoProjectionById(id)) return fail(ERR.BAD_TARGET, 'no-such-projection');
+    if (!projectionsForGd(this.gd).some((p) => p.id === id)) return fail(ERR.BAD_TARGET, 'no-such-projection');
     ps.echoProjection = id;
     try { ps.recompute(); } catch { /* ignore */ }
     ps.dirty?.();
