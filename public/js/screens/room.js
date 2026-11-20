@@ -757,7 +757,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${uniteFirst ? 'is-on' : ''} />${t('AI 联防置后')}
         </button>
       <//>
-      <${Tooltip} text=${t('打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中')}>
+      <${Tooltip} text=${t('打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中')}>
         <button type="button" role="switch" aria-checked=${cheatConsole ? 'true' : 'false'} data-testid="exp-cheat-console"
             class=${`dpick__opt ailast__opt${cheatConsole ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
             onClick=${() => {
@@ -769,7 +769,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
                 const yes = await confirmDialog({
                   title: t('开启作弊控制台'),
                   text: html`<div>
-                    <p>${t('开启后，本局创建者可以在对局中使用控制台：加资金、加层数、加干员、跳回合等。')}</p>
+                    <p>${t('开启后，本房间所有玩家（观战除外）都能在对局中使用控制台：加资金、加层数、加干员、跳回合等。')}</p>
                     <p>${t('这一局不会记入对局记录；本房间也不会出现在公开同盟列表里，不会被多人匹配选中。')}</p>
                   </div>`,
                   okText: t('仍然开启'),
