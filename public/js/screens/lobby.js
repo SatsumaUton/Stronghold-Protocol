@@ -74,7 +74,7 @@ import { SearchPanel } from '../ui/matchFlow.js';
 import { currentNode } from '../ui/stickyNode.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
-import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, ladderModes, ladderPick, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
+import { DEFAULT_VERSION, ECHO_VERSIONS, lobbyVersion, offeredDifficulties, fallbackDifficulty, ladderModes, ladderPick, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -1258,9 +1258,9 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [codexOpen, setCodexOpen] = useState(false);
   const [best] = useState(() => echoReadBest());
   // ★ 2026-11-20（维护者：榜单按版本分）：深潜榜跟着大厅选中的版本走。
-    // ★ 2026-11-20（玩家：切过版本后两个榜都空）：榜是按**房间版本**写的，所以读也要房间优先；
-  //   只有还没进房（深潜大厅 / 大厅卡片）时才退回大厅偏好。
-  const boardVersion = (() => {
+    // ★ 2026-11-20（维护者：排行榜可以直接查看其它版本）：
+  //   初值 = 房间版本优先（榜按房间版本写入），否则大厅偏好；玩家可以在榜单头部**手动切换**版本。
+  const [boardVersion, setBoardVersion] = useState(() => {
     try {
       const roomVer = store.getState?.().room?.version;
       if (typeof roomVer === 'string' && roomVer) return roomVer;
@@ -1269,7 +1269,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
     } catch {
       return 'act2autochess';
     }
-  })();
+  });
   useEffect(() => {
     let alive = true;
     setRows(null);
@@ -1279,7 +1279,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
       .then((j) => { if (alive) setRows(Array.isArray(j?.rows) ? j.rows : []); })
       .catch(() => { if (alive) { setRows([]); setFailed(true); } });
     return () => { alive = false; };
-  }, [boardDiff]);
+  }, [boardDiff, boardVersion]);
   const weekBest = useMemo(() => {
     const since = Date.now() - 7 * 24 * 3600 * 1000;
     const recent = (rows || []).filter((r) => (r.at || 0) >= since);
@@ -1312,6 +1312,13 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
           <aside class=${`echo-boardfloat${boardOpen ? '' : ' is-closed'}${rows != null && rows.length === 0 ? ' is-empty' : ''}`} aria-label=${t('排行榜')}>
             <div class="echo-boardhead">
               <b class="echo-boardhead__t">${t('排行榜')}</b>
+              ${/* ★ 2026-11-20：可以切换查看其它版本的榜（各版本分开计） */ null}
+              <div class="echo-boardtabs echo-boardtabs--ver" role="tablist" aria-label=${t('排行榜版本')}>
+                ${ECHO_VERSIONS.map((v) => html`<button key=${v} type="button" role="tab"
+                    aria-selected=${boardVersion === v ? 'true' : 'false'}
+                    class=${`echo-tab${boardVersion === v ? ' is-on' : ''}`}
+                    onClick=${() => setBoardVersion(v)}>${versionLabel(v)}</button>`)}
+              </div>
               <div class="echo-boardtabs" role="tablist" aria-label=${t('排行榜难度')}>
                 ${DEEP_ECHO_DIFFICULTIES.map((d) => html`<button key=${d} type="button" role="tab"
                     aria-selected=${boardDiff === d ? 'true' : 'false'}
