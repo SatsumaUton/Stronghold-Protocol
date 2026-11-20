@@ -537,29 +537,6 @@ function FundsChar({ character }) {
  * the level box and the character card are wider than 1.3× allows at 16:9. A narrow screen keeps its own --reg-k-max (1).
  */
 /**
- * 窄屏把「冻结 + 刷新」对齐到**商店池（卡牌组）的水平中心**（维护者 2026-11-20：
- * 「以商店池的位置来放置相对的冻结和刷新按钮，而不是默认在屏幕最右边」）。
- * 只写一个 --reg-tools-shift，CSS 负责 transform（窄屏媒体查询里才生效）。
- * @param {HTMLElement} el `.shopbar__cluster`
- * @param {number} k 当前 --reg-k（cluster 的 transform: scale）
- */
-function fitTools(el, k) {
-  const tools = el.querySelector('.shopbar__tools');
-  if (!tools) return;
-  tools.style.removeProperty('--reg-tools-shift');
-  const narrow = typeof matchMedia === 'function' ? matchMedia('(max-width: 900px)').matches : false;
-  if (!narrow) return;
-  const pool = el.querySelector('.shopbar__cards') || el.querySelector('.shopbar__row');
-  if (!pool) return;
-  const c = pool.getBoundingClientRect(), t = tools.getBoundingClientRect();
-  if (!c.width || !t.width) return;
-  // ★ 维护者 2026-11-20：「冻结/刷新放在商店池的右上角，参考 PC 版」→ 右边缘对齐（此前是中心对齐）。
-  //   元素坐标系里的位移 = 屏幕位移 / k（整个 cluster 被 scale(k) 缩放）。
-  const shift = ((c.left + c.width) - (t.left + t.width)) / (k || 1);
-  tools.style.setProperty('--reg-tools-shift', `${shift.toFixed(1)}px`);
-}
-
-/**
  * 升级卡的缩放：内层舞台 .rup 是 1.12rem × 1.9rem 再乘 --up-k，所以外框高度是
  * 1.9rem × --up-k。手机把外框撑到 --reg-card-h 之后必须同步 --up-k，否则框大内容小。
  * CSS 里做不到「长度 ÷ 长度」得无单位数，所以在这一并算。
@@ -599,7 +576,6 @@ function useRegFit(clusterRef, on) {
           el.style.setProperty('--reg-k', String(k.toFixed(3)));
         }
       } catch { /* layout not ready */ }
-      try { fitTools(el, k); } catch { /* layout not ready */ }
       try { fitUpgrade(el, k); } catch { /* layout not ready */ }
     };
     fit();

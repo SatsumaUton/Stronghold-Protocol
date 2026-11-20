@@ -1,11 +1,9 @@
-// test/ui/shop-tools-align.test.js —— 窄屏把「冻结 + 刷新」对齐到商店池（维护者 2026-11-20 要求）。
-//
-// 为什么需要 JS：.shopbar__tools 与 .shopbar__row 是兄弟节点，CSS 无法让一个兄弟对齐到另一个兄弟内部
-// 子元素（.shopbar__cards）的盒子。做法：useRegFit 里量一次中心差 → --reg-tools-shift → CSS transform。
-// 注意 cluster 带 scale(--reg-k)，元素坐标里的位移要除以 k 才是屏幕位移。
+// 重写守卫测试：手机商店区整体贴右边（维护者 2026-11-20），不再有 JS 量位置平移。
+// 断言：① 窄屏媒体查询里 cluster 不撑满、卡片行与工具带都右对齐；
+//       ② shopBar.js 里不再有 fitTools / --reg-tools-shift，但保留 fitUpgrade（升级卡缩放）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,19 +11,26 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const js = readFileSync(join(ROOT, 'public/js/ui/shopBar.js'), 'utf8');
 const css = readFileSync(join(ROOT, 'public/css/screens/game-reghud.css'), 'utf8');
 
-test('shopBar.js 有 fitTools，按商店池中心算位移', () => {
-  assert.match(js, /function fitTools\(el, k\)/, '★ 要有 fitTools');
-  assert.match(js, /\.shopbar__cards'\) \|\| el\.querySelector\('\.shopbar__row'\)/, '★ 以卡牌组为准（没有则退回行）');
-  assert.match(js, /--reg-tools-shift/, '★ 写 --reg-tools-shift');
-  assert.match(js, /\(c\.left \+ c\.width\) - \(t\.left \+ t\.width\)/, '★ 右边缘对齐（商店池右上角）');
-  assert.match(js, /\/(\s*\(\s*k\s*\|\|\s*1\s*\))/, '★ 位移要除以 --reg-k（cluster 被 scale）');
-  assert.match(js, /fitTools\(el, k\)/, '★ 在 fit() 里调用');
-});
-
-test('CSS：窄屏媒体查询里应用 --reg-tools-shift', () => {
+test('CSS：窄屏不撑满 cluster，卡片行与工具带都右对齐（贴屏幕右边，同 PC）', () => {
   const i = css.indexOf('@media (max-width: 900px)');
   assert.ok(i > 0, '有窄屏媒体查询');
-  const block = css.slice(i, i + 1200);
-  assert.match(block, /\.shopbar--reg \.shopbar__tools \{/, '★ 在窄屏里改工具带');
-  assert.match(block, /transform: translateX\(var\(--reg-tools-shift, 0px\)\)/, '★ 用位移变量（0 兜底）');
+  const end = css.indexOf('@media (max-height', i);
+  const block = css.slice(i, end > i ? end : i + 1200);
+  assert.doesNotMatch(block, /\.shopbar__cluster \{ width: 100%/, '★ 不再把 cluster 拉成 100%');
+  assert.match(block, /\.shopbar__tools \{ justify-content: flex-end; \}/, '★ 工具带右对齐');
+  assert.match(block, /justify-content: flex-end; \}/, '★ 卡片行右对齐');
+  assert.match(block, /width: max-content; max-width: 100%/, '★ 行宽按内容、不超视口');
+  assert.doesNotMatch(block, /justify-content: center/, '★ 不再居中');
+});
+
+test('JS：不再量商店池位置平移（fitTools / --reg-tools-shift 已删除）', () => {
+  assert.doesNotMatch(js, /function fitTools/, 'fitTools 应已删除');
+  assert.doesNotMatch(js, /--reg-tools-shift/, '位移变量应已删除');
+  assert.doesNotMatch(css, /--reg-tools-shift/, 'CSS 里也不该再引用');
+});
+
+test('JS：升级卡的 --up-k 仍然跟随卡片高度（保留）', () => {
+  assert.match(js, /function fitUpgrade\(el, k\)/, '★ 要保留 fitUpgrade');
+  assert.match(js, /--up-k/, '★ 写 --up-k');
+  assert.match(js, /fitUpgrade\(el, k\)/, '★ 在 fit() 里调用');
 });

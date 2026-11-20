@@ -415,21 +415,17 @@
 /* Short landscape (844×390 → 1rem = 40px). One row of 1.55rem cards is 62px and fits;
    wrap is the overflow safety. Touch targets stay at least --tap-min. */
 @media (max-width: 900px) {
-  .shopbar--reg .shopbar__cluster { width: 100%; --reg-k-max: 1; }
-  /* ★ 2026-11-20（玩家：刷新/冻结离商店池比较远；维护者选 B「贴近」）：
-     官方把这条控件带右对齐，但手机上的卡牌行是居中的，于是按钮在最右、卡牌在中间。
-     窄屏改成居中 —— 与卡牌行同一条中轴。属**故意偏离官方**（维护者决定）。 */
-  /* ★ 2026-11-20（维护者：冻结/刷新放在**商店池的右上角**，参考 PC 版）：
-     位移由 ui/shopBar.js 的 fitTools 量出来（右边缘对齐商店池），这里只负责应用。
-     justify-content: center 作为 JS 还没跑时的兜底。 */
-  .shopbar--reg .shopbar__tools {
-    justify-content: center;
-    transform: translateX(var(--reg-tools-shift, 0px));
-  }
+  /* ★ 2026-11-20（维护者：像电脑那样，商店区直接放在最右边，按钮也跟着走）：
+     不再把 cluster 拉成 100% 再居中卡片 —— 那样卡片居中、按钮在右，二者对不齐（此前为此加过
+     JavaScript 量位置再平移的补丁，现在不需要了）。这里保持 shrink-to-fit：
+     .shopbar 本身 right: .26rem + align-items: flex-end，卡片行与工具带都改右对齐，
+     「刷新 / 冻结」自然落在商店区右上角。 */
+  .shopbar--reg .shopbar__cluster { --reg-k-max: 1; }
+  .shopbar--reg .shopbar__tools { justify-content: flex-end; }
   .shopbar--reg .shopbar__row,
   .shopbar--reg .shopbar__cards,
-  .shopbar--reg .shopbar__rwcards { flex-wrap: wrap; justify-content: center; }
-  .shopbar--reg .shopbar__row { width: 100%; }
+  .shopbar--reg .shopbar__rwcards { flex-wrap: wrap; justify-content: flex-end; }
+  .shopbar--reg .shopbar__row { width: max-content; max-width: 100%; }
 }
 @media (max-height: 430px) {
   .shopbar--reg .shopbar__cluster { --reg-k-max: 1; }
