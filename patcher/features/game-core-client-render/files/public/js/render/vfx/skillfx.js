@@ -103,6 +103,12 @@ const ID_ROT = Object.freeze([0, 0, 0, 1]);
 /** 车道拖尾的统一缩放（塔露拉 heatwave：缩小后 4 条车道不再叠成一条厚火带）。 */
 const LANE_SCALE = 0.5;
 
+/**
+ * 火雨拖尾的朝向：美术沿 +x 拉长，按干员朝向绕 Z 旋转。
+ * RIGHT 0、UP +90°、LEFT 180°、DOWN −90°（Unity 战斗帧 +y 是行增大方向）。
+ */
+const LANE_YAW = Object.freeze({ RIGHT: 0, UP: Math.PI / 2, LEFT: Math.PI, DOWN: -Math.PI / 2 });
+
 /** Battle seconds a held (non-oneshot) row of a skill's single cast lasts (FxWiring's CAST_LOOP_S for attacks). */
 export const SKILL_CAST_S = 0.6;
 /**
@@ -1251,6 +1257,12 @@ export class SkillFx {
         //   横向 ≈1.4 格（重叠降到 ~29%），4 条重新看得出是 4 条。
         const h = this.w.playOn(k, this._ground(px0, py0, null), { important: true, scale: LANE_SCALE });
             if (!h) continue;
+            // ★ 2026-11-20（玩家：朝下时火雨变成一整条）：贴图是**横向**美术，而车道方向跟着朝向变；
+            //   不转贴图的话，朝上/朝下时几条横向拖影会并排叠在同一条横线上 → 看着是一整条。
+            //   这里按朝向把根节点转 90°（Effect.place 支持 yaw，之后的 place({pos}) 只改位置）。
+            // ★ 2026-11-20：四个方向都按朝向旋转贴图（朝左也要转，否则拖影头尾是反的）。
+        const laneYaw = LANE_YAW[D] ?? 0;
+        if (laneYaw) h.place({ yaw: laneYaw });
             drew = true;
             for (let step = 1; step <= STEPS; step++) {
               later(this.w.ofx, (step / STEPS) * dur, () => {

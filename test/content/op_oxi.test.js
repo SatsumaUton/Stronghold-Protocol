@@ -509,12 +509,18 @@ test('S3 日冕重烈 (MANUAL, DEFAULT, 36 s): ATK +atk, no attack; a volley at 
     const rel = volleys.map(([k]) => k - k0);
     const want = [0, 80, 160, 240, 320, 400, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020];
     assert.deepEqual(rel, want, `${label(f)}: 80 frames (2.67 s), from 18 s 60 frames`);
-    assert.ok(volleys.every(([, n]) => n === 4), `${label(f)}: every row of the field (4 < 5)`);
+    // ★ 2026-11-20（维护者：火雨高度固定，不随场地变化）：普通阶段恒 5 条、过载阶段恒 13 条，
+    //   不再压成场地行数。事件里两种阶段都在，所以按帧序分开断言。
+    const halfTick = Math.round((sk.duration / 2) / h.b.dt);   // 过载从技能一半（18 s）开始（按引擎 dt 换算）
+    const normalVolleys = volleys.filter(([k]) => k < k0 + halfTick);
+    const overVolleys = volleys.filter(([k]) => k >= k0 + halfTick);
+    assert.ok(normalVolleys.length > 0 && normalVolleys.every(([, n]) => n === 5), `${label(f)}: normal lanes = 5 (fixed)`);
+    assert.ok(overVolleys.length > 0 && overVolleys.every(([, n]) => n === 13), `${label(f)}: overload lanes = 13 (fixed)`);
     done(h);
   }
 });
 
-test('S3 lanes: across her facing within normal_half_width (overload_half_width under 过载) of her own, shifted inside the field; from up to 11 tiles behind her to wave_exit_distance past the far edge', () => {
+test('S3 lanes: across her facing within normal_half_width (overload_half_width under 过载) of her own, a fixed 2*half+1 lanes (shifted inside the field when it fits); from up to 11 tiles behind her to wave_exit_distance past the far edge', () => {
   const b = skillOf(6, true, 2).bb;
   const lanes = (u) => u.mem.oxiShots.map((s) => [s.x, s.y, s.dx, s.dy, s.left]);
   {
@@ -524,7 +530,10 @@ test('S3 lanes: across her facing within normal_half_width (overload_half_width 
     assert.deepEqual(lanes(u), [3, 4, 5, 6, 7].map((c) => [c, 9, 0, 1, 12 + b.wave_exit_distance - 9]), 'five columns around hers');
     h.runUntil(() => u.mem.oxiRain?.over, 20);
     const wave = u.mem.oxiShots[u.mem.oxiShots.length - 1].wave;   // the 过载 volley, just fired
-    assert.deepEqual(u.mem.oxiShots.filter((s) => s.wave === wave).map((s) => s.x), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], '过载: every column of the field (11 < 13)');
+    // ★ 2026-11-20（维护者：火雨高度固定）：13 列固定 —— 场地只有 11 列时贴住 c1=10，
+    //   允许两列落在场地外（-2 … 10），不再压成 11 列。
+    assert.deepEqual(u.mem.oxiShots.filter((s) => s.wave === wave).map((s) => s.x),
+      Array.from({ length: 13 }, (_, k) => k - 2), '过载: always overload_half_width*2+1 = 13 lanes (fixed)');
     done(h);
   }
   {
@@ -536,7 +545,9 @@ test('S3 lanes: across her facing within normal_half_width (overload_half_width 
   {
     const { h, u } = field({ skill: 2, dir: 'LEFT', col: 5 });
     inTick(h, () => { u.skill.gainSp(999); u.skill.activate('test'); });
-    assert.deepEqual(lanes(u), [9, 10, 11, 12].map((r) => [10, r, -1, 0, 10 + b.wave_exit_distance]), 'facing left: from col min(10, 5 + 11) to 0 − 5');
+    // 朝左：车道是**行**，5 条固定；4 行场地放不下 → 贴住 r1 = 12，窗口 8..12（有一条在场地外）。
+    assert.deepEqual(lanes(u), [8, 9, 10, 11, 12].map((r) => [10, r, -1, 0, 10 + b.wave_exit_distance]),
+      'facing left: 5 fixed lanes, window flush to r1 when the field is narrower');
     done(h);
   }
 });
@@ -593,23 +604,27 @@ test('S3: a 簇火 in flight when she leaves the field still explodes (the cache
   done(h);
 });
 
-test('S3: only one 塔露拉 channels at a time — another\'s volleys fail until the first one\'s skill ended; the 簇火 in flight outlive the skill', () => {
+test('S3: 每个塔露拉各自发火雨（维护者 2026-11-20 取消「同时只允许一个」的 PRTS 门槛）', () => {
   const second = { uid: 2, diy: { slot: SLOT[5], charId: OXI, skillIndex: 2 }, elite: true, row: 12, col: 5 };
   const { h, u } = field({ skill: 2, others: [second] });
   const v = h.unit(2);
   assert.equal(v.def.charId, OXI);
   const volleys = [];
   const fx = h.b.fx.bind(h.b);
-  h.b.fx = (kind, p) => { if (kind === 'heatwave') volleys.push([p.id, h.b.time]); return fx(kind, p); };
+  h.b.fx = (kind, p) => { if (kind === 'heatwave') volleys.push([p.id, h.b.time, p.n]); return fx(kind, p); };
   inTick(h, () => { u.skill.gainSp(999); u.skill.activate('test'); });
   h.run(10);
   inTick(h, () => { v.skill.gainSp(999); v.skill.activate('test'); });
   assert.ok(v.skill.active);
-  h.runUntil(() => !u.skill.active, 30);
-  const end = h.b.time;
-  assert.ok(volleys.filter(([id]) => id === v.id).length === 0, 'the second one fails while the first channels');
-  assert.ok(u.mem.oxiShots.length > 0, 'the first one\'s 簇火 still fly');
-  h.runUntil(() => !v.skill.active, 15);
-  assert.ok(volleys.some(([id, time]) => id === v.id && time >= end - 1e-9), 'then the second one channels');
+  h.run(10);
+  // ★ 两个人都在发：各自的 id 都要出现，且车道数都是固定 5 条
+  const ids = new Set(volleys.map(([id]) => id));
+  assert.ok(ids.has(u.id), '第一个人的火雨');
+  assert.ok(ids.has(v.id), '★ 第二个人的火雨也要有（此前被门槛丢弃）');
+  assert.equal(volleys[0][2], 5, '第一次齐射是普通阶段的 5 条');
+  assert.ok(volleys.every(([, , n]) => n === 5 || n === 13), '车道数只可能是固定的 5（普通）或 13（过载）');
+  assert.ok(u.mem.oxiShots.length > 0 && v.mem.oxiShots.length > 0, '两个人的簇火都在飞');
+  h.runUntil(() => !u.skill.active, 40);
+  h.runUntil(() => !v.skill.active, 40);
   done(h);
 });

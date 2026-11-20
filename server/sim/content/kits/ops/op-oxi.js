@@ -115,15 +115,11 @@ const SHOT_LIFETIME = 25;
 const GUARD_KEY = 'skill:oxi:guard';
 const WINDOW_KEY = 'skill:oxi:guardWindow';
 const STACK_KEY = 'skill:oxi:stack';
-/** battle → the 塔露拉 channelling S3 (CheckOxiFireRainSlot: one at a time). */
-const RAIN_SLOT = new WeakMap();
 
 const bbOf = (chess, id) => skillRec(chess, id)?.bb ?? {};
 const tileOf = (key) => [Math.floor(key / COLS), key % COLS];
 /** S2 selects with 隐匿 ignored (PRTS; `_onlyIgnoreSomeOfTargetFreeCase`): a living enemy no 无法选中 or 沉睡 keeps out. */
 const retaliable = (e) => !!e && e.alive && e.deployed && !e.hidden && e.side === 'enemy' && !e.s.flags.untargetable && !e.s.flags.sleep;
-/** S3 is channelling on `u`. */
-const raining = (u) => !!u && u.alive && !!u.skill && u.skill.active && u.skill.id === S3 && !!u.mem.oxiRain;
 
 export default {
   char_4247_oxi: (bb, chess, def) => {
@@ -177,15 +173,15 @@ export default {
     // ---- S3 日冕重烈 -------------------------------------------------------------------------------------------------
     /** A volley of 簇火 (EmitDirectionalMapEdgeProjectileVolley); `half` = the lanes on each side of hers. */
     const volley = (battle, unit, half) => {
-      const holder = RAIN_SLOT.get(battle);
-      if (holder && holder !== unit && raining(holder)) return;
-      RAIN_SLOT.set(battle, unit);
       if (!unit.canAct) return;
       const [fr, fc] = dirVec(unit.dir), R = battle.rect;
       const across = fr === 0;   // facing left / right: the lanes are rows
       const lo = across ? R.r0 : R.c0, hi = across ? R.r1 : R.c1, mine = across ? unit.tileR : unit.tileC;
-      let a = mine - half, b = mine + half;
-      if (hi - lo < b - a) { a = lo; b = hi; } else if (a < lo) { b += lo - a; a = lo; } else if (b > hi) { a -= b - hi; b = hi; }
+      // ★ 2026-11-20（维护者：火雨的高度固定，不随场地变化）：车道数恒为 2*half+1（普通 5 / 过载 13），
+      //   窗口放得进场地就平移进去；放不进时贴住上/右边界，允许有车道落在场地外 —— 绝不减少条数。
+      const span = 2 * half;
+      const a = span <= hi - lo ? Math.max(lo, Math.min(mine - half, hi - span)) : hi - span;
+      const b = a + span;
       const sign = across ? fc : fr, at = across ? unit.tileC : unit.tileR;
       const back = sign > 0 ? (across ? R.c0 : R.r0) : (across ? R.c1 : R.r1), edge = sign > 0 ? (across ? R.c1 : R.r1) : (across ? R.c0 : R.r0);
       const from = sign > 0 ? Math.max(back, at - WAVE_MAX_BACK) : Math.min(back, at + WAVE_MAX_BACK);
@@ -286,8 +282,7 @@ export default {
           },
           onEnd({ battle, unit }) {
             unit.mem.oxiRain = null;
-            if (RAIN_SLOT.get(battle) === unit) RAIN_SLOT.delete(battle);
-          },
+                },
         },
       },
       talents: [

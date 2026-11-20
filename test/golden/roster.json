@@ -578,7 +578,7 @@
       "hooks": [1,186,4617,590,589,1079,1063,0,171,171,61,58,0,20084,76,5,171,0,1,172,0,0,0],
       "events": {"atk":714,"bounty":6,"cast":1,"deploy":13,"die":171,"dmg":1063,"engage":8,"fx":166,"rate":146,"skill":119,"spawn":186,"status":216},
       "fx": {"crit":24,"displace":30,"dp":3,"phase":1,"ripple":11,"shadowWeave":25,"shield":2,"stealth":4,"summon":51,"telegraph":3,"volley":8,"wolfShadow":2,"wolfShadowLost":1,"zone":1},
-      "snaps": "854bb977 2a79b714 575498af d54f364a c01962b2 aa827151 064e63ba 74b1c62a 48f1b371 441e5826 a9ff609c 0ea8d31f 4817899f c2f7f8bd 3910b9e4 5defecee"
+      "snaps": "854bb977 2a79b714 575498af d54f364a c01962b2 aa827151 064e63ba 74b1c62a 48f1b371 441e5826 a9ff609c 0ea8d31f 4817899f c2f7f8bd e3397475 a45e95c7"
     },
     "roster-010": {
       "about": "pass 0 band 4: chess_char_4_17_a chess_char_4_18_a chess_char_4_11_a chess_char_4_19_a chess_char_4_07_a chess_char_4_16_a chess_char_4_09_a chess_char_4_10_a chess_char_4_12_a chess_char_4_13_a chess_char_4_14_a chess_char_4_20_a token_10041_cathy_catsld token_10041_cathy_catsld",
