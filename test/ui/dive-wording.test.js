@@ -84,8 +84,9 @@ test('房间页：深潜房没有版本胶囊、也没有版本切换入口', ()
 
 test('服务端：深潜房不能切版本（建房拒、进房后 proposeVersion 也要拒）', () => {
   const src = read('server/lobby.js');
-  assert.match(src, /if \(variant && version !== DEFAULT_VERSION\) \{[\s\S]*?'「深渊回响」只支持「第二期下半」，不支持其他版本'/, 'create 要拒');
-  assert.match(src, /if \(room\.variant === 'deepecho' && version !== DEFAULT_VERSION\) \{[\s\S]*?'「深渊回响」只支持「第二期下半」，不支持其他版本'/, 'proposeVersion 也要拒（以前漏了）');
+  // ★ 2026-11-20（维护者：规程版本也要支持深渊回响）：闸门改成 ECHO_VERSIONS 允许表，文案也换了。
+  assert.match(src, /if \(variant && !echoVersionSupported\(version\)\) \{[\s\S]*?'「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'/, 'create 要按允许表拒');
+  assert.match(src, /if \(room\.variant === 'deepecho' && !echoVersionSupported\(version\)\) \{[\s\S]*?'「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'/, 'proposeVersion 也要拒（以前漏了）');
 });
 
 test('队友面板 / 结算 / 复活 / 相位横幅 / 连接横幅 / 主入口都走 diveWords', () => {

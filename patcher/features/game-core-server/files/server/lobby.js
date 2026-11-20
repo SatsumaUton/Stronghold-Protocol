@@ -277,7 +277,7 @@ const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
 import { ruleOption } from '../shared/plugins/rules.js';
 import { msg, wireMessage } from '../shared/i18n.js';
-import { DEFAULT_VERSION, versionById, versionSlug } from '../shared/versions.js';
+import { DEFAULT_VERSION, echoVersionSupported, versionById, versionSlug } from '../shared/versions.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 import { soloHoldConflictDetail, soloHoldOf } from './soloHold.js';
 
@@ -1655,8 +1655,9 @@ case 'room.list': return this.roomList(msg);
     //   升级后 `defaultVersion()` 返回规程 → 下面那道检查直接把深潜房拒掉，
     //   玩家点「开始深潜」只会看到「只支持第二期下半」。深潜必须自己钉住基础版本。
     const version = variant ? (askedVersion ?? DEFAULT_VERSION) : (askedVersion ?? this.defaultVersion());
-    if (variant && version !== DEFAULT_VERSION) {
-      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
+    // ★ 2026-11-20（维护者：规程版本也要支持深渊回响）：允许的版本由 shared/versions.js 的 ECHO_VERSIONS 决定
+    if (variant && !echoVersionSupported(version)) {
+      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'));
     }
 
     // 深潜只开放 险境(NORMAL) / 绝境(HARD) / 终极(ABYSS) 三档：标准模拟(FUNNY)的强度曲线
@@ -2737,8 +2738,9 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     // 深潜房能通过 room.proposeVersion 被切到第一期下半，于是「建房时不许、进房后随便切」，
     // 而深渊的模板 / 怪物池 / 词条都是按默认版本标定的，切过去只会数值漂移。
     // 维护者 2026-11-08：「深潜房里那个版本标签也不该显示」—— 界面不再给入口，服务端也必须堵住。
-    if (room.variant === 'deepecho' && version !== DEFAULT_VERSION) {
-      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
+    // ★ 2026-11-20（维护者：规程版本也要支持深渊回响）：允许的版本由 shared/versions.js 的 ECHO_VERSIONS 决定
+    if (room.variant === 'deepecho' && !echoVersionSupported(version)) {
+      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」'));
     }
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, room.mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${room.mode} rooms`);

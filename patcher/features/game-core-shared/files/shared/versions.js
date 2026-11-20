@@ -41,6 +41,25 @@ export const DEFAULT_VERSION = 'act2autochess';
 export const LOBBY_DEFAULT_VERSION = 'act3autochess@V3_1';
 
 /**
+ * 允许「深渊回响」使用的版本（维护者 2026-11-20：「规程版本也要支持深潜」）。
+ *
+ * 深潜的模板 / 怪物池 / 词条按 DEFAULT_VERSION 标定，所以在多版本支持之前被钉死成它；
+ * 现在扩展到 **规程·序列Ⅰ**：`data/echo-stages.json` 的 pools 已含 act3autochess_m01…m12，
+ * `server/match/match/echoCrossVersion.js` 负责把本版本 data/stages.json 里没有的战场记录补齐。
+ * 其余版本（第一期 / 第二期上半）仍不支持 —— 它们没有对应的跨版本战场池。
+ */
+export const ECHO_VERSIONS = Object.freeze([DEFAULT_VERSION, 'act3autochess@V3_1']);
+
+/**
+ * 该版本能否开「深渊回响」。
+ * @param {unknown} version
+ * @returns {boolean}
+ */
+export function echoVersionSupported(version) {
+  return typeof version === 'string' && ECHO_VERSIONS.includes(version);
+}
+
+/**
  * @typedef {{ id: string, season: string, family: 'covenant' | 'regulation', label: string, roomModes: readonly string[], dir: string }} OfficialVersion
  */
 

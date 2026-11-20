@@ -19,12 +19,12 @@
 // data.js as it reads a gameplay plugin's content set.
 // Texts go through t() (docs/I18N.md).
 
-import { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
+import { DEFAULT_VERSION, ECHO_VERSIONS, LOBBY_DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
 import { DIFFICULTIES, modeIdFor } from '../../shared/constants.js';
 import { t, N_ } from '../../shared/i18n.js';
 import { loadPref, savePref, selectRoute, store as appStore } from './store.js';
 
-export { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, versionById, versionSlug };
+export { DEFAULT_VERSION, ECHO_VERSIONS, LOBBY_DEFAULT_VERSION, versionById, versionSlug };
 
 /** The lobby preference (`sp.pref.lobby.version`): a registry id. */
 export const LOBBY_VERSION_PREF = 'lobby.version';

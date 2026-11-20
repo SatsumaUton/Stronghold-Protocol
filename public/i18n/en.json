@@ -3431,5 +3431,6 @@
   "搜索干员…": "Search operators…",
   "场上没有干员（要在作战/休整阶段）": "No operators on the field (needs the combat / rest phase).",
   "这个干员没有可放置的召唤物": "This operator has no summon to place.",
-  "打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中": "Once enabled, ALL players in this room (spectators excluded) can use the console to change data. This match is not recorded, cannot be listed publicly, and cannot be picked by matchmaking."
+  "打开后本房间所有玩家（观战除外）都能在对局里用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中": "Once enabled, ALL players in this room (spectators excluded) can use the console to change data. This match is not recorded, cannot be listed publicly, and cannot be picked by matchmaking.",
+  "「深渊回响」只支持「第二期下半」与「规程·序列Ⅰ」": "“Abyss Echo” supports only “Season 2 Part 2” and “Regulation · Sequence I”"
 }
