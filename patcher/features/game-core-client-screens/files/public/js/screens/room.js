@@ -1521,16 +1521,43 @@ export function RoomScreen() {
           ladder=${ladder} modeId=${ladder ? protoPick || room.modeId : null} onMode=${setProtoPick} season=${seasonOf(roomVersion(room))} />`
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
           online=${online} readOnly=${true} difficulties=${protoDifficulties} ladder=${ladder} modeId=${room.modeId || null} season=${seasonOf(roomVersion(room))} />` : null}
-    ${/* ★ 2026-11-21：深潜难度选择（深潜自己的难度卡，和深潜大厅一致） */ null}
-    ${echoDiffOpen ? html`<${Modal} open=${true} class="echodiff" micro="DEEP DIVE // DIFFICULTY" title=${t('深潜难度')}
-      width="min(9.6rem, 96vw)" onClose=${() => setEchoDiffOpen(false)}
-      actions=${html`<${Button} variant="ghost" onClick=${() => setEchoDiffOpen(false)}>${t('取消')}<//>
-        <${Button} variant="primary" disabled=${!echoDiffPick || echoDiffPick === room.difficulty || !!busy}
-          onClick=${async () => { if (await setDifficulty(echoDiffPick)) setEchoDiffOpen(false); }}>${t('确认')}<//>`}>
-      <div class="proto__body" data-mode="deepecho" style=${`--d-color:${DIFFICULTY_COLORS[echoDiffPick || room.difficulty]}`}>
-        <div class="echodiff__cards">
-          ${DEEP_ECHO_DIFFICULTIES.map((d, i) => html`<${EchoDifficultyCard} key=${d} difficulty=${d} index=${i}
-            selected=${(echoDiffPick || room.difficulty) === d} onSelect=${setEchoDiffPick} />`)}
+    ${/* ★ 2026-11-21：深潜难度选择（整屏，和同盟模拟的 ProtocolSelect 同一套骨架，内容用深潜难度卡） */ null}
+    ${echoDiffOpen ? html`<${Modal} open=${true} onClose=${() => setEchoDiffOpen(false)} class="proto" veilClass="proto-veil">
+      <div class="proto__body" data-mode="deepecho" data-fit="full"
+        data-difficulty=${echoDiffPick || room.difficulty}
+        data-season=${seasonOf(roomVersion(room))}
+        style=${`--d-color:${DIFFICULTY_COLORS[echoDiffPick || room.difficulty] || 'var(--amber)'}`}>
+        <div class="proto__bg" aria-hidden="true"></div>
+        <header class="proto-top">
+          <button type="button" class="proto__back" aria-label=${t('返回')} onClick=${() => setEchoDiffOpen(false)}>
+            <${Icon} name="exit" />
+          </button>
+          <div class="proto-title">
+            <h2 class="modal__title">${t('深潜难度')}</h2>
+            <span class="proto-title__mode"><${Icon} name="book" />${t('深渊回响')}<i>DEEP DIVE</i></span>
+          </div>
+        </header>
+        <div class="proto-body">
+          <section class="proto-stage">
+            <div class="proto-brief">
+              <b class="proto-brief__name">DE-${DEEP_ECHO_DIFFICULTIES.indexOf(echoDiffPick || room.difficulty) + 1} · ${t(DIFFICULTY_NAMES[echoDiffPick || room.difficulty] || (echoDiffPick || room.difficulty))}</b>
+              <p>${t('选好难度后确认，房间里的所有人都会看到新的深潜难度。')}</p>
+            </div>
+          </section>
+          <section class="proto-side">
+            <div class="proto-list" role="group" aria-label=${t('深潜难度')}>
+              ${DEEP_ECHO_DIFFICULTIES.map((d, i) => html`<${EchoDifficultyCard} key=${d} difficulty=${d} index=${i}
+                selected=${(echoDiffPick || room.difficulty) === d} onSelect=${setEchoDiffPick} />`)}
+            </div>
+            <div class="proto-foot">
+              <p class="proto-hint">${t('确认后，其他人需要重新准备。')}</p>
+              <button type="button" class="proto-start" disabled=${!echoDiffPick || echoDiffPick === room.difficulty || !!busy}
+                onClick=${async () => { if (await setDifficulty(echoDiffPick)) setEchoDiffOpen(false); }}>
+                <span class="proto-start__label">${t('确认')}</span>
+                <span class="proto-start__deco" aria-hidden="true"></span>
+              </button>
+            </div>
+          </section>
         </div>
       </div>
     <//>` : null}
