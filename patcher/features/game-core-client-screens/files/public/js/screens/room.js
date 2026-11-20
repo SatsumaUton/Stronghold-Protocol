@@ -936,7 +936,7 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
         style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}`}
           title=${t('深渊回响难度（DE-1 / DE-2 / DE-3）')}
           onChange=${(e) => onSetDifficulty(e.target.value)}>
-        ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d}>
+        ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d} style=${`color:${DIFFICULTY_COLORS[d] || 'var(--amber)'}`}>
           DE-${i + 1} · ${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</option>`)}
       </select>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
           title=${isHost ? t(echoRoom ? '更改深潜难度' : '更改模拟难度') : t('由创建者选择')}>
