@@ -111,22 +111,6 @@ export class MatchSettle {
       }
       try {
         this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: combinedUnite || null });
-        // ★ 2026-11-21（维护者：乌萨斯在 16 回合后像是不叠层）：临时层数**自动并入永久层**。
-        //   以前只在这里 delete —— 没有「转化临时层」驻防的玩家，战斗里攒的临时层（乌萨斯每击杀 +2/+4）
-        //   结算后全部消失。现在转化驻防**先**消费（它们会从池里扣掉自己拿走的部分），
-        //   剩下的在派发结束后并入 ps.layers；上限仍走 layerGainRoom（深渊回响无上限、普通房 999）。
-        if (ps.tempLayers && typeof ps.tempLayers === 'object') {
-          for (const [bondId, rawN] of Object.entries(ps.tempLayers)) {
-            if (!this.gd.bond(bondId)) continue;
-            const n = Math.floor(Number(rawN));
-            if (!(n > 0)) continue;
-            const before = ps.layers[bondId] || 0;
-            const added = layerGainRoom(before, n, this.layerCapOff);
-            if (!(added > 0)) continue;
-            ps.layers[bondId] = before + added;
-            this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle-temp' });
-          }
-        }
       } finally {
         delete ps.tempLayers;
       }
