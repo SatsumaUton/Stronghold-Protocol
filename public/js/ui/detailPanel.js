@@ -37,6 +37,8 @@
 import { progressLabel } from '../itemProgress.js';
 import { itemText, garrisonText } from './showTags.js';
 import { BondTimers } from './bondTimers.js';
+// 盟约投影的说明要按「策略替换后的效果」解析（维护者 2026-11-21）：与盟约条 / 战斗同一条效果
+import { bondEffectRecord } from './bondEffect.js';
 import { useEffect, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, MicroLabel, Button, confirmDialog, useTicker } from './components.js';
 import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken, TokenAvatar } from './gameComponents.js';
@@ -265,8 +267,15 @@ export function MorphGrantLine({ item, off = null, carried = null, mode = 'offic
 export function ProjectionLine({ projection, bondId, onBoard = true }) {
   const bond = data.lookup('bonds', bondId);
   if (!projection || !bond) return null;
+  // ★ 2026-11-21（玩家：选了「裁度」这类策略后，这里的说明还是规程原文）：
+  //   投影可能带 `effectId`（服务端按该玩家的策略替换算出来的，见 echoPhase._echoProjectionInfo）。
+  //   有它就按那条效果解析文字 —— 和盟约条 / 战斗用的是同一条效果；没有再退回投影自带的 desc。
+  const swapped = typeof projection.effectId === 'string' && projection.effectId
+    ? bondEffectRecord(bond, data.lookup('effects', projection.effectId), 0)
+    : null;
   // 投影自带的说明拿不到时用盟约原文兜底（第三条数据源只有 id）
-  const desc = projection.desc || bond.descRaw || bond.desc || '';
+  const desc = (swapped ? swapped.effectDescRaw || swapped.effectDesc || swapped.desc : null)
+    || projection.desc || bond.descRaw || bond.desc || '';
   // 维护者 2026-11-07 晚：投影不再强制「满档」—— 场上一名干员算一个成员（同名只算一个），
   // 激活 / 档位按原版人数门槛走，所以这里只说「视为成员」，档位由盟约条自己显示。
   return html`<p class=${cx('dhint', 'dhint--morph', 'is-worn')} data-projection=${bondId}>

@@ -9,8 +9,10 @@
 //   layout    'regulation': every player's field is in one scene, so the stage levels are atlases of three pieces and the
 //             round templates the road only; tools/versions/layouts.mjs rebuilds the 盟约 19×21 levels from them
 //   adapters  none: the bond and shop schemas are 下半's
-//   research  docs/research/versions/act3autochess-v3_1/ — not written yet: every research file falls back to
-//             docs/research/ (第二期下半) [ASSUMED] with a warning
+//   research  docs/research/versions/act3autochess-v3_1/ — 02-bonds.json only (the 9 bonds this season changed or
+//             added: 叙拉古/炎/萨尔贡/谢拉格/卡西米尔/乌萨斯/伊比利亚/莱塔尼亚/聚合), the other 17 rows copied from
+//             docs/research/02-bonds.json so no spec comes out null; any other research file still falls back to
+//             docs/research/ (第二期下半) with a warning
 //   tables    stock left out [ASSUMED] (no 规程 stock recording). shopDraft, tacticDraft and bountyDrafts are
 //             tools/versions/tables/act3autochess-v3_1.mjs, measured on BV13LWM6BEvY (15 co-op 终极 matches,
 //             2026-11-10/11). Each inference is marked [ASSUMED] in that module.
