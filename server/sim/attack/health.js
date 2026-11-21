@@ -38,6 +38,12 @@ export function leaderHitCancelled(battle, target, amount) {
 export function loseHp(battle, ctx, amount, { noHitLimit = false } = {}) {
   const { target, dmg } = ctx;
   if (!target || !target.alive || !(amount > 0)) return 0;
+  // 不灭的**装置**（`kind: 'device'` + `flags.invulnerable`）免疫流失（维护者 2026-11-21）。
+  //   「模拟宝藏」(enemy_9038_achest)、舞台箱子这类装置挂了 invulnerable，但以前这里不看 flags，
+  //   深渊诅咒「腐蚀 / 溃烂」走 dealHPLose 会把它们慢慢流血流死 —— 寻宝人策略因此拿不到宝藏收益。
+  //   只针对 device：干员 / 召唤物的「流失跳过一切伤害防护」是官方语义（PRTS 作战机制
+  //   「生命流失…跳过所有结算与伤判效果」），test/sim/damage-api.test.js 也钉住了这一点，不能改。
+  if (target.kind === 'device' && target.s && target.s.flags && target.s.flags.invulnerable) return 0;
   const lost = dmg.type === 'phys' || dmg.type === 'arts' ? mitigate(amount, dmg.type, target.s, dmg) : amount;
   if (!Number.isFinite(lost) || !(lost > 0)) return 0;
   if (!noHitLimit && leaderHitCancelled(battle, target, lost)) return 0;
