@@ -403,7 +403,7 @@ test('SERVER_ADD_ACTIVATED_BOND_BY_ALIVE_CHAR: living chess, the per-trigger cap
   assert.equal(hand.L('iberiaShip'), 0);
 });
 
-test('SERVER_CONVERT_TEMP_BOND: converters share one pool, a replay consumes it, settle drops it', () => {
+test('SERVER_CONVERT_TEMP_BOND: converters share one pool; the rest is absorbed into permanent layers (2026-11-21)', () => {
   const one = setup();
   const piece = give(one.m, one.ps, 'chess_char_1_01_a', 'board', [10, 4]);
   one.activate('ursusShip');
@@ -426,8 +426,9 @@ test('SERVER_CONVERT_TEMP_BOND: converters share one pool, a replay consumes it,
     tempLayerGains: { ursusShip: 10 }, unitsEnd: [],
   });
   both.m.settle(null, null);
-  assert.equal(both.ps.tempLayers, undefined, 'settle deletes the bag after the dispatch');
-  assert.equal(both.L('ursusShip'), 4, '184 takes 2 and 21 takes one per on-board 乌萨斯 member');
+  assert.equal(both.ps.tempLayers, undefined, 'settle 派发结束后清掉临时层袋子');
+  // ★ 2026-11-21：驻防先拿走 4，剩下的 6 在派发结束后自动并入永久层 —— 池 10 全部留下。
+  assert.equal(both.L('ursusShip'), 10, '驻防拿 4 + 剩余 6 自动并入');
 });
 
 test('SERVER_ADD_BOND_BOARD_SELL_PRICE: every on-board price, capped by max', () => {
