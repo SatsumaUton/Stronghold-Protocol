@@ -393,10 +393,24 @@ H.SERVER_MOST_BOND = {
     const selfId = selfView(ctx)?.id ?? ctx.source.piece?.id;
     const self = noSelf && selfId ? baseOf(ctx, selfId) : null;
     const maxTier = capped ? Math.max(1, Math.min(6, Math.floor(num(ctx.shopLevel(), 6)))) : 6;
-    for (const bond of order) {
+    const tryBond = (bond) => {
       const id = ctx.rollChess({ bond, maxTier, ...(self ? { filter: (cid) => baseOf(ctx, cid) !== self } : {}) });
-      if (id && ctx.grantChess(id)) return;
-    }
+      return id && ctx.grantChess(id) ? id : null;
+    };
+    for (const bond of order) if (tryBond(bond)) return;
+    // ★ 2026-11-21（玩家反馈：伊桑受盟约投影影响，卖出后什么都没给）：
+    //   上面只试「人数最多」那一档；那条盟约在本级一个可买的干员都没有时（`rollChess` → `pool.roll` 返回 null），
+    //   效果就静默失效。盟约投影会让「投影那条」凭空成为人数最多（场上每名干员都算它的成员），更容易踩到。
+    //   兜底：按人数从多到少把**剩下的**盟约再试一遍（同人数按 bondOrder，不再额外抽随机数，
+    //   所以正常路径的 rng 消耗与改动前逐字节一致、golden 不变），保证效果至少兑现一次。
+    const rest = bondOrder(ctx)
+      .filter((id) => !order.includes(id))
+      .filter((id) => !(sold && ctx.gd.bond(id)?.countMode === 'BOARD_ALL_CHESS'))
+      .map((id) => ({ id, count: ctx.bondCount(id) }))
+      .filter((e) => e.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .map((e) => e.id);
+    for (const bond of rest) if (tryBond(bond)) return;
   },
 };
 
