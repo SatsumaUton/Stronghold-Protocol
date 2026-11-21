@@ -261,7 +261,19 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     // 内容全部由 echoCodex.js 从现有表生成，所以祝福/诅咒/投影/词条改了图鉴自动跟上（不手写第二份文案）。
     // 与一局无关、不随玩家变化 → 允许缓存 5 分钟。
     if (parts.rawPath === '/api/deepecho/codex') {
-      sendJson(req, res, 200, buildEchoCodex(), { 'Cache-Control': 'public, max-age=300' });
+      // ★ 2026-11-21（玩家：图鉴里的盟约投影文本没跟上规程的盟约改动）：按请求方选的版本生成。
+      //   ?version=<id> 时用该版本的数据；不带（或就是默认版本）仍是原来的写死 8 条，行为不变。
+      const codexVersion = String(parts.query?.version || '');
+      let codexBonds = null;
+      try {
+        // 默认版本用 lobby 自己的 data（data/bonds.json 的原文），非默认版本用该版本的数据；
+        // 这样两边的投影文本口径一致（都是从数据里的 desc 派生，不是手写的短句）。
+        const raw = codexVersion && codexVersion !== DEFAULT_VERSION
+          ? health?.lobby?.versions?.data?.(codexVersion)
+          : health?.lobby?.safeData?.();
+        if (raw && raw.bonds) codexBonds = { raw: { bonds: raw.bonds } };
+      } catch { /* 取不到数据就退回写死的表 */ }
+      sendJson(req, res, 200, buildEchoCodex(codexBonds), { 'Cache-Control': 'public, max-age=300' });
       return;
     }
     // 「深渊回响」深潜排行榜（只读）：GET /api/dive/board?limit=50
