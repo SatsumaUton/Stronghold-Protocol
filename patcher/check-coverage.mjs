@@ -139,5 +139,35 @@ if (banned.length) {
   console.error('  修复：git rm --cached <file>（保留本地文件）');
 }
 
+// 5) 深渊回响独占文件不许进公开仓库（维护者 2026-11-21）。
+//    「深渊回响」只放在私有仓库（.gitignore 第 134 行的 deepecho 组、docs/DEEPECHO-REPO.md），
+//    但补丁快照（patcher/features/*/files/**）不受那条 gitignore 保护 ——
+//    我两次误把 echoProjection.js / echoPhase.js / echoCodex.js 的快照 add 进了公开仓库。
+//    凡是「补丁里的文件，其仓库同名路径本身是 deepecho 独占」的，一律报错。
+const DEEPECHO_EXCLUSIVE_PATTERNS = [
+  /^server\/match\/match\/echo[^/]*\.js$/,
+  /^public\/js\/ui\/echo[^/]*\.js$/,
+  /^public\/js\/screens\/echo[^/]*\.js$/,
+  /^public\/css\/.*echo[^/]*\.css$/,
+  /^data\/echo-stages\.json$/,
+  /^tools\/build-echo-stages\.mjs$/,
+  /^tools\/deepecho-repo\.mjs$/,
+  /^server\/match\/match\/echoCrossVersion\.js$/,
+];
+let leakedEcho = [];
+try {
+  leakedEcho = git(['ls-files', 'patcher/features']).split('\n').filter(Boolean)
+    .map((f) => ({ snap: f, repo: f.replace(/^patcher\/features\/[^/]+\/files\//, '') }))
+    .filter(({ snap, repo }) => snap.includes('/files/') && DEEPECHO_EXCLUSIVE_PATTERNS.some((re) => re.test(repo)))
+    .map(({ snap }) => snap);
+} catch { /* git 不可用时跳过 */ }
+
+if (leakedEcho.length) {
+  bad = true;
+  console.error(`\n✗ 有 ${leakedEcho.length} 个「深渊回响独占文件」的补丁快照进了公开仓库：`);
+  leakedEcho.slice(0, 20).forEach((f) => console.error('  ' + f));
+  console.error('  这些文件只放私有仓库（docs/DEEPECHO-REPO.md）。修复：git rm --cached <file>');
+}
+
 if (!bad) console.log('\n✓ 全部改动都已被补丁覆盖，且没有违规入库的文件');
 process.exit(bad ? 1 : 0);
