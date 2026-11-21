@@ -3758,6 +3758,11 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       room.matchKey = key;
       room.matchKeys = keys;
       room.replay = null;
+      // ★ 2026-11-21（玩家：规程房点「开始游戏」提示「本局模拟已结束 / 服务器重启导致对局中断」）：
+      //   `lastEndReason` 是**上一局**的死因，toState 在「房间没在对局」时下发它 → 客户端据此渲染
+      //   MatchEnded 浮层。新一局真的开起来了就该清掉；start 失败时更要清 —— 否则一次「开局被拒」
+      //   会被说成「上一局结束了」，而且那块浮层会盖住真正的错误提示。
+      room.lastEndReason = null;
       // ★ 恢复时局号沿用存档，不 ++（否则这一局会被记成「下一局」，battleId 重号、回放对不上）
       room.matchCount = restore ? restore.matchNo : room.matchCount + 1;
       this.log.info(`[lobby] ${room.code} match #${room.matchCount} ${restore ? 'restored' : 'starting'} (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
@@ -3770,6 +3775,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       if (room.matchCtx === ctx) {
         resetAiTakeover(room);
         room.match = null; room.matchCtx = null; room.matchKey = null;
+        // 开局失败也要清：别让「上一局的死因」冒充这一局的结局
+        room.lastEndReason = null;
       }
       this.disposeMatchCtx(ctx);
       this.broadcastState(room);
@@ -3785,62 +3792,101 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    * 只记真进过深潜的对局（`echoDiveStart > 0`）；没有 Redis（`SP_REDIS_URL` 未设）时 store 为空，
    * 这里直接返回 —— 功能静默关闭，不影响对局与结算。
    */
+  /**
+   * 「深渊回响」深潜排行榜：结算时写一条成绩。
+   *
+   * ★ 2026-11-21（玩家反馈：规程版本里玩深渊回响没有记录）：
+   *   规程房跑在**版本宿主**里，`room.match` 是 MatchProxy（只有 hosted / opts / roomCode / ended …），
+   *   没有 `echoVariant` / `echoDiveStart` / `gd` / `order` —— 旧代码第一行就 return，规程的成绩一条都写不进来
+   *   （Redis 里只有默认版本那三张榜）。
+   *   现在**优先用结算回传的 summary**（buildResult 的 m.result 已带 variant / echoDepth / echoDiveStart /
+   *   version / seed / durationMs / players[].bonds），本进程的 Match 只用于补充（gd 的盟约名字等）。
+   */
   _recordEchoBoard(room, summary) {
-    const m = room && room.match;
     const store = this.persistStore;
-    if (!store || !m || m.echoVariant !== 'deepecho' || !(m.echoDiveStart > 0)) return;
+    if (!store || !room) return;
+    const m = room.match;                       // 本进程 Match，或 MatchProxy（宿主内）
+    const fromSummary = !!summary && summary.variant === 'deepecho';
+    const local = !!m && m.echoVariant === 'deepecho';
+    if (!fromSummary && !local) return;
     // 「深渊回响」：调过参的房间**不进排行榜**（深度只在标准配置下可比）
     if (room.echoCfg) return;
     // 作弊控制台（2026-11-17）：开着的房间一行成绩都不写（深潜本身禁实验性功能，这里是双保险）
     if (room.experimental?.cheatConsole === true) return;
-    const entry = echoBoardEntry({
-      depth: Math.max(0, Math.floor(Number(m.round) || 0) - m.echoDiveStart + 1),
-      round: m.round,
-      victory: !!(summary && summary.victory === true),
-      players: (Array.isArray(m.order) ? m.order : [])
-        .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
-        .map((ps) => ps.name),
-      // 榜上要展示：每名玩家的**核心盟约**与**用过的盟约数**；通关时间 = 结束时刻 − 开局时刻（维护者 2026-11-05）
-      squads: (Array.isArray(m.order) ? m.order : [])
-        .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
-        .map((ps) => {
-          // 优先读**峰值**（`bondPeak`）：团灭时 eliminate() 已经把棋盘退回卡池，现算出来全是 0
-          // （维护者 2026-11-05：排行榜「无核心 · 最高 0 层」就是这个问题）
-          const peak = ps.bondPeak && typeof ps.bondPeak === 'object' ? ps.bondPeak : null;
-          const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
-          const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
-          // 只显示**最高的一个已激活核心盟约**（维护者 2026-11-07 晚：玩家反馈「没有激活的盟约也会出现在上面」）。
-          // 峰值里存的是「已激活核心盟约里层数最高的那一个」（player/round.js _trackBondPeak）；
-          // 旧存档没有 top 字段时退回现算：只在**已激活**的核心盟约里挑层数最高的。
-          const coreName = (id) => (id ? (m.gd.bond(id) || {}).name || id : null);
-          let topId = peak && typeof peak.top === 'string' ? peak.top : null;
-          if (!topId) {
-            let best = null;
-            for (const [id, rec] of live) {
-              const bond = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
-              if (!bond || bond.isCore !== true || !rec || rec.active !== true) continue;
-              const n = Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0));
-              const count = Math.max(0, Math.floor(Number(rec.count) || 0));
-              if (!best || n > best.n || (n === best.n && count > best.count)
-                || (n === best.n && count === best.count && (Number(bond.bondOrder) || 0) < best.order)) {
-                best = { id, n, count, order: Number(bond.bondOrder) || 0 };
-              }
-            }
-            topId = best ? best.id : null;
+    const gd = (local && m.gd) || null;          // 跨进程拿不到；缺失时只用 bondId
+    const diveStart = Math.max(1, Math.floor(Number(local ? m.echoDiveStart : summary.echoDiveStart) || 1));
+    const round = Math.max(1, Math.floor(Number(local ? m.round : summary.echoRound ?? summary.roundsPassed) || 1));
+    const depth = Math.max(0, Math.floor(Number(fromSummary ? summary.echoDepth : round - diveStart + 1) || 0));
+    const playersOf = (local && Array.isArray(m.order)) ? m.order : null;
+    const rowsOf = (fromSummary && Array.isArray(summary.players)) ? summary.players : null;
+    const namesOfRows = rowsOf ? rowsOf.map((r) => (r && typeof r.name === 'string' ? r.name : '')).filter(Boolean) : [];
+    const namesOfLocal = playersOf ? playersOf.filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string').map((ps) => ps.name) : [];
+    const names = namesOfLocal.length ? namesOfLocal : namesOfRows;
+    /** summary 的 bond 行 → 核心盟约 / 最高层数（没有 gd 时名字用 bondId 兜底）。 */
+    const squadFromRow = (row) => {
+      const bonds = Array.isArray(row && row.bonds) ? row.bonds : [];
+      const live = bonds.filter((b) => b && Number(b.count) > 0);
+      // 只显示**最高的一个已激活核心盟约**（口径与维护者 2026-11-07 晚一致）：
+      // 层数优先、同层比人数、再同按 bondOrder 靠前。跨进程没有 gd 的 isCore，
+      // 那就退一步在所有已激活盟约里挑层数最高的（榜上不会因此空着）。
+      let best = null;
+      for (const b of live) {
+        if (b.active !== true) continue;
+        const core = gd ? !!gd.bond(b.bondId)?.isCore : false;
+        if (gd && !core) continue;
+        const n = Math.max(0, Math.floor(Number(b.layers) || 0));
+        const count = Math.max(0, Math.floor(Number(b.count) || 0));
+        const order = gd ? Number(gd.bond(b.bondId)?.bondOrder) || 0 : 0;
+        if (!best || n > best.n || (n === best.n && count > best.count)
+          || (n === best.n && count === best.count && order < best.order)) {
+          best = { id: b.bondId, n, count, order };
+        }
+      }
+      const name = best && best.id ? (gd ? (gd.bond(best.id) || {}).name || best.id : best.id) : null;
+      const maxLayers = Math.max(0, ...live.map((b) => Math.max(0, Math.floor(Number(b.layers) || 0))));
+      return { name: row && row.name, cores: name ? [name] : [], bonds: live.length, maxLayers };
+    };
+    // 本进程：沿用原来的峰值口径（`bondPeak` 优先，团灭后现算全是 0）
+    const squadFromPlayer = (ps) => {
+      const peak = ps.bondPeak && typeof ps.bondPeak === 'object' ? ps.bondPeak : null;
+      const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
+      const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
+      const coreName = (id) => (id ? (gd.bond(id) || {}).name || id : null);
+      let topId = peak && typeof peak.top === 'string' ? peak.top : null;
+      if (!topId) {
+        let best = null;
+        for (const [id, rec] of live) {
+          const bond = typeof gd.bond === 'function' ? gd.bond(id) : null;
+          if (!bond || bond.isCore !== true || !rec || rec.active !== true) continue;
+          const n = Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0));
+          const count = Math.max(0, Math.floor(Number(rec.count) || 0));
+          if (!best || n > best.n || (n === best.n && count > best.count)
+            || (n === best.n && count === best.count && (Number(bond.bondOrder) || 0) < best.order)) {
+            best = { id, n, count, order: Number(bond.bondOrder) || 0 };
           }
-          const cores = topId ? [coreName(topId)] : [];
-          // 最高盟约层数（维护者 2026-11-05）：只看盟约**层数**，不看词条、不看稀有度。
-          // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值；团灭后取峰值。
-          const nowMax = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
-          const maxLayers = Math.max(nowMax, Math.max(0, Math.floor(Number(peak && peak.maxLayers) || 0)));
-          const bonds = Math.max(live.length, Math.max(0, Math.floor(Number(peak && peak.bonds) || 0)));
-          return { name: ps.name, cores, bonds, maxLayers };
-        }),
-      clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(m.startedAt || this.now()))),
+        }
+        topId = best ? best.id : null;
+      }
+      const nowMax = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
+      const maxLayers = Math.max(nowMax, Math.max(0, Math.floor(Number(peak && peak.maxLayers) || 0)));
+      const bonds = Math.max(live.length, Math.max(0, Math.floor(Number(peak && peak.bonds) || 0)));
+      return { name: ps.name, cores: topId ? [coreName(topId)] : [], bonds, maxLayers };
+    };
+    const squads = playersOf && gd
+      ? playersOf.filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string').map(squadFromPlayer)
+      : (rowsOf || []).filter((r) => r && typeof r.name === 'string').map(squadFromRow);
+    const entry = echoBoardEntry({
+      depth,
+      round,
+      victory: !!(summary && summary.victory === true),
+      players: names,
+      squads,
+      clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(local ? m.startedAt : summary && summary.durationMs != null
+        ? this.now() - Math.max(0, Number(summary.durationMs)) : this.now()))),
       at: this.now(),
       roomCode: room.code,
       matchNo: room.matchCount,
-      seed: m.seed,
+      seed: local ? m.seed : (summary && summary.seed),
       // 榜按难度分开存（深度跨难度不可比），所以这条必须带上
       difficulty: room.difficulty,
       // ★ 2026-11-20：规程也能深潜，榜还要按**版本**分开（深度跨版本同样不可比）
