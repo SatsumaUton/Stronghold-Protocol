@@ -172,13 +172,54 @@ $expected = @('matchmaker', 'dashboard')
 #   然后逐个 start —— 等于每分钟都有可能全量重启一次，玩家对局被反复打断。
 #   `pm2 jlist` 会间歇性失败（尤其 pm2 忙的时候），而这里没有「读不到就别动」的保护。
 #   现在：读不到 / 读到的东西明显不完整 → 这一轮什么都不做。
-if ($online.Count -eq 0) {
-  Write-Log 'ALERT cannot read PM2 status -> skip (no action)'
-  exit 0
+#
+# ⚠ 2026-11-22 事故：有人跑了 `pm2 update`，dump 被清空、只剩 pm2-logrotate ——
+#   30 个节点 + matchmaker + dashboard 全部下线 53 分钟，而本脚本每分钟都写
+#   「ALERT only 1/32 apps visible -> treated as a read problem, skip」：
+#   把「应用真的没了」误判成「读抖动」，于是自己放弃了修复。
+#
+#   现在区分两者：**连续读 3 次、稳定地少 = 真的没了** → 继续往下补启动；
+#   两次读数之间发生变化 = 抖动 → 跳过。真正的读取失败仍由 _pm2-online.cjs 的退出码体现。
+function Read-OnlineApps {
+  $t = Join-Path $env:TEMP 'sp-pm2-jlist.json'
+  $null = Invoke-Hidden ('/c ""' + $pm2Cmd + '" jlist > "' + $t + '" 2>nul"')
+  $list = @()
+  $pr = Join-Path $root 'deploy\_pm2-online.cjs'
+  if (-not (Test-Path $pr)) { return $list }
+  try {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $nodeExe
+    $psi.Arguments = '"' + $pr + '" "' + $t + '"'
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    if ($p.WaitForExit(20000)) {
+      $o = ''
+      try { $o = $p.StandardOutput.ReadToEnd() } catch { }
+      $null = $p.StandardError.ReadToEnd()
+      if ($p.ExitCode -eq 0) { $list = @($o -split ',') }
+    } else { try { $p.Kill() } catch { } }
+  } catch { }
+  return $list
 }
-if ($online.Count -lt [Math]::Floor($expected.Count / 2)) {
-  Write-Log ('ALERT only ' + $online.Count + '/' + $expected.Count + ' apps visible -> treated as a read problem, skip')
-  exit 0
+
+$half = [Math]::Floor($expected.Count / 2)
+if ($online.Count -lt $half) {
+  $stable = 0
+  for ($i = 0; $i -lt 3 -and $stable -lt 2; $i++) {
+    Start-Sleep -Milliseconds 1200
+    $again = @(Read-OnlineApps)
+    if ($again.Count -eq $online.Count) { $stable++ } else { $online = $again; $stable = 0 }
+    if ($online.Count -ge $half) { break }
+  }
+  if ($online.Count -lt $half -and $stable -ge 2) {
+    Write-Log ('APPS GONE: only ' + $online.Count + '/' + $expected.Count + ' visible on 3 stable reads -> starting the missing ones (NOT a read problem)')
+  } elseif ($online.Count -lt $half) {
+    Write-Log ('ALERT only ' + $online.Count + '/' + $expected.Count + ' apps visible, unstable reads -> treated as a read problem, skip')
+    exit 0
+  }
 }
 
 $missing = @($expected | Where-Object { $online -notcontains $_ })
