@@ -3439,5 +3439,14 @@
   "取消叠层限制": "No stacking cap",
   "更改深潜难度": "Change deep dive difficulty",
   "选好难度后确认，房间里的所有人都会看到新的深潜难度。": "Pick a difficulty and confirm: everyone in the room sees the new deep dive difficulty.",
-  "确认后，其他人需要重新准备。": "Others must ready up again after you confirm."
+  "确认后，其他人需要重新准备。": "Others must ready up again after you confirm.",
+  "发送太频繁，请稍后再试": "Sent too often — please wait a moment",
+  "今日验证码发送次数已达上限，请明天再试": "Daily verification-code limit reached — try again tomorrow",
+  "密码已重置，请用新密码登录": "Password reset — sign in with your new password",
+  "用邮箱重置密码：填好邮箱后点「发送验证码」，收到 6 位验证码后设置新密码": "Reset by email: enter your mailbox, tap \"Send code\", then set a new password with the 6-digit code",
+  "新密码（至少 8 位）": "New password (at least 8 characters)",
+  "重置密码并登录": "Reset password and sign in",
+  "忘记密码？": "Forgot your password?",
+  "返回登录": "Back to sign in",
+  "献祭 · 扩容：祝福名额 +1（本局，全队共享），立刻补一次抽取": "Offering · Expansion: blessing slot +1 (this run, shared by the team), plus one immediate draw"
 }

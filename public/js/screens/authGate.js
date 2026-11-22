@@ -21,7 +21,7 @@ import { useLang, useLangs, switchLang, langMenuModel } from '../ui/lang.js';
 import { data } from '../data.js';
 import { uiUrl } from '../ui/assetUrls.js';
 import { t, N_ } from '../../../shared/i18n.js';
-import { adoptAuth, api, AUTH_CAPTCHA_URL, AUTH_LOGIN_URL, AUTH_REGISTER_URL, AUTH_SEND_CODE_URL, setGuestChosen } from './authSession.js';
+import { adoptAuth, api, AUTH_CAPTCHA_URL, AUTH_LOGIN_URL, AUTH_REGISTER_URL, AUTH_SEND_CODE_URL, AUTH_RESET_SEND_URL, AUTH_RESET_URL, setGuestChosen } from './authSession.js';
 
 const QQ_EMAIL = /^[1-9][0-9]{4,11}@qq\.com$/;
 const PASS_MIN = 8;
@@ -41,6 +41,8 @@ function errorText(code) {
     code_attempts: N_('验证码错误次数过多，请重新获取'),
     too_many_requests: N_('操作过于频繁，请稍后再试'),
     captcha_wrong: N_('图形验证码错误'),
+    too_soon: N_('发送太频繁，请稍后再试'),
+    too_many_codes: N_('今日验证码发送次数已达上限，请明天再试'),
   };
   return MAP[code] ? t(MAP[code]) : t(N_('操作失败，请稍后重试'));
 }
@@ -132,7 +134,9 @@ export function AuthGate({ onDone, checkError = false }) {
     if (!QQ_EMAIL.test(mail)) return say(t(N_('请输入正确的 QQ 邮箱')));
     if (cooldown > 0) return undefined;
     try {
-      const r = await api(AUTH_SEND_CODE_URL, { method: 'POST', body: JSON.stringify({ email: mail }) });
+      // ★ 2026-11-22：重置模式发的是「重置密码验证码」（/api/auth/reset/send），不是注册验证码
+      const url = mode === 'reset' ? AUTH_RESET_SEND_URL : AUTH_SEND_CODE_URL;
+      const r = await api(url, { method: 'POST', body: JSON.stringify({ email: mail }) });
       if (!r.body || !r.body.ok) {
         const retry = Number(r.body && r.body.retryAfter);
         if (Number.isFinite(retry) && retry > 0) setCooldown(Math.min(3600, retry));
@@ -154,7 +158,47 @@ export function AuthGate({ onDone, checkError = false }) {
     return submit(AUTH_REGISTER_URL, { email: mail, code: code.trim(), password: pass, captcha: captchaText.trim(), captchaId: captchaId.current }, 'register');
   }
 
-  const submitNow = () => (mode === 'login' ? doLogin() : doRegister());
+  /**
+   * 「忘记密码」：邮箱验证码重置（维护者 2026-11-22）。
+   *   成功后**直接登录** —— 密码刚改过，玩家就是本人，不必再输一遍。
+   */
+  async function doReset() {
+    const mail = email.trim().toLowerCase();
+    if (!QQ_EMAIL.test(mail)) return say(t(N_('请输入正确的 QQ 邮箱')));
+    if (!/^[0-9]{6}$/.test(code.trim())) return say(t(N_('请输入 6 位邮箱验证码')));
+    if (pass.length < PASS_MIN) return say(t(N_('密码至少 8 位')));
+    if (busy) return undefined;
+    setBusy(true);
+    say(t(N_('处理中…')), 'ok');
+    try {
+      const r = await api(AUTH_RESET_URL, {
+        method: 'POST', body: JSON.stringify({ email: mail, code: code.trim(), password: pass }),
+      });
+      if (!r.body || !r.body.ok) return say(errorText(r.body && r.body.error));
+      // 重置成功：后端已经把旧会话全部踢掉，这里自动登录一次拿新会话
+      const login = await api(AUTH_LOGIN_URL, {
+        method: 'POST',
+        body: JSON.stringify({ email: mail, password: pass, captcha: captchaText.trim(), captchaId: captchaId.current }),
+      });
+      if (login.body && login.body.ok) {
+        adoptAuth(login.body);
+        say('');
+        onDone('login');
+        return undefined;
+      }
+      // 自动登录失败（图形验证码填错之类）：密码已经改好了，把玩家留在登录页自己登
+      setMode('login');
+      say(t(N_('密码已重置，请用新密码登录')));
+      loadCaptcha();
+      return undefined;
+    } catch {
+      return say(t(N_('网络错误，请稍后重试')));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const submitNow = () => (mode === 'login' ? doLogin() : mode === 'reset' ? doReset() : doRegister());
   const onKeyDown = (e) => { if (e.key === 'Enter' && !busy) submitNow(); };
 
   return html`<div class="sp-lg-screen" data-testid="auth-gate" role="dialog" aria-modal="true" aria-label=${t(N_('登录 / 注册'))}>
@@ -205,6 +249,7 @@ export function AuthGate({ onDone, checkError = false }) {
             <button class=${`sp-lg-tab${mode === 'register' ? ' is-on' : ''}`} data-testid="auth-tab-register"
               onClick=${() => { setMode('register'); say(''); }}>${t(N_('注册'))}</button>
           </div>
+          ${mode === 'reset' ? html`<div class="sp-lg-hint sp-lg-hint--reset" data-testid="auth-reset-hint">${t(N_('用邮箱重置密码：填好邮箱后点「发送验证码」，收到 6 位验证码后设置新密码'))}</div>` : null}
 
           <div class="sp-lg-fields" onKeyDown=${onKeyDown}>
             <${Field} tag="MAIL">
@@ -213,7 +258,7 @@ export function AuthGate({ onDone, checkError = false }) {
             <//>
             <p class="sp-lg-hint">${t(N_('仅支持 QQ 号邮箱，QQ 号必须是纯数字；不支持自定义邮箱名'))}</p>
 
-            ${mode === 'register' ? html`<${Field} tag=${html`MAIL<br />CODE`}>
+            ${mode !== 'login' ? html`<${Field} tag=${html`MAIL<br />CODE`}>
               <input class="sp-lg-field__input" value=${code} inputmode="numeric" data-testid="auth-code"
                 placeholder=${t(N_('6 位邮箱验证码'))} onInput=${(e) => setCode(e.currentTarget.value)} />
               <button class="sp-lg-field__act" data-testid="auth-send-code" disabled=${cooldown > 0}
@@ -223,7 +268,7 @@ export function AuthGate({ onDone, checkError = false }) {
             <${Field} tag="PASS">
               <input class="sp-lg-field__input" type="password" value=${pass} data-testid="auth-pass"
                 autocomplete=${mode === 'login' ? 'current-password' : 'new-password'}
-                placeholder=${mode === 'login' ? t(N_('密码')) : t(N_('密码（至少 8 位）'))}
+                placeholder=${mode === 'login' ? t(N_('密码')) : mode === 'reset' ? t(N_('新密码（至少 8 位）')) : t(N_('密码（至少 8 位）'))}
                 onInput=${(e) => setPass(e.currentTarget.value)} />
             <//>
 
@@ -237,8 +282,16 @@ export function AuthGate({ onDone, checkError = false }) {
             </div>
 
             <button class=${`sp-lg-submit${busy ? ' is-busy' : ''}`} data-testid="auth-submit" disabled=${busy} onClick=${submitNow}>
-              ${mode === 'login' ? t(N_('登 录')) : t(N_('注册并登录'))}
+              ${mode === 'login' ? t(N_('登 录')) : mode === 'reset' ? t(N_('重置密码并登录')) : t(N_('注册并登录'))}
             </button>
+            ${/* ★ 2026-11-22（维护者：登录页没有忘记密码）：重置入口。register 模式不显示，重置模式变成「返回登录」 */ null}
+            <div class="sp-lg-forgot">
+              ${mode === 'reset'
+                ? html`<button type="button" class="sp-lg-forgot__link" data-testid="auth-forgot-back" onClick=${() => { setMode('login'); say(''); }}>${t(N_('返回登录'))}</button>`
+                : mode === 'login'
+                  ? html`<button type="button" class="sp-lg-forgot__link" data-testid="auth-forgot" onClick=${() => { setMode('reset'); say(''); }}>${t(N_('忘记密码？'))}</button>`
+                  : null}
+            </div>
           </div>
 
           ${msg ? html`<div class=${`sp-lg-msg ${msg.tone === 'ok' ? 'is-ok' : 'is-err'}`} data-testid="auth-msg">${msg.text}</div>` : null}

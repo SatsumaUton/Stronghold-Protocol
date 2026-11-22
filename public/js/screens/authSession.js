@@ -18,6 +18,11 @@ export const AUTH_LOGIN_URL = '/api/auth/login';
 export const AUTH_REGISTER_URL = '/api/auth/register';
 export const AUTH_SEND_CODE_URL = '/api/auth/send-code';
 export const AUTH_CAPTCHA_URL = '/api/auth/captcha';
+// 「忘记密码」（维护者 2026-11-22）：邮箱验证码重置。后端matchmaker/account.cjs 的
+// POST /api/auth/reset/send（发 6 位验证码，10 分钟有效，带限流与「不论存在都回成功」的防探测）
+// 与 POST /api/auth/reset（email + code + password → 改密并踢掉全部会话）都已存在，缺的只是 UI。
+export const AUTH_RESET_SEND_URL = '/api/auth/reset/send';
+export const AUTH_RESET_URL = '/api/auth/reset';
 
 /** 游客选择（同一标签页内有效）。 */
 export const GUEST_KEY = 'sp.authGate.guest';

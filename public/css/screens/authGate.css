@@ -945,3 +945,37 @@ html.sp-gate-open .app-root { visibility: hidden; }
 /* 线上还有一条老注入器会塞 `.mm-icp`（固定在右下/底部），维护者 2026-11-16 要求备案号只跟
    「非官方同人复刻…」写在一起一处，所以任何 `.mm-icp` 一律不显示（我们自己的锚点是 .sp-lg-icp / .title-icp）。 */
 .mm-icp { display: none !important; }
+
+/* ★ 2026-11-22（维护者：登录页没有忘记密码）：重置入口与它的说明行。
+   配色沿用这一屏的 draft 调色（琥珀提示 / 薄荷链接），尺寸走项目规则（>32px 的用 max(rem, 32px, ...)）。 */
+.sp-lg-forgot {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+.sp-lg-forgot__link {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: #9fb4b8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color .16s;
+}
+.sp-lg-forgot__link:hover {
+  color: #9ff0d8;
+}
+.sp-lg-forgot__link:focus-visible {
+  outline: 2px solid #9ff0d8;
+  outline-offset: 2px;
+}
+/* 重置模式的说明行：和注册页那句邮箱提示同一档（margin 用负值贴紧上方字段组） */
+.sp-lg-hint--reset {
+  margin: 8px 0 2px;
+  padding-left: 2px;
+}
