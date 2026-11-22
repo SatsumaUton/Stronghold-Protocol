@@ -12,13 +12,13 @@
 #
 # Usage:
 #   powershell -File deploy\archive-security-audit.ps1                 # snapshot now
-#   powershell -File deploy\archive-security-audit.ps1 -KeepDays 60   # retention
+#   powershell -File deploy\archive-security-audit.ps1 -KeepDays 365  # retention (default 180)
 #   powershell -File deploy\archive-security-audit.ps1 -WhatIf        # show, do nothing
 #
 # Scheduled task: SP-Audit-Archive (SYSTEM, daily 03:00).
 
 param(
-  [int]$KeepDays = 30,
+  [int]$KeepDays = 180,
   [string]$OutDir = "D:\Stronghold-Protocol\logs\security",
   [switch]$WhatIf
 )

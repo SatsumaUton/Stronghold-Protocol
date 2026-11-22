@@ -2390,7 +2390,7 @@ powershell -File deploy\find-process.ps1 -Pattern "node.exe" -Hours 1 -Limit 40
 |---|---|
 | 活日志 | `C:\Windows\System32\Winevt\Logs\Security.evtx`，上限 512 MB / Circular（实测占用 31 MB） |
 | 归档 | `deploy\archive-security-audit.ps1` → `D:\Stronghold-Protocol\logs\security\Security-<yyyyMMdd-HHmmss>.evtx` |
-| 保留 | 默认 30 天（`-KeepDays`），超期自动删；每次运行追加 `archive.log` |
+| 保留 | 默认 **180 天**（`-KeepDays`；维护者 2026-11-23 从 30 天调上来），超期自动删；每次运行追加 `archive.log` |
 | 计划任务 | `SP-Audit-Archive`（SYSTEM，每天 03:00，隐藏窗口） |
 
 快照是**完整的 .evtx 事件日志**，可以直接查：
@@ -2405,6 +2405,8 @@ Get-WinEvent -Path "...\Security-20261122-2329.evtx" -FilterXPath "*[System[(Eve
 
 实测（23:29）：快照 31.07 MB，`Get-WinEvent -Path` 能查到 4688 且带命令行；
 `find-process.ps1 -File ... -Pattern SPAUDIT2-MARKER` 正确打印了「新进程 / 父进程 / 命令行」。
+
+**空间估算**：单份 ~31–36 MB，每天 1 份 → 180 天约 **5–6 GB**（D 盘 671 GB 空闲，足够）。
 
 **如果以后 D 盘也想省空间**：把 `-KeepDays` 调小、或给任务加 `-WhatIf` 只算不写；
 但注意**归档是唯一的长期证据**（C: 的活日志是 Circular，写满就覆盖）。
