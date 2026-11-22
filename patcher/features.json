@@ -545,6 +545,7 @@
         "server/match/match/echoBounty.js",
         "server/match/match/echoCodex.js",
         "server/match/match/echoConfig.js",
+        "server/match/match/echoAllied.js",
         "server/match/match/echoCrossVersion.js",
         "server/match/match/echoCrossBounty.js",
         "server/match/match/echoCurse.js",
