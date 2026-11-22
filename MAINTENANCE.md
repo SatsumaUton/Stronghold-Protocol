@@ -1023,6 +1023,8 @@ curl --resolve stronghold.luobomiao.love:443:127.0.0.1 -o NUL -s -w "%{http_code
 | `C:\Users\<用户>\AppData\Roaming\pm2\logs\` | pm2 自己保留的副本（`pm2 logs` 读这里） |
 | `logs/restart-watch.log` | 自动重启巡检记录（「玩家说一直在重启」先看它） |
 | `logs\pm2-resurrect.log` | `_start-pm2.ps1` 的日志 |
+| `deploy\find-process.ps1` | 进程创建取证：`-Pattern` 查实时日志，`-File` 查 D 盘的 .evtx 归档（§9.9c/§9.9d） |
+| `deploy\archive-security-audit.ps1` | 把 Security 日志快照到 `D:\Stronghold-Protocol\logs\security\`，保留 30 天（任务 `SP-Audit-Archive`，§9.9d） |
 
 **读日志的两个注意点**：
 1. `pm2 jlist` 输出的 JSON 里**同名但大小写不同的键**会让 PowerShell 的 `ConvertFrom-Json` 直接失败。
@@ -2372,6 +2374,40 @@ powershell -File deploy\find-process.ps1 -Pattern "node.exe" -Hours 1 -Limit 40
    要在策略刷新后用 `auditpol /get /subcategory:"{0CCE922B-69AE-11D9-BED3-505054503030}"` 复查一次。
 2. **代价**：每个进程一次事件。512 MB ≈ 十几万条，按本机日常量能留几天；要更久就把容量再调大
    （现在 C: 还有 59 GB 空闲），或改成 `AutoBackup` 归档。
+
+#### 9.9d 为什么 Security 日志不能放 D 盘，以及我们怎么把证据放到 D 盘（2026-11-22）
+
+维护者问：「可以移到 D 盘吗？」—— **日志文件本体不能移。**
+
+`Security.evtx` 的路径是 Windows 写死的：`%SystemRoot%\System32\Winevt\Logs\Security.evtx`，
+由 LSA 持有；`wevtutil sl Security /lfn:D:\...` 会被拒绝。
+**只有自己新建的日志**（`New-WinEvent` 那个 `New-EventLog`/`wevtutil im` 机制）才能指定到别的盘。
+实测本机 `Get-WinEvent -ListLog Security` 的 `LogFilePath` 就是那个固定路径。
+
+所以采用等价方案：**活日志留 C: 当滚动缓冲，定期快照到 D: 归档**。
+
+| 环节 | 设置 |
+|---|---|
+| 活日志 | `C:\Windows\System32\Winevt\Logs\Security.evtx`，上限 512 MB / Circular（实测占用 31 MB） |
+| 归档 | `deploy\archive-security-audit.ps1` → `D:\Stronghold-Protocol\logs\security\Security-<yyyyMMdd-HHmmss>.evtx` |
+| 保留 | 默认 30 天（`-KeepDays`），超期自动删；每次运行追加 `archive.log` |
+| 计划任务 | `SP-Audit-Archive`（SYSTEM，每天 03:00，隐藏窗口） |
+
+快照是**完整的 .evtx 事件日志**，可以直接查：
+
+```powershell
+# 查某天的归档里 4688 都跑了什么
+powershell -File deploy\find-process.ps1 -File "D:\Stronghold-Protocol\logs\security\Security-20261122-2329.evtx" -Pattern "pm2"
+
+# 或者直接用 Windows 自带命令
+Get-WinEvent -Path "...\Security-20261122-2329.evtx" -FilterXPath "*[System[(EventID=4688)]]" -MaxEvents 20
+```
+
+实测（23:29）：快照 31.07 MB，`Get-WinEvent -Path` 能查到 4688 且带命令行；
+`find-process.ps1 -File ... -Pattern SPAUDIT2-MARKER` 正确打印了「新进程 / 父进程 / 命令行」。
+
+**如果以后 D 盘也想省空间**：把 `-KeepDays` 调小、或给任务加 `-WhatIf` 只算不写；
+但注意**归档是唯一的长期证据**（C: 的活日志是 Circular，写满就覆盖）。
 
 #### 相关文件
 

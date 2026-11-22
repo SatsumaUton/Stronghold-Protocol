@@ -18,10 +18,13 @@
 # Prints, one block per hit: time, account, new process, PARENT process, command line.
 
 param(
-  [Parameter(Mandatory = $true)][string]$Pattern,
+  [string]$Pattern,
+  [string]$File,            # query an archived .evtx under logs\security\*
   [int]$Hours = 12,
   [int]$Limit = 30
 )
+
+if (-not $Pattern -and -not $File) { Write-Host 'Usage: -Pattern <regex> [-Hours N] | -File <archive.evtx> [-Pattern <regex>]'; exit 2 }
 
 $ErrorActionPreference = 'SilentlyContinue'
 $since = (Get-Date).AddHours(-1 * [Math]::Abs($Hours))
@@ -33,12 +36,20 @@ if ($policy -notmatch 'Success') {
   Write-Host 'See MAINTENANCE section 9.9c for how to enable it.' -ForegroundColor Yellow
 }
 
-$events = Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 4688; StartTime = $since } -ErrorAction SilentlyContinue |
-  Where-Object { $_.Message -match $Pattern } |
-  Select-Object -First $Limit
+if ($File) {
+  if (-not (Test-Path $File)) { Write-Host ("archive not found: " + $File); exit 2 }
+  $events = Get-WinEvent -Path $File -FilterXPath "*[System[(EventID=4688)]]" -ErrorAction SilentlyContinue |
+    Where-Object { -not $Pattern -or $_.Message -match $Pattern } |
+    Select-Object -First $Limit
+} else {
+  $events = Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 4688; StartTime = $since } -ErrorAction SilentlyContinue |
+    Where-Object { $_.Message -match $Pattern } |
+    Select-Object -First $Limit
+}
 
 if (-not $events) {
-  Write-Host ("No process-creation event matched '{0}' in the last {1} hour(s)." -f $Pattern, $Hours)
+  if ($File) { Write-Host ("No 4688 event matched in " + $File) }
+  else { Write-Host ("No process-creation event matched '{0}' in the last {1} hour(s)." -f $Pattern, $Hours) }
   exit 0
 }
 
