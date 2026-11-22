@@ -1024,7 +1024,8 @@ curl --resolve stronghold.luobomiao.love:443:127.0.0.1 -o NUL -s -w "%{http_code
 | `logs/restart-watch.log` | 自动重启巡检记录（「玩家说一直在重启」先看它） |
 | `logs\pm2-resurrect.log` | `_start-pm2.ps1` 的日志 |
 | `deploy\find-process.ps1` | 进程创建取证：`-Pattern` 查实时日志，`-File` 查 D 盘的 .evtx 归档（§9.9c/§9.9d） |
-| `deploy\archive-security-audit.ps1` | 把 Security 日志快照到 `D:\Stronghold-Protocol\logs\security\`，保留 30 天（任务 `SP-Audit-Archive`，§9.9d） |
+| `deploy\archive-security-audit.ps1` | 把 Security 日志快照成 .evtx 到 `D:\Stronghold-Protocol\logs\security\`，保留 180 天（任务 `SP-Audit-Archive`，§9.9d） |
+| `deploy\collect-process-audit.ps1` | **把 4688 增量采集到 D 盘的 `process-audit-*.log`（正式日志落点）**，每 5 分钟（任务 `SP-Audit-Collect`，§9.9e） |
 
 **读日志的两个注意点**：
 1. `pm2 jlist` 输出的 JSON 里**同名但大小写不同的键**会让 PowerShell 的 `ConvertFrom-Json` 直接失败。
@@ -2410,6 +2411,53 @@ Get-WinEvent -Path "...\Security-20261122-2329.evtx" -FilterXPath "*[System[(Eve
 
 **如果以后 D 盘也想省空间**：把 `-KeepDays` 调小、或给任务加 `-WhatIf` 只算不写；
 但注意**归档是唯一的长期证据**（C: 的活日志是 Circular，写满就覆盖）。
+
+#### 9.9e 进程审计日志**落在 D 盘**（2026-11-23，维护者：「我要把日志放在 D 盘中，而不是调整它的上限」）
+
+维护者要的是「日志文件在 D 盘」，不是「把 C: 的日志上限调小」。`Security.evtx` 本体移不了（§9.9d），
+所以这里让 **D 盘成为正式日志落点**：把 4688 增量采集到一个**纯文本、可 grep** 的日志里。
+
+| 角色 | 位置 | 说明 |
+|---|---|---|
+| 滚动缓冲（Windows 管） | `C:\Windows\System32\Winevt\Logs\Security.evtx`，512 MB / Circular | 不调整上限，维持原样 |
+| **正式日志（我们的）** | **`D:\Stronghold-Protocol\logs\security\process-audit-<yyyyMMdd>.log`** | 一行一条 JSON，可 grep |
+| 全量快照 | 同目录 `Security-<yyyyMMdd-HHmmss>.evtx` | 保留原始 .evtx，便于 `Get-WinEvent -Path` |
+
+两条计划任务（都是 SYSTEM + 隐藏窗口）：
+
+| 任务 | 频率 | 作用 |
+|---|---|---|
+| **`SP-Audit-Collect`** | **每 5 分钟** | `deploy\collect-process-audit.ps1`：把新的 4688 追加进 D 盘的 `process-audit-*.log` |
+| `SP-Audit-Archive` | 每天 03:00 | `deploy\archive-security-audit.ps1`：整份 Security 快照成 .evtx（保留 180 天） |
+
+**日志格式**（一行一条，JSONL）：
+
+```json
+{"t":"2026-11-23 00:15:26","rid":1233724,"user":"LUOBOMIAO\\Administrator","pid":"13404","proc":"D:\\nodejs\\node.exe","ppid":"134096","parent":"C:\\Program Files\\PowerShell\\7\\pwsh.exe","cmd":"\"D:\\nodejs\\node.exe\" .cache\\make-collector.mjs"}
+```
+
+字段：`t` 时间、`rid` 事件 RecordId、`user` 账户、`pid`/`proc` 新进程、`ppid`/`parent` **父进程**、`cmd` 命令行。
+
+**怎么查**：
+
+```powershell
+# 谁跑过 pm2（D 盘的正式日志，直接 grep）
+Select-String -Path D:\Stronghold-Protocol\logs\security\process-audit-*.log -Pattern "pm2 update"
+
+# 用现成脚本（自动解析 JSONL，打印新进程/父进程/命令行）
+powershell -File deploy\find-process.ps1 -Pattern "pm2"
+```
+
+**可靠性设计**：
+
+- **增量不重复**：状态文件 `.last-collected.json` 记 `lastId`（RecordId），每次只取更大的；实测 2608 行 / 2608 个唯一 rid / 0 重复。
+- **不丢**：采集间隔 5 分钟，C: 缓冲 512 MB（按实测 4688 约 150 MB/天 ≈ 3 天）—— 缓冲远大于间隔。
+- **首次回填**：`-BackfillHours N` 可以补采（第一次跑时补了 1 小时 = 7369 条）。
+- **保留**：D 盘 `process-audit-*.log` 默认 180 天，按日期分文件，删旧文件不影响当天。
+- **失败不阻断**：脚本不写 pm2，纯文件操作；任务每 5 分钟重试一次。
+
+实测（2026-11-23 00:16 起）：`collected 7369 event(s)` → 5 分钟后 `collected 626 event(s)`，
+D 盘 `process-audit-20261122.log` 2.44 MB / `process-audit-20261123.log` 0.89 MB。
 
 #### 相关文件
 
