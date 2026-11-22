@@ -527,9 +527,15 @@ async function roomInfo(code, node) {
     //   从存档恢复的对局、或所有玩家都离线（AI 托管）时它是 0，后台就会把跑到深层的深潜房
     //   显示成「准备中」。doc.match.round 是 persister 每轮 flush 从活着的对局上读的，一直是准的，
     //   所以 liveRound 有值用它，否则退回它。
+    // ★ 2026-11-22（玩家：规程房的深渊回响存档重启后没有回合数）：
+    //   规程房的对局跑在版本宿主里，`room.match` 是 MatchProxy —— 以前没有 `round` 属性，
+    //   于是 `doc.match.round` 恒为 null；而重启后 `matchLive=false` 时旧代码只认 snapshotRound，
+    //   最终显示「—」。现在：① proxy 从 m.public 记下 round（match/host/proxy.js），
+    //   ② persister.matchRef 取不到时退回 room.liveRound，③ 这里**不再按 matchLive 分支** ——
+    //   两者谁有值用谁（对局结束时 lobby.onMatchEnd 会把 liveRound 清零，所以不会显示上一局的回合）。
     const liveRound = Number(doc.liveRound) || 0;
     const snapshotRound = doc.match && Number.isFinite(Number(doc.match.round)) ? Number(doc.match.round) : null;
-    const round = doc.matchLive ? (liveRound || snapshotRound || 0) : snapshotRound;
+    const round = liveRound || snapshotRound || 0;
     const maxSpectators = Number.isInteger(doc.maxSpectators) ? doc.maxSpectators
       : (mode === 'coop' ? Math.max(2, Math.ceil(humans / 2)) : 0);
     // 房间容量：优先 doc.capacity（lobbyState 现在会存）。

@@ -3947,6 +3947,10 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     // summary.victory 是有值的（settle.js finish 把 m.result 原样传进来），客户端那时看结算
     // 界面、不会读这个字段；被打断的只有 reason。
     room.lastEndReason = summary && typeof summary.reason === 'string' ? summary.reason : null;
+    // ★ 2026-11-22：这一局结束了，`liveRound` 就不再是「活着的对局进度」——
+    //   不清掉的话，房间回到等待室后后台还会显示上一局的回合数（matchmaker 用 liveRound 兜底）。
+    room.liveRound = 0;
+    room.livePhase = null;
     resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;

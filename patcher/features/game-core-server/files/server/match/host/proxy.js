@@ -101,6 +101,15 @@ export class MatchProxy {
     this.log = log;
     this.requestTimeoutMs = requestTimeoutMs;
     this.roomCode = opts.roomCode ?? '----';
+    /**
+     * 最后一帧 m.public 里的进度（维护者 2026-11-22）：宿主里的对局没有真正的 `round`/`phase` 字段，
+     * 而 persister.matchRef 与后台「回合」列都要读它们 —— 不记下来，规程房的存档详情里
+     * `match.round` 就是 null，重启后控制台只能显示「—」。
+     * @type {number|null}
+     */
+    this.round = null;
+    /** @type {string|null} */
+    this.phase = null;
     /** @type {Map<number, { resolve: (r: any) => void, timer: any }>} */
     this.pending = new Map();
     this.seq = 0;
@@ -231,7 +240,19 @@ export class MatchProxy {
     if (m.type === 'checkpoint') { try { this.opts.onCheckpointDoc?.(m.doc, m.reason ?? 'tick'); } catch (e) { this.log.error?.(`[match ${this.roomCode}] checkpoint handler failed`, e); } return; }
     if (m.type === 'restored') { this.restored = true; this._resolveRestore?.(true); return; }
     if (m.type === 'send') { try { this.opts.send(m.playerId, m.msg); } catch (e) { this.log.error?.(`[match ${this.roomCode}] send failed`, e); } return; }
-    if (m.type === 'broadcast') { try { this.opts.broadcast(m.msg); } catch (e) { this.log.error?.(`[match ${this.roomCode}] broadcast failed`, e); } return; }
+    if (m.type === 'broadcast') {
+      // ★ 2026-11-22（玩家：规程房的深渊回响存档重启后没有回合数）：
+      //   主进程这边 `room.match` 就是本对象，而 persister.matchRef 读的是 `m.round` / `m.phase`
+      //   来写房间文档里的 match 描述。以前这里没有 `round`/`phase` 属性 → 规程房的
+      //   `doc.match.round` 恒为 null → 重启后（matchLive=false）后台只能显示「—」。
+      //   m.public 帧本身是扁平的（{ t, phase, round, ... }，match/match/views.js publicView），
+      //   顺手记下来即可，和真正 Match 实例上的字段同口径。
+      if (m.msg && m.msg.t === 'm.public') {
+        if (Number.isFinite(Number(m.msg.round))) this.round = Number(m.msg.round);
+        if (typeof m.msg.phase === 'string') this.phase = m.msg.phase;
+      }
+      try { this.opts.broadcast(m.msg); } catch (e) { this.log.error?.(`[match ${this.roomCode}] broadcast failed`, e); } return;
+    }
     if (m.type === 'end') { this._end(m.summary ?? null); return; }
     if (m.type === 'failed') { this.crash(/** @type {any} */ (this.host).kind === 'version' ? 'version-start' : 'plugin-start', m.error); }
   }

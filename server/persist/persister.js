@@ -143,10 +143,18 @@ export class LobbyPersister {
     const m = this.localMatch(room) || this.hostedMatch(room);
     if (!m) return null;
     const rec = this.matches.get(m);
+    // ★ 2026-11-22（玩家：规程房的深渊回响存档重启后没有回合数）：宿主里的对局是 MatchProxy，
+    //   它的 `round`/`phase` 由最后一帧 m.public 记下来（match/host/proxy.js）；仍取不到时退回
+    //   房间自己的 `liveRound`（lobby.matchBroadcast 维护，且随存档持久化）——
+    //   否则这里的 null 会让后台在「重启后 matchLive=false」时显示「—」。
+    const mRound = Number(m.round);
+    const mPhase = typeof m.phase === 'string' ? m.phase : null;
+    const liveRound = Number(room && room.liveRound);
+    const round = Number.isFinite(mRound) ? mRound : (Number.isFinite(liveRound) && liveRound > 0 ? liveRound : null);
     return rec && rec.json ? {
       kind: 'local', id: rec.id, seed: rec.seed, matchNo: rec.matchNo,
-      round: Number.isFinite(m.round) ? m.round : null,
-      phase: typeof m.phase === 'string' ? m.phase : null,
+      round,
+      phase: mPhase || (typeof (room && room.livePhase) === 'string' ? room.livePhase : null),
     } : null;
   }
 

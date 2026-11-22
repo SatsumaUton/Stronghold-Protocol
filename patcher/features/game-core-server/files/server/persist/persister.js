@@ -80,6 +80,8 @@ export class LobbyPersister {
     // every local match the lobby starts offers its safe points here (Lobby.startMatch: opts.onCheckpoint); a cluster
     // lobby rebuilds a lost node's matches from their checkpoints (ClusterLobby.recoverRemote)
     lobby.onCheckpoint = (room, ctx, match, reason) => this.capture(room, match, reason);
+    // 版本宿主（规程 / 一期 / 二期 / 插件内容集）里的对局：检查点由 worker 快照、主进程在这里收
+    lobby.onHostedCheckpoint = (room, ctx, match, doc, reason) => this.captureHosted(room, match, doc, reason);
     lobby.checkpointsOn = true;
     // ★ 2026-11-09（墓碑）：房间被回收的**那一刻**先留一份副本 —— 必须在 disposeRoom 动手之前，
     //   那时 room.match / seats / 检查点都还完整。等到下一轮 flush 从 goneRooms 里发现它时已经晚了。
@@ -90,7 +92,9 @@ export class LobbyPersister {
   record(room, match) {
     let rec = this.matches.get(match);
     if (!rec) {
-      const seed = match.seed >>> 0, matchNo = room.matchCount;
+      // 版本宿主的 Match 只是个 proxy，没有 seed 字段：退回它带过去的 opts.seed
+      const rawSeed = Number.isFinite(match?.seed) ? match.seed : Number(match?.opts?.seed);
+      const seed = (Number.isFinite(rawSeed) ? rawSeed : 0) >>> 0, matchNo = room.matchCount;
       rec = { id: localCheckpointId(room.code, matchNo, seed), seed, matchNo, room: room.code, json: null, pending: null };
       this.matches.set(match, rec);
     }
@@ -104,10 +108,25 @@ export class LobbyPersister {
     return m;
   }
 
-  /** Take a local match's checkpoint now (a safe point, or the periodic round) and queue its write. */
-  capture(room, match, reason = 'tick') {
-    if (this.closed || this.localMatch(room) !== match) return null;
-    const doc = snapshotMatch(match);
+  /** A room's match in a match host (another official version / a content plugin set), still live here. */
+  hostedMatch(room) {
+    const m = room.match;
+    if (!m || room.disposed || !room.matchCtx?.live || this.cluster || m.hosted !== true) return null;
+    return m;
+  }
+
+  /** Take a hosted match's checkpoint (the worker's snapshotMatch result) and queue its write. */
+  captureHosted(room, match, doc, reason = 'tick') {
+    if (this.closed || this.hostedMatch(room) !== match || !doc) return null;
+    return this.capture(room, match, reason, doc);
+  }
+
+  /** Take a checkpoint now (a safe point, or the periodic round) and queue its write. `hostedDoc`: from the host. */
+  capture(room, match, reason = 'tick', hostedDoc = null) {
+    if (this.closed) return null;
+    const hosted = hostedDoc != null && this.hostedMatch(room) === match;
+    if (!hosted && this.localMatch(room) !== match) return null;
+    const doc = hosted ? hostedDoc : snapshotMatch(match);
     if (!doc) { this.counts.captureSkips++; return null; }
     const rec = this.record(room, match);
     const json = JSON.stringify({ v: 1, kind: 'local', room: room.code, matchNo: rec.matchNo, seed: rec.seed, reason, match: doc });
@@ -118,16 +137,24 @@ export class LobbyPersister {
     return rec;
   }
 
-  /** The lobby document's reference of a room's running match. */
+  /** The lobby document's reference of a room's running match (a local one, or one in a match host). */
   matchRef(room) {
     if (this.cluster) return this.lobby.remoteMatchRef(room);
-    const m = this.localMatch(room);
+    const m = this.localMatch(room) || this.hostedMatch(room);
     if (!m) return null;
     const rec = this.matches.get(m);
+    // ★ 2026-11-22（玩家：规程房的深渊回响存档重启后没有回合数）：宿主里的对局是 MatchProxy，
+    //   它的 `round`/`phase` 由最后一帧 m.public 记下来（match/host/proxy.js）；仍取不到时退回
+    //   房间自己的 `liveRound`（lobby.matchBroadcast 维护，且随存档持久化）——
+    //   否则这里的 null 会让后台在「重启后 matchLive=false」时显示「—」。
+    const mRound = Number(m.round);
+    const mPhase = typeof m.phase === 'string' ? m.phase : null;
+    const liveRound = Number(room && room.liveRound);
+    const round = Number.isFinite(mRound) ? mRound : (Number.isFinite(liveRound) && liveRound > 0 ? liveRound : null);
     return rec && rec.json ? {
       kind: 'local', id: rec.id, seed: rec.seed, matchNo: rec.matchNo,
-      round: Number.isFinite(m.round) ? m.round : null,
-      phase: typeof m.phase === 'string' ? m.phase : null,
+      round,
+      phase: mPhase || (typeof (room && room.livePhase) === 'string' ? room.livePhase : null),
     } : null;
   }
 
@@ -143,7 +170,7 @@ export class LobbyPersister {
     const run = (async () => {
       const pending = [];
       if (!this.cluster) for (const room of this.lobby.rooms.values()) {
-        const m = this.localMatch(room);
+        const m = this.localMatch(room) || this.hostedMatch(room);
         if (!m) continue;
         // a match past its last safe point (a battle) is not captured again, but the write that safe point started (its
         // prep's end) still lands before the document names it and before a shutdown closes the store
@@ -433,15 +460,24 @@ export class LobbyPersister {
     }
     const doc = cp.match;
     let refused = false;
+    // 版本宿主（规程 / 一期 / 二期 / 内容集）：Match 在 worker 里，主进程拿不到本体 ——
+    // 存档随 create 一起送过去，由宿主 restoreMatch；这里等它回 'restored'。
+    const hosted = this.lobby.matchIsHosted?.(room) === true;
     const result = this.lobby.startMatch(room, room.matchKey, room.matchKeys, { restore: {
       seed: cp.seed, matchNo: cp.matchNo, seats: doc.seats, spectators: room.spectators.map((s) => s.playerId),
+      ...(hosted ? { hostedDoc: doc, replay: cp.reason === CHECKPOINT_PREP_END } : {}),
       apply: (match) => {
+        if (hosted) return;
         if (!restoreMatch(match, doc, { createRngFromState, log: this.log, replay: cp.reason === CHECKPOINT_PREP_END })) {
           refused = true; throw new Error('checkpoint refused');
         }
       },
     } });
     if (result?.error || refused || !room.match) return false;
+    if (hosted) {
+      const ok = await (room.match.restoreDone ?? Promise.resolve(false));
+      if (!ok) { this.log.warn?.(`[persist] ${room.code}: the match host refused the checkpoint`); return false; }
+    }
     const rec = this.record(room, room.match);
     rec.json = null;
     this.written.add(rec.id);
