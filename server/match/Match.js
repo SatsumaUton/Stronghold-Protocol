@@ -254,6 +254,7 @@ import { MatchEcho } from './match/echoPhase.js';
 import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
 import { echoCurveOf } from './match/echoConfig.js';
 import { crossVersionEnemies, crossVersionStages, crossVersionBosses } from './match/echoCrossVersion.js';
+import { crossBountyOverlay } from './match/echoCrossBounty.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchPauseVote } from './match/pauseVote.js';
@@ -373,6 +374,18 @@ export class Match {
         if (n > 0) {
           // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
           this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
+        }
+        // 悬赏卡：其余版本有、本版没有的那些（维护者 2026-11-22「放吧」：赏金目标可以混合，
+        // 只有涉及装备/盟约且对面版本没有时才分版本 —— 悬赏卡本身不含装备/盟约，所以整体混合）。
+        //
+        // 为什么需要单独一层：cards.bounty 的 enemyKey 是**裸 key**，而 crossVersionEnemies 注入的是
+        // `<slug>:<key>` 前缀 key → 直接并进来会在 `gd.enemy(card.enemyKey)` 这一步被滤掉，一张都出不来。
+        // echoCrossBounty 负责把目标换成能解析的 key，并把卡面对应的 effectId 一起补上。
+        // 没有可并的卡时返回 null，**一个键都不动**（非深潜房与深潜房的键集/随机流保持原样）。
+        const overlay = crossBountyOverlay(this.gd.raw, (k) => this.gd.enemy(k), (id) => this.gd.effect(id));
+        if (overlay) {
+          this.gd.raw = { ...this.gd.raw, choices: overlay.choices, effects: overlay.effects };
+          this.echoCrossBountyCards = overlay.added;
         }
         // 战场：把各版本**同一难度**里本版没有的地图并进来（维护者 2026-11-16）。
         // 规程·序列Ⅰ 的 12 张新图、以及其它版本缺的图，都按当前难度各自补齐。

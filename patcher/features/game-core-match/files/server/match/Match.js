@@ -254,6 +254,7 @@ import { MatchEcho } from './match/echoPhase.js';
 import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
 import { echoCurveOf } from './match/echoConfig.js';
 import { crossVersionEnemies, crossVersionStages, crossVersionBosses } from './match/echoCrossVersion.js';
+import { crossBountyOverlay } from './match/echoCrossBounty.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchPauseVote } from './match/pauseVote.js';
@@ -373,6 +374,18 @@ export class Match {
         if (n > 0) {
           // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
           this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
+        }
+        // 悬赏卡：其余版本有、本版没有的那些（维护者 2026-11-22「放吧」：赏金目标可以混合，
+        // 只有涉及装备/盟约且对面版本没有时才分版本 —— 悬赏卡本身不含装备/盟约，所以整体混合）。
+        //
+        // 为什么需要单独一层：cards.bounty 的 enemyKey 是**裸 key**，而 crossVersionEnemies 注入的是
+        // `<slug>:<key>` 前缀 key → 直接并进来会在 `gd.enemy(card.enemyKey)` 这一步被滤掉，一张都出不来。
+        // echoCrossBounty 负责把目标换成能解析的 key，并把卡面对应的 effectId 一起补上。
+        // 没有可并的卡时返回 null，**一个键都不动**（非深潜房与深潜房的键集/随机流保持原样）。
+        const overlay = crossBountyOverlay(this.gd.raw, (k) => this.gd.enemy(k), (id) => this.gd.effect(id));
+        if (overlay) {
+          this.gd.raw = { ...this.gd.raw, choices: overlay.choices, effects: overlay.effects };
+          this.echoCrossBountyCards = overlay.added;
         }
         // 战场：把各版本**同一难度**里本版没有的地图并进来（维护者 2026-11-16）。
         // 规程·序列Ⅰ 的 12 张新图、以及其它版本缺的图，都按当前难度各自补齐。
@@ -549,6 +562,8 @@ export class Match {
     // 注意：**不含**深潜。深潜只在真正进入深潜回合后才解除层数上限（见 layerCapOff），
     // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
+    // ★ 2026-11-20（维护者：取消干员特质的每回合叠层限制）：特质脚本按 ctx.traitStackUnlimited 放行
+    this.traitStackUnlimited = this.experimental.traitStackUnlimited === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
     /** 【AI 联防置后】(维护者 2026-11-06)：联防优先真人，AI 队友与托管中的博士排后（unite.js helperOrder）。 */
     this.uniteHumansFirst = this.experimental.uniteHumansFirst === true;
