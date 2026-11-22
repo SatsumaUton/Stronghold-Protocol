@@ -2338,6 +2338,41 @@ $c = Get-NetTCPConnection -LocalPort (3000+N) -State Listen
 **证据留存**：`dump.pm2 应用数: 0 / 修改时间 20:40:08` 是这次事故的硬证据；恢复后 dump 为 396 827 字节、
 含 `matchmaker`。维护前建议先 `Copy-Item dump.pm2 dump.pm2.$(Get-Date -f yyyyMMdd-HHmm)`。
 
+#### 9.9c 进程创建审计：以后能查到「是谁执行了这条命令」（2026-11-22 开启）
+
+§9.9b 那次事故里有个更糟的副作用：**查不到是谁执行的 `pm2 update`**。
+安全日志的 4688（进程创建）一条都没有 —— Windows 默认**关闭**这个子类别的审计。
+
+当天开启了三项（维护者同意，属系统策略变更）：
+
+| 项 | 设置 | 为什么 |
+|---|---|---|
+| 审核进程创建 | `auditpol /set /subcategory:"{0CCE922B-69AE-11D9-BED3-505054503030}" /success:enable` | 产生 4688 事件（账户 + 新进程 + **父进程** + 命令行） |
+| 记录命令行 | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit` 的 `ProcessCreationIncludeCmdLine_Enabled = 1`（DWORD） | 不开这一项的话，4688 里**只有进程名，没有参数** —— 也就分不出 `pm2 update` 和 `pm2 list` |
+| 安全日志容量 | 20 MB → **512 MB**（`Get-WinEvent -ListLog Security` 设 `MaximumSizeInBytes`） | 原来是 Circular，20 MB 在开启审计后**几小时就会被冲掉**，等于白开 |
+
+验证过（22:11）：跑一个带唯一参数的进程，4688 里能读到
+账户 `Administrator\LUOBOMIAO`、新进程 `D:\nodejs\node.exe`、父进程 `pwsh.exe`、
+命令行原文 `"D:\nodejs\node.exe" -e process.exit(0) SPAUDIT2-MARKER-9F3`。
+
+**取证怎么用**（新增脚本 `deploy\find-process.ps1`）：
+
+```powershell
+powershell -File deploy\find-process.ps1 -Pattern "pm2"              # 最近 12 小时
+powershell -File deploy\find-process.ps1 -Pattern "pm2 update" -Hours 24
+powershell -File deploy\find-process.ps1 -Pattern "node.exe" -Hours 1 -Limit 40
+```
+
+输出每条：时间、账户、新进程、**父进程**、命令行。审计没开时脚本会先警告
+（「查不到」≠「没发生」）。
+
+注意两点：
+
+1. **审计策略会持久**（auditpol 写注册表，重启仍在）；但如果以后有组策略覆盖「审核进程创建」，
+   要在策略刷新后用 `auditpol /get /subcategory:"{0CCE922B-69AE-11D9-BED3-505054503030}"` 复查一次。
+2. **代价**：每个进程一次事件。512 MB ≈ 十几万条，按本机日常量能留几天；要更久就把容量再调大
+   （现在 C: 还有 59 GB 空闲），或改成 `AutoBackup` 归档。
+
 #### 相关文件
 
 | 文件 | 作用 |
