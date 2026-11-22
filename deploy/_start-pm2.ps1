@@ -242,6 +242,17 @@ $missing = @($missing | Where-Object { $defined -contains $_ })
 if ($missing.Count -gt 0) {
   Write-Log ('missing apps (' + $missing.Count + '): ' + ($missing -join ', ') + ' -> start only those')
   foreach ($name in $missing) {
+    # ★ 2026-11-22 双保险：jlist 读失败时 $online 会是空的，上面那 3 次稳定读也可能被
+    #   「一直读不到」骗过 —— 于是这里会去启动 32 个应用，而 `pm2 start --only` 对已在跑的
+    #   应用可能触发 restartProcessId，**打断玩家对局**。所以启动前用 describe 单独确认。
+    $desc = Join-Path $env:TEMP ('sp-pm2-desc-' + $name + '.txt')
+    $null = Invoke-Hidden ('/c ""' + $pm2Cmd + '" describe ' + $name + ' > "' + $desc + '" 2>nul"')
+    $d = ''
+    if (Test-Path $desc) { try { $d = Get-Content $desc -Raw -ErrorAction SilentlyContinue } catch { } }
+    if ($d -match 'status[^a-z]*online') {
+      Write-Log ('  skip ' + $name + ': pm2 describe says it is already online (jlist was wrong)')
+      continue
+    }
     $r = Invoke-Hidden ('/c ""' + $pm2Cmd + '" start "' + $eco + '" --only ' + $name + ' --update-env >> "' + $log + '" 2>&1"')
     Write-Log ('  start ' + $name + ' exit=' + $r.code)
   }

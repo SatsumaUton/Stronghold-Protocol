@@ -2293,11 +2293,56 @@ $c = Get-NetTCPConnection -LocalPort (3000+N) -State Listen
 **结论**：AI 助手 / 终端里执行 `pm2 restart` **完全安全**；危险的是 `pm2 start` / `pm2 resurrect`
 （首次拉起守护进程）。这就是为什么本手册要求启动一律走「双击 `启动服务器.bat`」或计划任务。
 
+#### 9.9b 2026-11-22：`pm2 update` 把进程表清空，30 节点下线 53 分钟（玩家「网页进不去」）
+
+**症状**：全站打不开。`netstat` 里 3001–3030 全部没有监听，`pm2 list` 只剩 `pm2-logrotate` 一个模块。
+
+**时间线**：
+
+| 时间 | 发生了什么 |
+|---|---|
+| 20:40:04 | 有人执行了 `pm2 update`（父进程启动后立即退出；PSReadLine 历史里**没有**这条命令 → 不是那个控制台敲的） |
+| 20:40:08 | `dump.pm2` 被重写成 **0 个应用**（实测 `dump.pm2 应用数: 0`） |
+| 20:40:12 | 新守护进程起来，只有 `pm2-logrotate`；30 节点 + matchmaker + dashboard 全部不存在 |
+| 20:40–21:33 | 看门狗**每分钟**都跑，每分钟都写 `ALERT only 1/32 apps visible -> treated as a read problem, skip` —— **什么都不做** |
+| 21:33 | 玩家反馈「网页进不去」 |
+| ~21:40 | 手工恢复：kill 卡住的 `pm2 update` → `pm2 start ecosystem.config.cjs --update-env` → `pm2 save`（dump 重建为 396 KB） |
+| 21:41 | 30 个节点 + matchmaker + dashboard 全部 online；站点 HTTP 200 |
+
+**两层根因**：
+
+1. **`pm2 update` 会重写 `dump.pm2`**。它先杀守护进程、再从 dump 重建；这次 dump 被写成空的，
+   于是「恢复」等于「什么都不恢复」。危险级别与 `pm2 start` / `pm2 resurrect` 相同，
+   但旧版 AGENTS.md 只写了后两个。
+2. **看门狗把「应用真的没了」误判成「读取抖动」**。旧保护是 `if ($online.Count -lt expected/2) { 跳过 }`
+   —— 本意是防止 `pm2 jlist` 间歇性失败时全量重启，但它对「真的只剩 1 个应用」和「读失败」给出同一个结论，
+   于是 53 分钟无人修复。
+
+**修法**（提交 `52e1ccb5` 及后续）：`deploy/_start-pm2.ps1` 连续读 3 次 jlist ——
+稳定地少（3 次都是 1/32）= 应用真的没了 → 补启动 + `pm2 save` 重建 dump；
+两次读数之间变化 = 抖动 → 跳过（保留原保护）。补启动前再用 `pm2 describe <name>` 逐个确认，
+避免把正在跑的应用重启掉（那会打断玩家对局）。
+
+干跑验证（把 `$pm2Cmd` 换成 stub、强制 `$online` 只剩 1 个）：日志出现
+`APPS GONE: only 0/32 visible on 3 stable reads -> starting the missing ones (NOT a read problem)`，
+不再走 skip；正常情况（32 个都在）仍是 `all 32 apps online, nothing to do`。
+
+**以后怎么避免**：
+
+| 想做的事 | 正确做法 |
+|---|---|
+| 升级 pm2 本体 | `npm i -g pm2`，再逐台 `pm2 restart node-N --update-env`。**不要** `pm2 update` |
+| 备份进程表 | `pm2 save`（确认 `dump.pm2` 非空）；它同时留 `dump.pm2.bak` |
+| 全站打不开 | 先 `pm2 list` 看是不是只剩 logrotate → 是的话按上面「手工恢复」三步走，先别急着查 nginx |
+
+**证据留存**：`dump.pm2 应用数: 0 / 修改时间 20:40:08` 是这次事故的硬证据；恢复后 dump 为 396 827 字节、
+含 `matchmaker`。维护前建议先 `Copy-Item dump.pm2 dump.pm2.$(Get-Date -f yyyyMMdd-HHmm)`。
+
 #### 相关文件
 
 | 文件 | 作用 |
 |---|---|
-| `deploy\_start-pm2.ps1` | 以 SYSTEM 身份启动/恢复 pm2，幂等（已在跑就不重复启动）。**读不到 jlist 时整轮跳过**，不再把「读不到」当成「全都没了」 |
+| `deploy\_start-pm2.ps1` | 以 SYSTEM 身份启动/恢复 pm2，幂等（已在跑就不重复启动）。**连续 3 次稳定地少才动手**（§9.9b），补启动前用 `pm2 describe` 逐个确认 |
 | `deploy\_stack-watchdog.ps1` | 每 2 分钟的看门狗，会自动修复；**永不 `resurrect` 去补缺失应用**（详见 §9.12） |
 | `deploy\restart-watch.ps1` | 每 10 分钟的重启巡检，比对运行时长，只要变小就记 `RESTART DETECTED`（§9.12） |
 | `deploy\server-watchdog.ps1` | 旧看门狗脚本；对应任务 `Stronghold-Server-Watchdog` 已 **Disabled** |

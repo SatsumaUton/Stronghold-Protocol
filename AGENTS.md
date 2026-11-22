@@ -122,6 +122,14 @@ node patcher/check-coverage.mjs
 |---|---|---|
 | `pm2 start` / `pm2 resurrect`（守护进程不在时） | **当前 shell** 拉起 pm2 | ❌ **危险**：pm2 挂在这个会话下，会话死服务器死 |
 | `pm2 restart node-N` / `startOrReload`（守护进程已在跑时） | **pm2 自己** fork | ✅ **安全**：实测重启前后父进程都是 pm2，SessionId 都是 0 |
+| **`pm2 update`** | 杀掉守护进程后由它自己重建 | ❌ **危险**：会**重写 `dump.pm2`**。2026-11-22 实测一次 `pm2 update` 把 dump 写成 **0 个应用**，30 个节点 + matchmaker + dashboard 全部消失，玩家「网页进不去」**53 分钟**。升级 pm2 本体请用 `npm i -g pm2`，然后逐台 `pm2 restart node-N --update-env`，**不要**跑 `pm2 update` |
+| `pm2 kill` / `pm2 delete all` / `pm2 flush` 之外的 `* all` 类命令 | 同上 | ❌ **危险**：一次清掉全部应用或进程表 |
+
+> 2026-11-22 事故的**第二层**：看门狗每分钟都在跑，却把「应用真的没了」误判成
+> 「`pm2 jlist` 读取抖动」而跳过（日志 `ALERT only 1/32 apps visible -> treated as a read problem, skip`），
+> 等于眼睁睁看着不修。现在 `deploy/_start-pm2.ps1` 会**连续读 3 次**：稳定地少 = 真没了 →
+> 补启动 + `pm2 save` 重建 dump；读数在两次之间变化 = 抖动 → 跳过。补启动前还会用
+> `pm2 describe` 逐个确认，避免把正在跑的应用重启掉。
 
 `pm2 restart` 用的命令行客户端只是临时进程，发完指令就退出，**不持有任何应用**。
 所以在 AI 助手 / 终端里重启节点没问题 —— 前提是 pm2 守护进程已经是 SYSTEM 托管的那个。
