@@ -560,10 +560,28 @@ html[data-sp-theme="ac_s_closur"] .gm__bonds--pf .bond.is-active .bond__glyph { 
 .gtop--pf [data-pf] {
   pointer-events: none;
 }
+/* ★ 2026-11-22（玩家：乌萨斯主题最上面 2 排在手机/全屏下都放不了干员）：
+   game.css 的 `.gtop > * { pointer-events: auto; }` 让三个列容器（左/中/右）全都吃点击，
+   而 prefab 主题的中间带比手写 HUD 更高 → 三个列盒子连成一条，把棋盘顶上 1–2 排盖住。
+   这里在 prefab 主题下把列容器设为穿透；真正可交互的控件（按钮/输入/可点胶囊）仍恢复 auto。 */
+.gtop--pf > .gtop__left,
+.gtop--pf > .gtop__center,
+.gtop--pf > .gtop__right {
+  pointer-events: none;
+}
 .gtop--pf button,
 .gtop--pf a,
 .gtop--pf [role="button"],
 .gtop--pf .gtop__iconbtn,
 .gtop--pf .readybtn {
+  pointer-events: auto;
+}
+
+/* 列内部真正可点的东西（观战席胶囊、倒计时上的准备/暂停、加速投票…）—— 规则写在 game.css 里
+   用 .btn / .specpill / .readybtn 这类类名，所以按「能点的角色」统一恢复 auto；
+   不用 `.gtop--pf *`（那会把装饰层也放开，等于没改）。 */
+.gtop--pf > .gtop__left :is(button, a, input, select, [role="button"], .btn, .tapx, .specpill),
+.gtop--pf > .gtop__center :is(button, a, input, select, [role="button"], .btn, .tapx),
+.gtop--pf > .gtop__right :is(button, a, input, select, [role="button"], .btn, .tapx, .readybtn, .specpill) {
   pointer-events: auto;
 }
