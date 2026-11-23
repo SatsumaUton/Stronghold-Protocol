@@ -263,14 +263,30 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/api/deepecho/codex') {
       // ★ 2026-11-21（玩家：图鉴里的盟约投影文本没跟上规程的盟约改动）：按请求方选的版本生成。
       //   ?version=<id> 时用该版本的数据；不带（或就是默认版本）仍是原来的写死 8 条，行为不变。
-      const codexVersion = String(parts.query?.version || '');
+      //
+      // ★ 2026-11-23（玩家：深渊回响的图鉴没有更新）：以前这里写的是 `parts.query?.version`，
+      //   但 `parts.query` 是**原始查询字符串**（common.js: { rawPath, query }），不是解析好的对象 ——
+      //   取 `.version` 永远是 undefined，于是**不管选哪个版本都走默认分支**，图鉴一直显示第二期下半的
+      //   8 条投影。按本项目其它路由的写法（见本文件 /api/dive/board）用 URLSearchParams 解析。
+      let codexVersion = '';
+      try { codexVersion = String(new URLSearchParams(parts.query || '').get('version') || ''); } catch { codexVersion = ''; }
+      // 本服的默认版本可能**不是**编译期常量 DEFAULT_VERSION（这里是规程 act3autochess@V3_1），
+      // 这种情况下 `versions.data(id)` 对「服务器默认版本」同样要给数据 —— 见下面两个分支的兜底。
+      // 注意：`defaultVersion()` 是 **Lobby 的方法**；`versions` 上暴露的是 `defaultId` 属性（server/versions.js:173）。
+      const serverDefault = (() => {
+        try {
+          const byLobby = typeof health?.lobby?.defaultVersion === 'function' ? health.lobby.defaultVersion() : '';
+          return String(byLobby || health?.lobby?.versions?.defaultId || '');
+        } catch { return ''; }
+      })();
       let codexBonds = null;
       try {
-        // 默认版本用 lobby 自己的 data（data/bonds.json 的原文），非默认版本用该版本的数据；
-        // 这样两边的投影文本口径一致（都是从数据里的 desc 派生，不是手写的短句）。
-        const raw = codexVersion && codexVersion !== DEFAULT_VERSION
-          ? health?.lobby?.versions?.data?.(codexVersion)
-          : health?.lobby?.safeData?.();
+        // 取哪个版本的数据：请求里带的 > 服务器默认版本 > 编译期默认。
+        // ⚠ 不能按「是不是服务器默认版本」去选 safeData()：本服的服务器默认是规程，
+        //   而 safeData() 给的是 vanilla 数据目录（= 第二期下半），会张冠李戴。
+        //   versions.data(id) 对 DEFAULT_VERSION 自己也会返回 vanilla 数据，所以优先它就是对的。
+        const wanted = codexVersion || serverDefault || DEFAULT_VERSION;
+        const raw = health?.lobby?.versions?.data?.(wanted) || health?.lobby?.safeData?.();
         if (raw && raw.bonds) codexBonds = { raw: { bonds: raw.bonds } };
       } catch { /* 取不到数据就退回写死的表 */ }
       sendJson(req, res, 200, buildEchoCodex(codexBonds), { 'Cache-Control': 'public, max-age=300' });
