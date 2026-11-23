@@ -2459,6 +2459,37 @@ powershell -File deploy\find-process.ps1 -Pattern "pm2"
 实测（2026-11-23 00:16 起）：`collected 7369 event(s)` → 5 分钟后 `collected 626 event(s)`，
 D 盘 `process-audit-20261122.log` 2.44 MB / `process-audit-20261123.log` 0.89 MB。
 
+#### 9.9f 手工改 Redis 里的中文**会乱码**：用 RESP，别走 redis-cli 参数（2026-11-23 踩到）
+
+背景：修深潜排行榜的旧记录（去掉 AI 行 + 把 `ursusShip` 换成「乌萨斯」）时，第一版脚本用
+`execFileSync('redis-cli', ['HSET', key, member, json])` 写回，结果**所有中文变成乱码**：
+
+```
+叶   → Ҷ        乌萨斯 → ����˹
+```
+
+**原因**：Windows 上 Node 把参数按 UTF-16 交给子进程，而 `redis-cli.exe` 是 C 程序，
+用 **ANSI 代码页（本机 GBK）** 取 `argv` —— UTF-8 中文在那一层就被转坏了。
+（服务端自己写 Redis 不受影响：`server/persist/valkey.js` 是 Node 直连发 RESP，全程 UTF-8。）
+
+**正确做法**（脚本见当时的 `.cache/rewrite-board-resp.mjs`，要点）：
+
+```js
+// 自己拼 RESP，值走原始 UTF-8 字节
+const parts = [`*${args.length}\r\n`];
+for (const a of args) { const b = Buffer.from(String(a), "utf8"); parts.push(`$${b.length}\r\n`, b, "\r\n"); }
+sock.write(Buffer.concat(parts.map(p => typeof p === "string" ? Buffer.from(p, "utf8") : p)));
+```
+
+或者用 `redis-cli -x HSET key field`（值从 **stdin** 读，stdin 是二进制安全的 UTF-8）。
+
+**还有第二个坑（同一次踩到）**：`redis-cli ZREVRANGE ... WITHSCORES` 的输出在 Windows 是
+`\r\n`，按 `\n` 切分后 member 末尾带 `\r` → `HGET` 全部查不到（当时表现为「51 条全部无明细」）。
+读的时候要 `split(/\r?\n/)` 并 `.trim()`。
+
+**规律**：手工脚本读写 Redis 时，**读**要处理 CRLF，**写**要绕开 ANSI 参数转换。
+改完一定用**接口**复核（`/api/dive/board?version=…`）而不是只看 redis-cli 的回显。
+
 #### 相关文件
 
 | 文件 | 作用 |
