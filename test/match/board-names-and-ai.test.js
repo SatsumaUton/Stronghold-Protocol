@@ -88,3 +88,40 @@ test('第二期下半（本进程 Match）行为不变：只留真人、盟约�
   assert.equal(detail.squads.length, 1);
   assert.equal(detail.squads[0].cores[0], '叙拉古', '盟约中文名');
 });
+
+test('宿主房（规程）：核心盟约只取 isCore，非核心不进「核心盟约」列', async () => {
+  const { store, cmds } = makeStore();
+  const lobby = lobbyWith(store);
+  const room = hostedRoom('act3autochess@V3_1');
+  const summary = summaryWith([
+    {
+      name: '甲',
+      isBot: false,
+      bonds: [
+        // 非核心但层数最高：不能被选中
+        { bondId: 'indomShip', count: 6, layers: 500, active: true },
+        { bondId: 'arcaneShip', count: 6, layers: 400, active: true },
+        // 核心但层数较低：这才是应该显示的
+        { bondId: 'siracusaShip', count: 6, layers: 120, active: true },
+      ],
+    },
+    {
+      name: '乙',
+      isBot: false,
+      // 只有非核心：核心列应当为空
+      bonds: [{ bondId: 'indomShip', count: 6, layers: 300, active: true }],
+    },
+  ]);
+  LOBBY.prototype._recordEchoBoard.call(lobby, room, summary);
+  await new Promise((r) => setTimeout(r, 0));
+
+  const detail = JSON.parse(cmds.find((c) => c[0] === 'HSET')[3]);
+  const jia = detail.squads.find((x) => x.name === '甲');
+  const yi = detail.squads.find((x) => x.name === '乙');
+  assert.deepEqual(jia.cores, ['叙拉古'], `甲 的核心盟约应是叙拉古（核心、层数最高），实际 ${JSON.stringify(jia.cores)}`);
+  assert.deepEqual(yi.cores, [], `乙 只有非核心，核心列应为空，实际 ${JSON.stringify(yi.cores)}`);
+  // 非核心不能出现
+  for (const sq of detail.squads) {
+    for (const c of sq.cores) assert.ok(!['不屈', '奥术'].includes(c), `${sq.name} 的核心列出现了非核心 ${c}`);
+  }
+});
