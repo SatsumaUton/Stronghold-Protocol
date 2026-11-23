@@ -3813,15 +3813,27 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (room.echoCfg) return;
     // 作弊控制台（2026-11-17）：开着的房间一行成绩都不写（深潜本身禁实验性功能，这里是双保险）
     if (room.experimental?.cheatConsole === true) return;
-    const gd = (local && m.gd) || null;          // 跨进程拿不到；缺失时只用 bondId
+    // ★ 2026-11-23（玩家：规程榜的盟约显示成 ursusShip 这种 id）：宿主房（规程/其它官方版本）的
+    //   `room.match` 是 MatchProxy，没有 `.gd` —— 以前直接 null，于是盟约名字退回 bondId。
+    //   房间的版本数据其实取得到（lobby.versions.data(room.version)，与开局用的是同一份），
+    //   这里包一个最小适配器，只提供 squadFromRow 需要的 `bond(id)`。
+    const versionGd = (() => {
+      try {
+        const data = room && room.version ? this.versions?.data?.(room.version) : null;
+        if (!data || !data.bonds) return null;
+        return { bond: (bid) => data.bonds[bid] || null };
+      } catch { return null; }
+    })();
+    const gd = (local && m.gd) || versionGd || null;
     const diveStart = Math.max(1, Math.floor(Number(local ? m.echoDiveStart : summary.echoDiveStart) || 1));
     const round = Math.max(1, Math.floor(Number(local ? m.round : summary.echoRound ?? summary.roundsPassed) || 1));
     const depth = Math.max(0, Math.floor(Number(fromSummary ? summary.echoDepth : round - diveStart + 1) || 0));
     const playersOf = (local && Array.isArray(m.order)) ? m.order : null;
     const rowsOf = (fromSummary && Array.isArray(summary.players)) ? summary.players : null;
-    const namesOfRows = rowsOf ? rowsOf.map((r) => (r && typeof r.name === 'string' ? r.name : '')).filter(Boolean) : [];
     const namesOfLocal = playersOf ? playersOf.filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string').map((ps) => ps.name) : [];
-    const names = namesOfLocal.length ? namesOfLocal : namesOfRows;
+    // 同上：玩家名一栏也不能出现 AI（第二期下半榜一直是纯真人）
+    const namesOfRowsHuman = (rowsOf || []).filter((r) => r && r.isBot !== true && typeof r.name === 'string').map((r) => r.name);
+    const names = namesOfLocal.length ? namesOfLocal : namesOfRowsHuman;
     /** summary 的 bond 行 → 核心盟约 / 最高层数（没有 gd 时名字用 bondId 兜底）。 */
     const squadFromRow = (row) => {
       const bonds = Array.isArray(row && row.bonds) ? row.bonds : [];
@@ -3872,9 +3884,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       const bonds = Math.max(live.length, Math.max(0, Math.floor(Number(peak && peak.bonds) || 0)));
       return { name: ps.name, cores: topId ? [coreName(topId)] : [], bonds, maxLayers };
     };
+    // ★ 2026-11-23（玩家：规程榜带了 AI）：第二期下半的榜**只有真人**（本进程分支一直是
+    //   `ps.isBot !== true`）。走 summary 的分支以前只查了 name，于是 AI 队友也上了榜。
+    //   两条路统一成「AI 不上榜」—— 结算行里带 `isBot`，直接滤掉。
+    const humansOfRows = (rowsOf || []).filter((r) => r && r.isBot !== true && typeof r.name === 'string');
     const squads = playersOf && gd
       ? playersOf.filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string').map(squadFromPlayer)
-      : (rowsOf || []).filter((r) => r && typeof r.name === 'string').map(squadFromRow);
+      : humansOfRows.map(squadFromRow);
     const entry = echoBoardEntry({
       depth,
       round,
