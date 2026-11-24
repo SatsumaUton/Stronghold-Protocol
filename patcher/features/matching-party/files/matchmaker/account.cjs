@@ -938,7 +938,7 @@ async function handle(req, res, pathname) {
     await audit({ id: u.id, email: u.email }, 'self-change-password', u.id, null, ipOf(req));
     return sendJson(res, 200, { ok: true });
   }
-  // 修改代号（昵称），四位代码不变
+  // 修改代号（昵称）：**会重新分配四位代码**（维护者 2026-11-24 确认这是设计，不是 bug）
   if (method === 'POST' && pathname === '/api/auth/set-name') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
@@ -1609,7 +1609,8 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
         const bad = checkNickname(nick);
         if (bad) return sendJson(res, 400, { ok: false, ...bad });
         const tag = freshTag();
-        await db().query('UPDATE accounts SET nickname = ?, name = ?, tag = ? WHERE id = ?', [nick, nick, tag, id]);
+        // 与自助改名保持同一口径：name 存「昵称#代码」（后台改名前这里漏了 #代码）
+        await db().query('UPDATE accounts SET nickname = ?, name = ?, tag = ? WHERE id = ?', [nick, nick + '#' + tag, tag, id]);
         await audit({ id: me2.admin_id, email: me2.email }, 'set-nickname', id, nick, ipOf(req));
         return sendJson(res, 200, { ok: true, id, nickname: nick, tag });
       }

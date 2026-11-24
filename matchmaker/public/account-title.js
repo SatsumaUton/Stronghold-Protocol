@@ -240,7 +240,7 @@
     logged.querySelector('#mm-acc-rename').onclick = async (e) => {
       e.preventDefault();
       const cur = state.user ? (state.user.nickname || '') : '';
-      const v = prompt('输入新的博士代号（最多 8 个汉字或 16 个字母/数字）', cur);
+      const v = prompt('输入新的博士代号（最多 8 个汉字或 16 个字母/数字）。改名后会分配新的四位代码', cur);
       if (!v) return;
       const why = nickProblem(v);
       if (why) { alert(why); return; }
