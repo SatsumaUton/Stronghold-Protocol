@@ -48,14 +48,29 @@ check('★ 去掉名字里的 #四位代码 后缀（账号名形如 雾灯#6923
   /replace\(\/#\\d\{4\}\\s\*\$\/, ''\)/.test(client));
 
 console.log('\n=== 修复②：setName 不再被 entered 挡住 ===\n');
-// 只看真代码行，忽略注释（注释里会提到旧写法作为说明）
-const clientCode = client.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+// 只看真代码行，忽略注释（注释里会提到旧写法作为说明）。
+// ⚠ 必须按 CRLF 切行：`matchmaker/public/client.js` 是 CRLF（4655 行全是），
+//   以前写 `split('\n')` 时每行末尾留着 `\r`，而 JS 正则的 `.` 不匹配 `\r`，
+//   于是 `replace(/\/\/.*$/, '')` **整行剥不掉** —— 注释里的旧写法被当成代码，
+//   这条检查在 2026-11-24 一直假失败（产品代码其实早就修好了）。
+const clientCode = client.split(/\r?\n/).map((l) => l.replace(/\/\/.*$/, '')).join('\n');
 check('★ 旧写法 `if (NAME && !store.get().session.entered)` 已从代码移除',
   !/if \(NAME && !store\.get\(\)\.session\.entered\)/.test(clientCode));
 check('★ 现在只要 NAME 非空就调用 setName',
   /if \(NAME\) \{[\s\S]{0,400}?net\.setName\(NAME\)/.test(client));
 check('setName 是幂等的（同名字不重复握手）',
   /if \(this\.status === 'online' && this\.helloName === n\) return;/.test(net));
+
+// 线上真正跑的是被 nginx 注入的 mm/client.js（matchmaker/public/client.js 只是同源副本），
+// 两份都要守：只查其中一份时，另一份回归了没人发现。切行同样要按 CRLF。
+const injected = fs.readFileSync('mm/client.js', 'utf8');
+const injectedCode = injected.split(/\r?\n/).map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+check('★ 注入脚本 mm/client.js：旧写法也已移除',
+  !/if \(NAME && !store\.get\(\)\.session\.entered\)/.test(injectedCode));
+check('★ 注入脚本 mm/client.js：NAME 非空就调用 setName',
+  /if \(NAME\) \{[\s\S]{0,400}?net\.setName\(NAME\)/.test(injected));
+check('★ 注入脚本 mm/client.js：名字回退 localStorage',
+  /for \(const k of \['sp\.name', 'mm\.name'\]\)/.test(injected));
 
 console.log('\n=== 修复③：握手前兜底补名字 ===\n');
 check('★ rehandshake 前若 net.name 为空则先 setName',
