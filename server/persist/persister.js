@@ -437,6 +437,9 @@ export class LobbyPersister {
 
   /** Keep a restored alliance room but drop its interrupted match (restart → 返回同盟). */
   abortRestoredMatch(room) {
+    // ★ 2026-11-25（玩家：深潜卡死/重启后排行榜没有记录）：恢复失败的深潜局也要把「打到第几层」留下来。
+    //   必须在 liveRound 被清零**之前**调用 —— 那是这条 fallback 成绩的唯一来源。
+    try { this.lobby.recordAbortedEchoRun?.(room, 'restart-abort'); } catch { /* 记不上不影响恢复流程 */ }
     room.match = null;
     room.matchKey = null;
     room.matchKeys = null;

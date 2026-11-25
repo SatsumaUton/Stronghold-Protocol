@@ -67,7 +67,44 @@ const log = {
   debug: () => {},
 };
 let beat = null;
-const startBeat = () => { if (!beat) beat = setInterval(() => post({ type: 'hb' }), Math.max(50, Number(options.heartbeatMs) || 1000)); };
+/**
+ * 心跳 + **卡顿诊断**（2026-11-25）。
+ *
+ * 背景：玩家深潜打到 63 层「一刀卡死」，宿主日志只有 `version-hang: no heartbeat for 19 s` ——
+ * 只知道事件循环被阻塞了 19 秒，**不知道卡在哪一回合、什么阶段、多少单位**。
+ * 这里记录每次心跳与上一次的间隔：正常情况下就是一个心跳周期（1 s），
+ * 一旦间隔明显超出（> 2.5 个周期或 > 3 s），说明上一个 tick 里的同步计算把事件循环占住了，
+ * 于是把当时每个对局的回合/阶段/单位数/内存打出来 —— 下次再卡就有据可查。
+ */
+const beatEvery = Math.max(50, Number(options.heartbeatMs) || 1000);
+let lastBeatAt = 0;
+const describeMatches = () => {
+  const parts = [];
+  for (const [id, m] of matches) {
+    if (!m) continue;
+    const info = (() => {
+      try {
+        const units = (m.fields || []).reduce((n, f) => n + ((f && f.units && f.units.size) || 0), 0);
+        return `round=${m.round} phase=${m.phase} units=${units}`;
+      } catch { return 'round=? phase=?'; }
+    })();
+    parts.push(`${id}(${info})`);
+  }
+  return parts.length ? parts.join(', ') : '(no match)';
+};
+const startBeat = () => {
+  if (beat) return;
+  beat = setInterval(() => {
+    const now = Date.now();
+    const gap = lastBeatAt ? now - lastBeatAt : 0;
+    if (lastBeatAt && gap > Math.max(3000, beatEvery * 2.5)) {
+      const mb = Math.round(process.memoryUsage().heapUsed / 1048576);
+      log.warn(`[host] event loop stalled ~${gap} ms (heartbeat ${beatEvery} ms, heap ${mb} MB): ${describeMatches()}`);
+    }
+    lastBeatAt = now;
+    post({ type: 'hb' });
+  }, beatEvery);
+};
 if (viaWorker) startBeat();
 
 /** @type {any[]} messages that came before the boot finished */

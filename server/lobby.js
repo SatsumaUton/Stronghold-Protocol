@@ -2704,6 +2704,34 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
   }
 
   /**
+   * 房间开局该用哪个官方模式 id（**按房间版本校验**，2026-11-25）。
+   *
+   * 背景：`modeIdFor(mode, difficulty)` 只会拼出 `mode_single_<难度>` / `mode_multi_<难度>`，
+   * 而有些版本的官方模式不是这个命名：
+   *   · 规程·序列Ⅰ 的单人全是阶梯模式（`mode_single_15/16…`），`mode_single_normal/hard/abyss` 一个都没有；
+   *   · 第一期 / 第二期上半 / 第二期下半的 ABYSS 单人没有对应模式（它们也不提供该难度）。
+   * 旧代码在**恢复房间**时只会退回 `modeIdFor()`（因为 `room.modeId` 没进存档），于是宿主拒绝建局：
+   * `Match: mode mode_single_abyss is unavailable in act3autochess@V3_1` —— 玩家的对局直接丢失。
+   *
+   * @param {any} room
+   * @returns {string | null}
+   */
+  officialModeId(room) {
+    const asked = (room && (room.content?.modeId || room.modeId)) || null;
+    const fallback = modeIdFor(room.mode, room.difficulty);
+    let list = [];
+    try { list = this.versionModes(room.version, room.mode) || []; } catch { list = []; }
+    if (!Array.isArray(list) || !list.length) return asked || fallback;
+    if (asked && list.some((m) => m && m.id === asked)) return asked;
+    // 该版本没有 `asked`：按难度挑它的官方式模式，再不行用它列表里的第一个
+    const byDiff = list.find((m) => m && m.difficulty === room.difficulty);
+    if (byDiff && byDiff.id) return byDiff.id;
+    const naive = list.find((m) => m && m.id === fallback);
+    if (naive) return naive.id;
+    return (list[0] && list[0].id) || asked || fallback;
+  }
+
+  /**
    * Does this version's solo use the official per-round timers (`config.version.rules.soloTimed`)? 第二期下半, a server
    * without the versions service, and a version whose data cannot be read: no.
    * @param {string} id
@@ -3676,7 +3704,12 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         difficulty: room.difficulty,
         // a plugin mode the host chose (header "Gameplay plugins"), a laddered room's official mode (规程's solo), else the
         // official mode of the difficulty
-        modeId: room.content?.modeId || room.modeId || modeIdFor(room.mode, room.difficulty),
+        // ★ 2026-11-25（玩家反馈：规程单人绝境房重启后恢复即失败 `mode_single_abyss is unavailable`）：
+        //   规程没有 `mode_single_<难度>` 这种 id（单人全是 `mode_single_15/16…` 阶梯模式），而
+        //   `room.modeId` 以前没进存档 → 恢复时退回 modeIdFor() 拼出来的不存在 id，宿主直接拒绝建局。
+        //   现在统一走 officialModeId()：**按房间版本校验**，取该版本该难度真实存在的模式。
+        //   （第一期 / 第二期上半的 ABYSS 单人同样没有对应模式，一并覆盖。）
+        modeId: this.officialModeId(room),
         // 「AI 队友最后选择」 (GitHub #338): fixed for the match
         aiPicksLast: room.mode !== 'solo' && room.aiPicksLast === true,
         seats,
@@ -3802,13 +3835,31 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    *   现在**优先用结算回传的 summary**（buildResult 的 m.result 已带 variant / echoDepth / echoDiveStart /
    *   version / seed / durationMs / players[].bonds），本进程的 Match 只用于补充（gd 的盟约名字等）。
    */
-  _recordEchoBoard(room, summary) {
-    const store = this.persistStore;
+  /**
+   * 恢复失败的深潜局：把「打到第几层」记进排行榜（2026-11-25）。
+   *
+   * 只在 `room.variant === 'deepecho'` 且 `room.liveRound > 0` 时生效；由 persister.abortRestoredMatch
+   * 在清零 liveRound **之前**调用，所以这是节点重启/恢复失败时唯一还能拿到的深度。
+   * @param {any} room @param {string} reason
+   */
+  recordAbortedEchoRun(room, reason = 'restart-abort') {
+    if (!room || room.variant !== 'deepecho') return;
+    try { this._recordEchoBoard(room, { reason }); } catch { /* 记不上不影响恢复流程 */ }
+  }
+
+  _recordEchoBoard(room, summary) {    const store = this.persistStore;
     if (!store || !room) return;
     const m = room.match;                       // 本进程 Match，或 MatchProxy（宿主内）
     const fromSummary = !!summary && summary.variant === 'deepecho';
     const local = !!m && m.echoVariant === 'deepecho';
-    if (!fromSummary && !local) return;
+    // ★ 2026-11-25（玩家：深潜打到 63 层卡死，出来后排行榜没有记录）：
+    //   宿主对局**异常结束**（version-hang / version-crash）时，结算 summary 里只有 `{ reason }`，
+    //   没有 `variant`；`room.match` 是 MatchProxy、也没有 echoVariant —— 于是旧代码在这里直接 return，
+    //   玩家辛苦打到的深度**一条记录都留不下**。
+    //   现在多一条 fallback：房间本身记得是深潜房（room.variant）且知道最后的回合（room.liveRound，
+    //   由 matchBroadcast 维护并随存档持久化），就按「到此为止」记一条成绩（无盟约明细）。
+    const abnormal = !fromSummary && !local && room.variant === 'deepecho';
+    if (!fromSummary && !local && !abnormal) return;
     // 「深渊回响」：调过参的房间**不进排行榜**（深度只在标准配置下可比）
     if (room.echoCfg) return;
     // 作弊控制台（2026-11-17）：开着的房间一行成绩都不写（深潜本身禁实验性功能，这里是双保险）
@@ -3825,6 +3876,35 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       } catch { return null; }
     })();
     const gd = (local && m.gd) || versionGd || null;
+    // ★ 2026-11-25：异常结束（宿主卡死 / 崩溃）单独走一条路 —— 用房间记得的最后回合当深度，
+    //   玩家名单取房间座位（真人），盟约明细拿不到就留空。至少「打到第几层」留得下来。
+    if (abnormal) {
+      const lastRound = Math.max(0, Math.floor(Number(room.liveRound) || 0));
+      if (!(lastRound > 0)) return;                      // 还没走过第一回合：没什么可记
+      const seats = (Array.isArray(room.seats) ? room.seats : [])
+        .filter((s) => s && s.isBot !== true && typeof s.name === 'string' && s.name);
+      if (!seats.length) return;
+      const entry = echoBoardEntry({
+        depth: lastRound,
+        round: lastRound,
+        victory: false,
+        players: seats.map((s) => s.name),
+        squads: [],
+        clearMs: 0,
+        at: this.now(),
+        roomCode: room.code,
+        matchNo: room.matchCount,
+        difficulty: room.difficulty,
+        version: room.version,
+      });
+      if (entry) {
+        this.log.info?.(`[lobby] ${room.code} 深潜异常结束（${summary && summary.reason ? summary.reason : '?'}），`
+          + `按最后回合记一条成绩：深度 ${lastRound}`);
+        recordEchoBoard(store, entry).catch(() => {});
+        this._archiveEchoBoard(entry);
+      }
+      return;
+    }
     const diveStart = Math.max(1, Math.floor(Number(local ? m.echoDiveStart : summary.echoDiveStart) || 1));
     const round = Math.max(1, Math.floor(Number(local ? m.round : summary.echoRound ?? summary.roundsPassed) || 1));
     const depth = Math.max(0, Math.floor(Number(fromSummary ? summary.echoDepth : round - diveStart + 1) || 0));

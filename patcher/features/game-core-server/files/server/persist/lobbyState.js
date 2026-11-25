@@ -133,6 +133,12 @@ export function roomDoc(room, matchRef, sessionOf) {
     ...(room.variant === 'deepecho' && plain(room.echoCfg) ? { echoCfg: room.echoCfg } : {}),
     experimental: room.experimental, source: room.source, ownerKey: room.ownerKey, ownerKeys: room.ownerKeys ? [...room.ownerKeys] : null,
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
+    // ★ 2026-11-25（规程单人绝境房重启后恢复失败）：`room.modeId` 是「该版本这一难度的官方模式 id」
+    //   （规程的叫 mode_single_15/16，不是 mode_single_abyss）。以前它**不进存档**，重启后
+    //   startMatch 退回 modeIdFor() 拼出来的 `mode_single_<难度>` —— 规程没有这种 id，宿主拒绝建局，
+    //   玩家的深潜局就此丢失（还拿不到成绩）。存下来，恢复时原样用。
+    //   只在真的不是默认拼法时才写，普通房间的存档逐字节不变。
+    ...(typeof room.modeId === 'string' && room.modeId ? { modeId: room.modeId } : {}),
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
     matchLive: !!room.match, liveRound: room.liveRound | 0, livePhase: room.livePhase || null,
     // 「最后一个真人是什么时候走的」（维护者 2026-11-09）：`sweepOldRooms` 的僵尸房兜底拿它当 `since`，
@@ -306,7 +312,11 @@ function roomFrom(r, sessions, lobby, now) {
     if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
   if (r.seats.length !== room.seats.length) return null;
   const inMatch = !!r.match;
-  room.content = lobby.vanilla;
+  // ★ 2026-11-17：内容集必须按**房间自己的版本**取，不能一律用 lobby.vanilla。
+  //   以前这里写死 lobby.vanilla —— 那是默认版本（第二期下半）的 cs，规程/一期/二期房恢复时
+  //   拿着它去问自己的版本宿主，宿主回「the content set … is not kept by this server」，
+  //   整局被判恢复失败、退回「返回同盟」。版本房现在会真的走恢复流程，这条必须对。
+  room.content = lobby.baseContent(room.version) || lobby.vanilla;
   room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
   // ★ 「深渊回响」断点续玩（维护者 2026-11-06）：variant 必须一起恢复。
   //   丢了它 → persister.restoreLocal 的 startMatch 不带 variant → 新 Match 的构造函数
@@ -319,6 +329,9 @@ function roomFrom(r, sessions, lobby, now) {
   room.ownerKey = typeof r.ownerKey === 'string' ? r.ownerKey : null;
   room.ownerKeys = Array.isArray(r.ownerKeys) ? new Set(r.ownerKeys.filter((k) => typeof k === 'string')) : null;
   room.matchCount = Number.isSafeInteger(r.matchCount) && r.matchCount >= 0 ? r.matchCount : 0;
+  // ★ 2026-11-25：恢复房间的官方模式 id（规程的 mode_single_15/16 等）。没有就留空，
+  //   startMatch 会按房间版本重新解析（ladderMode），不会再拼出规程没有的 mode_single_<难度>。
+  room.modeId = typeof r.modeId === 'string' && r.modeId ? r.modeId : undefined;
   room.liveRound = Number.isSafeInteger(r.liveRound) && r.liveRound >= 0 ? r.liveRound : 0;
   room.livePhase = typeof r.livePhase === 'string' ? r.livePhase : null;
   if (inMatch) {
@@ -358,7 +371,8 @@ function fallbackRoom(r, lobby, now) {
     const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
       typeof r.version === 'string' && r.version ? r.version : undefined);
     room.lobby = lobby;
-    room.content = lobby.vanilla;
+    // 同 roomFrom：内容集按房间版本取（默认版本才是 lobby.vanilla）
+    room.content = lobby.baseContent(room.version) || lobby.vanilla;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
     room.matchCount = Number.isSafeInteger(r.matchCount) ? r.matchCount : 0;
