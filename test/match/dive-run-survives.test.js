@@ -85,6 +85,27 @@ test('非深潜房 / 没有进度时一行都不写', async () => {
   }
 });
 
+test('多人：一次宿主卡死连带多局时，每间房各记一条（不会只记一局）', async () => {
+  const { store, cmds } = makeStore();
+  const lobby = lobbyWith(store);
+  // 2026-11-25 01:56 实测：一个宿主挂掉，GRFC 与 WEEP 两局同时 ended
+  const a = hungRoom({ code: 'GRFC', matchCount: 11, liveRound: 40, seats: [{ name: '一波', isBot: false }, { name: '队友A', isBot: false }] });
+  const b = hungRoom({ code: 'WEEP', matchCount: 1, liveRound: 22, seats: [{ name: '小明', isBot: false }] });
+  LOBBY.prototype._recordEchoBoard.call(lobby, a, { reason: 'version-hang' });
+  LOBBY.prototype._recordEchoBoard.call(lobby, b, { reason: 'version-hang' });
+  await new Promise((r) => setTimeout(r, 0));
+
+  const zadds = cmds.filter((c) => c[0] === 'ZADD');
+  assert.equal(zadds.length, 2, `两间房都要写榜，实际 ${zadds.length}`);
+  const depths = zadds.map((z) => z[2]).sort();
+  assert.deepEqual(depths, ['22', '40'], `深度应为各自的最后回合，实际 ${depths.join(',')}`);
+
+  const details = cmds.filter((c) => c[0] === 'HSET').map((c) => JSON.parse(c[3]));
+  const grfc = details.find((d) => (d.players || []).includes('一波'));
+  assert.ok(grfc, 'GRFC 的玩家要在里面');
+  assert.deepEqual(grfc.players.sort(), ['一波', '队友A'].sort(), '多人都要留下');
+});
+
 test('开局 modeId：规程单人按难度取版本里真实存在的模式（不是 mode_single_abyss）', () => {
   const reg = getVersionData('act3autochess@V3_1', { log: QUIET });
   const modes = Object.entries(reg.config.modes).map(([id, rec]) => ({ id, difficulty: rec && rec.difficulty }));
