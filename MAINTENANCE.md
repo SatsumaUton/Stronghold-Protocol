@@ -2490,6 +2490,44 @@ sock.write(Buffer.concat(parts.map(p => typeof p === "string" ? Buffer.from(p, "
 **规律**：手工脚本读写 Redis 时，**读**要处理 CRLF，**写**要绕开 ANSI 参数转换。
 改完一定用**接口**复核（`/api/dive/board?version=…`）而不是只看 redis-cli 的回显。
 
+#### 9.9g 30 台节点全部「等待重启」：`shared/node_modules` 被 `npm install` 清空（2026-11-26）
+
+**症状**：维护者跑了 `启动服务器.bat`，控制台**所有节点都不在线**。
+
+**真相**（不是启动脚本的问题、也不用一直开着窗口）：
+
+```
+pm2: node-1 waiting restart（重启 311 次）、node-2 waiting restart（348 次）…
+端口 3001–3030 一个都没监听；dashboard(3080)/matchmaker(3090) 正常
+pm2 logs node-1 → ERR_MODULE_NOT_FOUND: Cannot find package 'ws'
+                    imported from node-1serverhttpwebsocket.js
+```
+
+**根因**：30 台节点的 `node-N\node_modules` **全部是 junction → `shared\node_modules`**（实测 30/30），
+而 `shared\package.json` 当时**只声明了 mysql2**。npm 会把「package.json 里没声明、但 node_modules 里存在」
+的包当作 extraneous **删除** —— 于是任何一次在 `shared\` 里执行 `npm install`（哪怕只是想装一个包），
+都会把 `ws` / `preact` / `pixi` / `three` / `htm` / `acorn` / `ses` 一起清掉，
+30 台节点随即在同一秒集体崩溃重启，控制台全红。
+
+**证据**：`shared\node_modules` 的修改时间是 `2026-11-26 10:09:45`（启动前后），
+内容为 **0 个顶层包**；`node-1\package.json` 明确依赖 `ws@^8.22.0` 等 8 个包。
+
+**修复**：
+
+| 步骤 | 内容 |
+|---|---|
+| ① 装回依赖 | `cd shared && npm install --no-save --no-audit --no-fund htm pixi-spine pixi.js preact ses three ws acorn mysql2`（实测 94 个包、约 1 分钟） |
+| ② 补全声明 | `shared\package.json` 的 `dependencies` 里补齐**全部** 9 个包（原来只有 mysql2）—— 否则下次 `npm install` 又会被删 |
+| ③ 启动前自检 | `deploy\_start-pm2.ps1` 现在先看 `shared\node_modules\ws` 在不在；不在就 `ALERT` + 自动 `npm install`（30 分钟内只试一次） |
+
+修好后：`node-1..30` 全部 online，`pm2 list` 显示 `all 32 apps online, nothing to do`，控制台 `30/30`。
+
+**为什么 `启动服务器.bat` 的窗口不用一直开着**：它调用计划任务 `SP-PM2-Resurrect`（SYSTEM + Session 0），
+pm2 守护进程与窗口无关 —— §3.5。窗口关掉不影响服务器；反过来，**窗口开着也不会让崩溃循环的节点起来**。
+
+**以后要记住**：`shared/` 不是普通目录，它是 30 台节点共用的依赖根。在 `shared/` 里跑 npm 命令前，
+先确认 `shared\package.json` 声明的依赖 ≥ `node-N\package.json` 的依赖集。
+
 #### 相关文件
 
 | 文件 | 作用 |

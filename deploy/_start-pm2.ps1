@@ -160,6 +160,30 @@ if (Test-Path $probe) {
   }
 }
 
+# ⚠ 2026-11-26 事故（30 台节点全部「等待重启」、控制台全离线）：
+#   `node-N\node_modules` 全部是 junction → `shared\node_modules`，而 `shared\package.json`
+#   当时只声明了 mysql2。于是**任何一次在 shared\ 里跑 `npm install`**（哪怕只是想装一个包）
+#   都会把 ws / preact / pixi … 当成 extraneous **删掉**，30 台节点随即
+#   `ERR_MODULE_NOT_FOUND: Cannot find package 'ws'` 崩溃循环（实测 node-1 重启 311 次、node-2 348 次），
+#   端口 3001–3030 一个都没监听 —— 玩家侧就是「控制台显示所有节点都不在线」。
+#   修法两层：① shared/package.json 声明**全部**依赖（已做）；
+#            ② 这里加一道启动前自检：缺依赖就先补装，补不上就大声报错（而不是让节点静默崩溃）。
+$sharedDir = Join-Path $root 'shared'
+$wsDir = Join-Path $sharedDir 'node_modules\ws'
+if (-not (Test-Path $wsDir)) {
+  $stamp = Join-Path $root 'logs\npm-bootstrap.stamp'
+  $lastTry = 0
+  if (Test-Path $stamp) { try { $lastTry = (Get-Item $stamp).LastWriteTime.Ticks } catch { $lastTry = 0 } }
+  $recent = ([DateTime]::Now.Ticks - $lastTry) -lt ([TimeSpan]::FromMinutes(30).Ticks)
+  Write-Log ('ALERT shared/node_modules/ws is MISSING (nodes would crash-loop)')
+  if (-not $recent -and (Test-Path $sharedDir)) {
+    Write-Log 'bootstrapping shared dependencies (npm install)…'
+    $r = Invoke-Hidden ('/c "cd /d "' + $sharedDir + '" && npm install --no-audit --no-fund --loglevel=error >> "' + $log + '" 2>&1"')
+    Write-Log ('  npm install exit=' + $r.code)
+    try { New-Item -ItemType File -Force -Path $stamp | Out-Null } catch { }
+  }
+} 
+
 # 真正必须活着的应用。
 # ⚠ nginx-gateway 不在其中：它是 pm2 里包一层 nginx 的 wrapper，会反复
 #   「waiting restart」（实测 28 次）。nginx 本体是独立进程（计划任务 SP-Nginx-Start
