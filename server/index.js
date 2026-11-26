@@ -90,7 +90,7 @@ export {
  *   lobbyGraceMs?: number, reconnectWindowMs?: number, heartbeatMs?: number, helloTimeoutMs?: number,
  *   ratePerSec?: number, rateBurst?: number, maxConnections?: number, maxRooms?: number,
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
- *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
+ *   heavyPerSec?: number, heavyBurst?: number, viewPerSec?: number, viewBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
  *   versionVoteMs?: number, versionRetryMs?: number,
  *   roomCode?: string | null,
  *   assetIndex?: boolean | { cacheFile?: string | null, delayMs?: number }, studio?: boolean,

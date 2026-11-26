@@ -145,7 +145,10 @@ export function describeError(err) {
  * @returns {number}
  */
 export function toastError(err) {
-  recordError('request', err);
+  // ★ 2026-11-26（玩家诊断里只有「操作过于频繁 (RATE)」，看不出是哪个动作被挡）：
+  //   NetError 自带 `detail`（服务端写的是 `<msg.t> too often`，例如 'g.watch too often'），
+  //   以前没进诊断 —— 把它当 detail 记下来，下次玩家一贴诊断就知道是哪条请求。
+  recordError('request', err, err && typeof err.detail === 'string' && err.detail ? `detail: ${err.detail}` : null);
   try {
     const qs = new URLSearchParams(location.search);
     const hiddenWatch = qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || !!qs.get('watchToken');

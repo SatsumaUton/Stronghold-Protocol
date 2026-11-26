@@ -229,7 +229,8 @@
       "files": [
         "matchmaker/account.cjs",
         "dashboard/**",
-        "public/js/ui/accountObserver.js"
+        "public/js/ui/accountObserver.js",
+        "matchmaker/check-mail.mjs"
       ],
       "tests": [
         "登录/注册",

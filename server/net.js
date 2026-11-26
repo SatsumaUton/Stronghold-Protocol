@@ -70,8 +70,20 @@ export const NET_DEFAULTS = Object.freeze({
   maxOnline: 0,                 // authenticated players admitted at once (0 = unlimited); a resume is never refused
   heavyPerSec: 2,               // refill of the bucket for resend-heavy intents (HEAVY_TYPES)
   heavyBurst: 6,
+  // ★ 2026-11-26（玩家诊断里出现 `NetError: 操作过于频繁 (RATE)`，PREP 阶段连续 3 次）：
+  //   `g.watch` 是**看别人战场**的动作，回复虽然大，但玩家会连着点（切视角 / 双击队友 / 追看某人），
+  //   和「改配装、改皮肤」这类写操作挤在同一个 2 次/秒的桶里，正常操作也会被挡。
+  //   现在看盘单独一个桶：4 次/秒、burst 8 —— 切视角够用，仍然防住脚本刷。
+  viewPerSec: 4,
+  viewBurst: 8,
   trustProxy: 'auto',           // forwarding headers: 'auto' = from loopback/private peers only, true = always, false = never
 });
+
+/**
+ * 只读的「大回复」意图（另有一个桶，见 NET_DEFAULTS.viewPerSec）：目前只有 g.watch ——
+ * 它的回复是一整帧 m.field（可观战的战场状态），但玩家切视角会连点，不该和写操作抢同一个额度。
+ */
+export const VIEW_TYPES = new Set(['g.watch']);
 
 /**
  * Intents that also draw from the per-connection heavy bucket: g.watch (its reply is a large state resend, m.field),
@@ -596,6 +608,8 @@ class Connection {
     this.session = null;
     this.bucket = new TokenBucket(opts.ratePerSec, opts.rateBurst, now);
     this.heavy = new TokenBucket(opts.heavyPerSec, opts.heavyBurst, now);
+    // 看盘（VIEW_TYPES）用的独立桶，与写操作分开计数（2026-11-26）
+    this.view = new TokenBucket(opts.viewPerSec ?? opts.heavyPerSec, opts.viewBurst ?? opts.heavyBurst, now);
     this.dropWindowAt = now;
     this.drops = 0;
     /** true once the server initiated the close; frames still in flight are ignored */
@@ -732,7 +746,12 @@ export class Network {
     // 重请求节流（HEAVY_TYPES：room.card / room.loadout / room.skins …）。
     // 管理员/服主豁免：维护期自测要连续改名片、调配、皮肤等，挨个保存会被
     // 「操作过于频繁」拦下（玩家反馈的正是这类）。普通玩家仍受保护。
-    if (HEAVY_TYPES.has(msg.t) && conn.session.admin !== true && !conn.heavy.take(now)) {
+    // ★ 2026-11-26：看盘（VIEW_TYPES，目前只有 g.watch）走**独立的桶**——切视角会被玩家连点，
+    //   和写操作抢额度会让正常操作报「操作过于频繁」（玩家诊断里 PREP 阶段连续 3 次）。
+    if (VIEW_TYPES.has(msg.t) && conn.session.admin !== true && !conn.view.take(now)) {
+      this.reply(conn, errorMsg(ERR.RATE, rid, `${msg.t} too often`)); return;
+    }
+    if (HEAVY_TYPES.has(msg.t) && !VIEW_TYPES.has(msg.t) && conn.session.admin !== true && !conn.heavy.take(now)) {
       this.reply(conn, errorMsg(ERR.RATE, rid, `${msg.t} too often`)); return;
     }
 
