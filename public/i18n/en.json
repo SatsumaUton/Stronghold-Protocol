@@ -3448,5 +3448,7 @@
   "重置密码并登录": "Reset password and sign in",
   "忘记密码？": "Forgot your password?",
   "返回登录": "Back to sign in",
-  "献祭 · 扩容：祝福名额 +1（本局，全队共享），立刻补一次抽取": "Offering · Expansion: blessing slot +1 (this run, shared by the team), plus one immediate draw"
+  "献祭 · 扩容：祝福名额 +1（本局，全队共享），立刻补一次抽取": "Offering · Expansion: blessing slot +1 (this run, shared by the team), plus one immediate draw",
+  "验证码邮件发送失败（邮件通道异常），请联系管理员": "Could not send the verification email (mail channel error) — please contact the administrator",
+  "验证码邮件未配置，请联系管理员": "Email delivery is not configured — please contact the administrator"
 }

@@ -43,6 +43,11 @@ function errorText(code) {
     captcha_wrong: N_('图形验证码错误'),
     too_soon: N_('发送太频繁，请稍后再试'),
     too_many_codes: N_('今日验证码发送次数已达上限，请明天再试'),
+    // ★ 2026-11-26（玩家：注册发送验证码显示「操作失败」）：服务端在邮件发不出去时回
+    //   `mail_failed`（QQ 邮箱 SMTP 授权码失效那类），这里以前没有映射 → 落到兜底「操作失败」，
+    //   玩家完全不知道是邮件通道的问题，也不会去联系管理员。
+    mail_failed: N_('验证码邮件发送失败（邮件通道异常），请联系管理员'),
+    mail_not_configured: N_('验证码邮件未配置，请联系管理员'),
   };
   return MAP[code] ? t(MAP[code]) : t(N_('操作失败，请稍后重试'));
 }

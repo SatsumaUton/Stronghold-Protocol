@@ -335,6 +335,37 @@ function mail() {
   return mailer;
 }
 
+/**
+ * 发一封验证码邮件，**失败时把真实原因写进日志**（2026-11-26）。
+ *
+ * 背景：玩家反馈「注册发送验证码显示操作失败」。排查时发现三处发信点全是
+ * `catch { … }` —— 错误被完全吞掉，日志里一个字都没有，只能靠现写脚本复现，
+ * 才发现是 QQ 邮箱 SMTP 返回 `EAUTH 535`（授权码失效 / 账号 SMTP 被限制）。
+ *
+ * 现在：错误码 + 服务器响应写 `[mail] … 发送失败`，方便一眼看出是凭据问题还是网络问题；
+ * 返回值只用于决定给玩家的提示，**不把 SMTP 细节暴露给前端**。
+ *
+ * @param {string} what 用途（'register' | 'reset' | 'admin2fa'），只用于日志
+ * @param {object} payload sendMail 的参数
+ * @returns {Promise<boolean>} 是否发送成功
+ */
+async function sendMailLogged(what, payload) {
+  try {
+    await mail().sendMail(payload);
+    return true;
+  } catch (e) {
+    const code = (e && e.code) || 'ERROR';
+    const detail = String((e && (e.response || e.message)) || e).slice(0, 300);
+    try {
+      console.error(`[mail] ${what} 发送失败: ${code} | ${detail}`);
+      if (code === 'EAUTH' || code === 'MAIL_NOT_CONFIGURED') {
+        console.error('[mail] ↑ 这是**凭据/配置**问题：检查 .secrets/secrets.json 的 mailUser / mailPassword（QQ 邮箱需用「授权码」，不是登录密码），改完 pm2 restart matchmaker');
+      }
+    } catch { /* 日志失败不影响主流程 */ }
+    return false;
+  }
+}
+
 // 验证码邮件 HTML（深色卡片风格，避免外部图片被拦截）
 function codeMailHtml(code) {
   return `<!doctype html><html><body style="margin:0;padding:24px;background:#0a1012;font-family:'Noto Sans SC',Arial,sans-serif;color:#d8e6e3">
@@ -835,15 +866,13 @@ async function handle(req, res, pathname) {
     }
 
     const code = String(crypto.randomInt(100000, 1000000));
-    try {
-      await mail().sendMail({
+    if (!await sendMailLogged('register', {
         from: `"萝卜喵公益服" <${MAIL.user}>`,
         to: email,
         subject: '【萝卜喵公益服】卫戍协议：盟约 · 注册验证码',
         text: `你的注册验证码是 ${code}，10 分钟内有效。若非本人操作请忽略。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约`,
         html: codeMailHtml(code),
-      });
-    } catch {
+    })) {
       return sendJson(res, 502, { ok: false, error: 'mail_failed' });
     }
 
@@ -1181,7 +1210,7 @@ async function handle(req, res, pathname) {
     if (rows[0]) {
       const code = String(crypto.randomInt(100000, 1000000));
       await db().query('INSERT INTO reset_codes (email, code_hash, expires_at, attempts, last_sent_at) VALUES (?,?,?,0,?) ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash), expires_at = VALUES(expires_at), attempts = 0, last_sent_at = VALUES(last_sent_at)', [email, hashCode(email, code), new Date(Date.now() + 10 * 60_000), new Date()]);
-      try { await mail().sendMail({ from: `"萝卜喵公益服" <${MAIL.user}>`, to: email, subject: '【萝卜喵公益服】重置密码验证码', text: `你的重置密码验证码是 ${code}，10 分钟内有效。如非本人操作请忽略。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约`, html: codeMailHtml(code) }); } catch { /* 邮件失败不暴露 */ }
+      await sendMailLogged('reset', { from: `"萝卜喵公益服" <${MAIL.user}>`, to: email, subject: '【萝卜喵公益服】重置密码验证码', text: `你的重置密码验证码是 ${code}，10 分钟内有效。如非本人操作请忽略。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约`, html: codeMailHtml(code) });
     }
     return sendJson(res, 200, { ok: true, cooldown: 60 });
   }
@@ -1226,9 +1255,9 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
     if (limited('a2code-day:' + u.email, 30, 24 * 3600_000)) return sendJson(res, 429, { ok: false, error: 'too_many_codes', retryAfter: 3600 });
     const code = String(crypto.randomInt(100000, 1000000));
     await db().query('INSERT INTO admin_codes (email, code_hash, expires_at, attempts, last_sent_at) VALUES (?,?,?,0,?) ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash), expires_at = VALUES(expires_at), attempts = 0, last_sent_at = VALUES(last_sent_at)', [u.email, hashCode(u.email, code), new Date(Date.now() + 10 * 60_000), new Date()]);
-    try {
-      await mail().sendMail({ from: `"萝卜喵公益服" <${MAIL.user}>`, to: u.email, subject: '【萝卜喵公益服】管理后台二次验证码', text: `你的管理后台二次验证码是 ${code}，10 分钟内有效。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约`, html: codeMailHtml(code) });
-    } catch { return sendJson(res, 502, { ok: false, error: 'mail_failed' }); }
+    if (!await sendMailLogged('admin2fa', { from: `"萝卜喵公益服" <${MAIL.user}>`, to: u.email, subject: '【萝卜喵公益服】管理后台二次验证码', text: `你的管理后台二次验证码是 ${code}，10 分钟内有效。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约`, html: codeMailHtml(code) })) {
+      return sendJson(res, 502, { ok: false, error: 'mail_failed' });
+    }
     return sendJson(res, 200, { ok: true, cooldown: 60, masked: u.email.replace(/^(.).*(@.*)$/, '$1***$2') });
   }
   if (method === 'POST' && pathname === '/api/admin2/login-code') {
