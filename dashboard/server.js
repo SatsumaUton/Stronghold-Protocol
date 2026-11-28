@@ -554,7 +554,9 @@ async function opsState() {
       // 多人匹配正在排队等的人数：他们不在任何房间里，只有这个字段能看见
       queued: Number(h.queued) || 0,
       sockets: Number(h.sockets) || 0,
+      // ★ 2026-11-28：humans 现在只数在线真人（server/lobby.js stats），离线单独一项
       players: (Number(h.humans) || 0) + (Number(h.bots) || 0),
+      offline: Number(h.offline) || 0,
       alive: pr.httpOk,
       // 只有「跑旧代码 + 没对局 + 进程活着」才允许重启
       restartable: !fresh && Number(h.matches) === 0 && pr.httpOk,
@@ -582,6 +584,7 @@ async function opsState() {
       matches: nodes.reduce((s, x) => s + x.matches, 0),
       rooms: nodes.reduce((s, x) => s + x.rooms, 0),
       players: nodes.reduce((s, x) => s + x.players, 0),
+      offline: nodes.reduce((s, x) => s + (x.offline || 0), 0),
     },
   };
   opsCache = { at: data.at, data };
@@ -714,31 +717,34 @@ async function opsRestartAll(opts = {}) {
 
   const res = await runPm2(['startOrReload', eco, '--only', safe.map(nodeName).join(','), '--update-env']);
   opsCache = { at: 0, data: null };
-  if (!res.ok) {
-    // pm2 失败时【绝不能】报「已重启」—— 之前就是这样误报，实际一个都没动
-    return {
-      ok: false, restarted: [], skipped: skippedBusy, dead,
-      out: res.out.slice(-1500), err: res.err.slice(-1200),
-      message: `重启失败，没有节点被重启：${(res.err || res.out || '').split('\n').filter(Boolean).pop() || '未知原因'}`,
-    };
-  }
+  // pm2 的退出码不可靠：实测 30 台全部 `✓`、节点也确实重启了，CLI 仍可能返回非 0
+  // （维护者 2026-11-05：面板报「重启失败，没有节点被重启」，但日志里每台都是 ✓）。
+  // 所以这里不再凭退出码下结论 —— 真正确认靠下面的「逐个复查」。
+  const pm2Failed = !res.ok;
   await runPm2(['save']);
 
-  // 复查：都起来了吗？
-  await new Promise((r) => setTimeout(r, 6000));
-  opsCache = { at: 0, data: null };
-  const after = await opsState();
-  const down = safe.filter((n) => {
-    const x = after.nodes.find((y) => y.n === n);
-    return !x || !x.alive;
-  });
+  // 复查：轮询最多约 30 秒（节点重启后要重新载内容，6 秒常常还没起来）
+  let after = null;
+  let down = safe;
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    opsCache = { at: 0, data: null };
+    after = await opsState();
+    down = safe.filter((n) => {
+      const x = after.nodes.find((y) => y.n === n);
+      return !x || !x.alive;
+    });
+    if (!down.length) break;
+  }
 
-  let message = `已重启 ${safe.length} 台：${safe.join(', ')}`;
+  let message = down.length === safe.length && pm2Failed
+    ? `重启失败，没有节点被重启：${(res.err || res.out || '').split('\n').filter(Boolean).pop() || '未知原因'}`
+    : `已重启 ${safe.length} 台：${safe.join(', ')}`;
   if (skippedBusy.length) message += `；跳过 ${skippedBusy.length} 台（对局进行中）：${skippedBusy.map((x) => x.n).join(', ')}`;
   if (dead.length) message += `；⚠ 重启前就没响应：${dead.join(', ')}`;
-  if (down.length) message += `；⚠ 重启后未响应：${down.join(', ')}`;
+  if (down.length) message += `；⚠ 30 秒内还没起来：${down.join(', ')}`;
   return {
-    ok: !down.length,
+    ok: down.length < safe.length,
     restarted: safe, skipped: skippedBusy, dead, down,
     out: res.out.slice(-1500), err: res.err.slice(-800),
     message,
@@ -919,7 +925,7 @@ function opsSetOpenList() {
         opsCache = { at: 0, data: null };
         const after = readOpenList();
         // powershell.exe 往管道里写的是控制台代码页（中文系统 = GBK/936），
-        // 直接当 UTF-8 用会得到一串「<GBK 乱码>」这样的乱码，面板上没法看。
+        // 直接当 UTF-8 用会得到一串「ڵ�̽��」这样的乱码，面板上没法看。
         // 这里按 UTF-8 解一次，解出替换字符就退回 GBK 再解。
         const decode = (buf) => {
           if (!buf || !buf.length) return '';

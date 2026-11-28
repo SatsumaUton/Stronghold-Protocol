@@ -495,7 +495,11 @@ async function roomInfo(code, node) {
     const doc = JSON.parse(raw);
     const seats = Array.isArray(doc.seats) ? doc.seats : [];
     const seatList = seats.filter(Boolean);
-    const humans = seatList.filter((s) => !s.isBot).length;
+    // ★ 2026-11-28（维护者：离线的玩家不该算进人数）：以前 seats 里只要有座位就算一个人，
+    //   于是「掉线但座位还在」的玩家也计入房间的 humans。现在 humans 只数 connected 的真人，
+    //   离线单独给 offline（房间表照旧显示总座位数，但「玩家」这一列不再虚高）。
+    const humans = seatList.filter((s) => !s.isBot && s.connected !== false).length;
+    const offline = seatList.filter((s) => !s.isBot && s.connected === false).length;
     const bots = seatList.length - humans;
     const mode = doc.mode || null;
     const players = seatList
@@ -549,7 +553,7 @@ async function roomInfo(code, node) {
     // `{ since, until, windowMs, name }`；不是这种房间时整条省掉（两个界面的默认行不变）。
     // 由 lobbyState.soloHoldDoc 在写房间文档时算好 —— 这是唯一同时知道「谁在什么时候断线」的地方。
     const soloHold = soloHoldView(doc.soloHold);
-    return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
+    return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, offline, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
       // 本服：房间的游戏版本（默认版本在房间状态里被省略）
       version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
       // 本服：「深渊回响」（深潜）房。控制台与后台靠它把类型列显示成深渊回响、并给出深潜深度（= round）。

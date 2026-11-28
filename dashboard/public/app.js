@@ -145,9 +145,13 @@ function updateCard(el, d) {
 
   const h = d.health;
   const players = h ? (h.humans ?? 0) : 0;
+  const offline = h ? (h.offline ?? 0) : 0;
   const rooms = h ? (h.rooms ?? 0) : 0;
   const matches = h ? (h.matches ?? 0) : 0;
-  el.querySelector('.players').textContent = `${players} 玩家`;
+  // ★ 2026-11-28（维护者：离线的玩家不该算进节点控制台的人数）：
+  //   `humans` 现在只数**在线**的真人（server/lobby.js stats）。离线但座位还留着的单独显示成
+  //   「· N 离线」，既不让在线人数虚高，也不把「有人在挂机等着回来」这件事藏掉。
+  el.querySelector('.players').textContent = offline > 0 ? `${players} 玩家 · ${offline} 离线` : `${players} 玩家`;
   el.querySelector('.rooms').textContent = `${rooms} 房间`;
   el.querySelector('.matches').textContent = `${matches} 对局`;
   const lat = el.querySelector('.lat');

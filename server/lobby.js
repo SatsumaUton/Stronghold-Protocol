@@ -1035,16 +1035,25 @@ export class Lobby {
   stats() {
     let matches = 0;
     let humans = 0;
+    let offline = 0;
     let bots = 0;
     let spectators = 0;
     for (const r of this.rooms.values()) {
       if (r.match) matches++;
-      for (const s of r.seats) if (s && !s.left) (s.isBot ? bots++ : humans++);
+      for (const s of r.seats) {
+        if (!s || s.left) continue;
+        if (s.isBot) { bots++; continue; }
+        // ★ 2026-11-28（维护者：离线的玩家不该算进后台节点控制台的人数）：
+        //   以前只判断 `!s.left`，于是**掉线但座位还在**的玩家也计入 humans ——
+        //   控制台「N 玩家」显示的其实是「N 个座位有人」，与「真的有人在玩」不是一回事。
+        //   现在离线单独计 offline：humans 只保留 connected 的真人，控制台/后台读到的就是在线人数。
+        if (s.connected) humans++; else offline++;
+      }
       spectators += r.spectators.length;
     }
     // queued：多人匹配**正在排队等**的人数。他们没有房间、没进对局，光看 rooms/matches 完全看不见，
   // 所以控制台和后台要能读到 —— 否则「有人点了开始多人匹配但还没成局」在运维侧是隐形的。
-  return { rooms: this.rooms.size, matches, humans, bots, spectators, queued: this.quickQueue?.size || 0 };
+  return { rooms: this.rooms.size, matches, humans, offline, bots, spectators, queued: this.quickQueue?.size || 0 };
   }
 
   // ---------------------------------------------------------------------------------------------------
