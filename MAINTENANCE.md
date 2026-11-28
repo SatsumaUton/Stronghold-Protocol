@@ -2528,6 +2528,78 @@ pm2 守护进程与窗口无关 —— §3.5。窗口关掉不影响服务器；
 **以后要记住**：`shared/` 不是普通目录，它是 30 台节点共用的依赖根。在 `shared/` 里跑 npm 命令前，
 先确认 `shared\package.json` 声明的依赖 ≥ `node-N\package.json` 的依赖集。
 
+#### 9.9h 部署闸门：`sync-nodes --apply` 之前先比对 repo-sync 与 node-1（2026-11-28）
+
+**为什么要有这道闸门**：`deploy/sync-nodes.cjs` 的参照物是 **node-1**，不是 `repo-sync`：
+
+```js
+const ref = {};
+for (const d of DIRS) ref[d] = walk(path.join(ROOT, 'node-1', d));   // ← 拿 node-1 当模板
+```
+
+所以「改了 `repo-sync`、忘了拷到 `node-1`」时，它会**照报「0 处差异」**，而 30 台跑的全是旧代码。
+这个坑已经踩过三次：
+
+| 时间 | 漏掉的改动 | 后果 |
+|---|---|---|
+| 2026-11-18 | `server/match/match/echoPhase.js` 的盟约投影修复 | 30 台全没生效，`sync-nodes` 一直报 0 差异 |
+| 2026-11-28 | `matchmaker/server.js` 的 humans 口径 | 只改了部署根，后来被仓库版本覆盖回去 |
+| 2026-11-28 | `settle.js`（少 13 行回退）、`screenFit.js`（少 28 行钳制修复） | **node-1 一直在跑旧代码**，闸门接上当天就查出来了 |
+
+**现在的行为**：
+
+```powershell
+node deploy/sync-nodes.cjs                        # 只读报告（不拦，行为同以前）
+node deploy/sync-nodes.cjs --apply                # ← 先跑闸门，不一致就中止
+node deploy/sync-nodes.cjs --apply --skip-drift   # 显式跳过（输出里留痕）
+```
+
+不一致时的输出（实测）：
+
+```text
+✗ repo-sync 与 node-1 不一致 —— 拒绝分发（否则 2–30 台会继续跑旧代码）。
+  修法：把上面列出的文件拷到 node-1，然后再跑本脚本。
+  确实要先分发（node-1 故意不同时）可加 --skip-drift，但请说明原因。
+已中止，没有复制任何文件。
+```
+
+**放行项**（`deploy/check-node1-drift.mjs` 的 `INTENTIONAL`，两处刻意不同，不是漏洞）：
+
+| 文件 | 为什么不同 |
+|---|---|
+| `data/assets.json` | 生成本地素材清单的摘要文件，两地各自生成 |
+| `data/create-room.json` | 公开仓库默认**关闭建房**（`{"enabled":false}`），生产是开放的（`true`） |
+
+> ⚠ 加放行项必须写明理由，否则下次它会被当成噪音，闸门就白做了。
+
+**闸门接上当天就抓到的两处真实漂移**（已修，node-1 现与仓库一致）：
+
+| 文件 | 差异 | 判定依据 |
+|---|---|---|
+| `server/match/match/settle.js` | node-1 多 13 行（乌萨斯临时层自动并入永久层） | 仓库有 `1f47b318 回退临时层自动并入` → 仓库是新的 |
+| `public/js/ui/screenFit.js` | node-1 少 28 行（`clampFitToViewport` 异形屏钳制） | 仓库有 `db65f46d 异形屏适配锁死修复` → 仓库是新的 |
+
+判定方向的方法：`git log --oneline -1 -- <file>` 看仓库那份的最后一次改动，再对照 node-1 的 mtime / 行数。
+
+**正确的部署顺序**（三步，一步都不能省）：
+
+```powershell
+# ① 在仓库里改：D:\Stronghold-Protocol\repo-sync
+# ② 拷到 node-1（闸门会检查这一步）
+Copy-Item repo-sync\server\lobby.js node-1\server\lobby.js -Force
+# ③ 分发 + 确认 0 差异
+$env:SP_ROOT='D:\Stronghold-Protocol'
+node deploy/sync-nodes.cjs --apply
+node deploy/sync-nodes.cjs          # 必须看到「完成：共 0 处差异」
+```
+
+> 复制 ≠ 生效：`server/**` 的改动要 `pm2 restart node-N --update-env` 才载入；
+> `public/**` 刷新页面即生效。**有玩家在局里的节点不能重启**，等空闲再动。
+
+**踩过的额外教训**：测试 `--skip-drift` 时我往 `node-1\server\http\config.js` 里加了一行测试标记，
+紧接着的两次 `--apply` 把它分发到了全部 30 台。事后逐台覆盖恢复并核对。
+→ **不要在 node-1 里留任何测试痕迹**；要测闸门就用一个临时文件，测完立刻删。
+
 #### 相关文件
 
 | 文件 | 作用 |
