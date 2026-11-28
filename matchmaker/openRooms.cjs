@@ -27,12 +27,18 @@ const SEATS = 4;
 function pickOpenRoom(code, node, doc) {
   if (!doc || typeof doc !== 'object') return null;
   if (doc.listed !== true) return null;                        // 没挂公开同盟
-  if (doc.matchLive || doc.matchKey || doc.match) return null;  // 已经开局（或开局中）
+  // ★ 2026-11-28（维护者：开局后仍留在公开列表上、显示「已开始」、可点观战）：
+  //   以前这里 `matchLive/matchKey/match` 任一为真就直接丢弃 → 一开局就从列表消失。
+  //   现在只丢弃「观战席已满」的已开局房；其余保留并标 started，客户端据此把「加入」换成「已开始」。
+  const started = !!(doc.matchLive || doc.matchKey || doc.match);
   const seats = Array.isArray(doc.seats) ? doc.seats : [];
   const taken = seats.filter(Boolean).length;
   const capacity = Number(doc.capacity ?? (doc.experimental && doc.experimental.playerCapacity) ?? SEATS);
   const cap = Number.isInteger(capacity) && capacity > 0 ? capacity : SEATS;
-  if (taken >= cap) return null;                               // 满员
+  // 已开局的房：座位满了没关系（不能再加入），只要观战席还有空就继续列出
+  const maxSpec = Number(doc.maxSpectators) > 0 ? Number(doc.maxSpectators) : 2;
+  const specs = Array.isArray(doc.spectators) ? doc.spectators.length : 0;
+  if (started) { if (specs >= maxSpec) return null; } else if (taken >= cap) return null;
   const hostSeat = seats.find((s) => s && doc.hostId && s.playerId === doc.hostId) || seats.find(Boolean);
   return {
     code: String(code || doc.code || ''),
@@ -44,6 +50,10 @@ function pickOpenRoom(code, node, doc) {
     difficulty: doc.difficulty || null,
     version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
     matchmaking: doc.matchmaking === true,
+    // 已开局：客户端据此禁用「加入」、显示「已开始」，只留观战
+    started,
+    spectators: specs,
+    maxSpectators: maxSpec,
     // 「深渊回响」（深潜）：公开的深潜房也要能被认出来（列表里显示成深渊回响，维护者 2026-11-06）
     variant: doc.variant === 'deepecho' ? 'deepecho' : null,
     experimental: !!(doc.experimental && typeof doc.experimental === 'object' && Object.keys(doc.experimental).length),

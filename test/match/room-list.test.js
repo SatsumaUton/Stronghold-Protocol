@@ -218,14 +218,17 @@ test('room.list 的行里没有 playerId / 地址 / 座位明细', () => {
   lobby.setListed(host, { listed: true });
   const row = lobby.roomList().reply.rooms[0];
 
+  // ★ 2026-11-28：新增 started / spectators / maxSpectators（开局后仍留列表，见下一条用例）
+  //                version 是 2026-11-21 就加上的（公开列表要带版本徽章）
   assert.deepEqual(Object.keys(row).sort(),
-    ['capacity', 'code', 'difficulty', 'experimental', 'filled', 'host', 'humans'].sort());
+    ['capacity', 'code', 'difficulty', 'experimental', 'filled', 'host', 'humans', 'maxSpectators', 'spectators', 'started', 'version'].sort());
   const blob = JSON.stringify(row);
   assert.ok(!blob.includes(host.playerId), '不能泄漏 playerId');
   assert.ok(!blob.includes('acc_'), '不能泄漏 accountId');
   assert.equal(row.host, 'Host', 'host 是显示名');
   assert.equal(row.filled, 1, '已占座位 = 1（房主）');
   assert.equal(row.capacity, 8);
+  assert.equal(row.started, false, '还没开局');
 });
 
 test('列表按空位升序，同样多则先建的在前', () => {
@@ -257,15 +260,28 @@ test('ROOM_LIST_CACHE_MS 内共用一次扫描，挂/摘会立刻让缓存失效
   assert.equal(lobby.roomList().reply.rooms.length, 0);
 });
 
-test('开局后的房挂不上，挂上的也进不了列表', () => {
+// ★ 2026-11-28 需求变更（维护者）：开局后的房**继续留在列表上**，标「已开始」、只能观战。
+// 以前这条断言是「开局后不在列表上」—— 行为已被需求推翻，这里改成新的口径。
+test('开局后仍留在列表上（标已开始、只能观战），观战席满了才消失', () => {
   const lobby = makeLobby();
   const { host, room } = coopRoom(lobby, 8);
   lobby.setListed(host, { listed: true });
-  // 直接伪造「对局已开始」
-  room.match = { fake: true };
-  assert.equal(lobby.roomOpen(room), false, '开局后不在列表上');
+  room.match = { fake: true };                      // 伪造「对局已开始」
+
+  assert.equal(lobby.roomOpen(room), true, '开局后仍在列表上（观战席还有空）');
+  const rows = lobby.roomList().reply.rooms;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].started, true, '行上标 started，客户端据此显示「已开始」');
+  assert.equal(rows[0].spectators, 0);
+  assert.ok(rows[0].maxSpectators > 0, '给出观战席上限');
+
+  // 观战席满了 → 从列表消失（再点观战也进不去）
+  room.spectators = Array.from({ length: room.spectatorLimit() }, (_, i) => ({ playerId: `sp${i}` }));
+  lobby.roomListCache = null;
+  assert.equal(lobby.roomOpen(room), false, '观战席满 = 不再列出');
   assert.equal(lobby.roomList().reply.rooms.length, 0);
-  // 开局后也不能再改 listed
+
+  // 开局后仍然不能再改 listed（这条规则没变）
   assert.equal(lobby.setListed(host, { listed: false }).error, ERR.ROOM_STARTED);
 });
 

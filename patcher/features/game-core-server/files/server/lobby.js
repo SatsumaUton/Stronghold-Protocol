@@ -2245,9 +2245,16 @@ case 'room.list': return this.roomList(msg);
   roomOpen(room) {
     // 「深渊回响」房也允许公开（维护者 2026-11-06：「公开深潜」按钮）——是否真的在等人仍由下面的 listed 判据决定。
     // 2026-11-07 起深潜对所有人开放，公开的深潜房普通玩家也能加入（不再有 ECHO_FORBIDDEN 那道门）。
-    return room.listed && !room.disposed && !room.match && this.listable(room)
-      && room.freeSeat() >= 0 && !this.roomQueued(room)
-      && room.seatOf(room.hostId)?.connected === true;
+    // ★ 2026-11-28（维护者：开局后仍要留在列表上、可点观战进去看）：
+    //   以前这里要求 `!room.match` —— 一开局就从列表消失。现在分成两种可见状态：
+    //     · 还没开局 + 有空位 → 可加入（原来的行）
+    //     · 已开局 + 观战席没满 → 仍列出，标 started，只能观战
+    //   别的判据（listed / 未销毁 / listable / 房主在线 / 没在排队）两种状态共用。
+    if (!room.listed || room.disposed || !this.listable(room)) return false;
+    if (room.seatOf(room.hostId)?.connected !== true) return false;
+    if (this.roomQueued(room)) return false;
+    if (room.match) return room.spectatorLimit() > room.spectators.length;
+    return room.freeSeat() >= 0;
   }
 
   /**
@@ -2293,6 +2300,12 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
           // ★ 2026-11-21（维护者：公开同盟 / 公开深潜要跨版本显示并带版本号）：
         //   以前默认版本（第二期下半）不带 version → 列表里那一行没有版本徽章。现在一律带上。
         version: room.version,
+          // ★ 2026-11-28（维护者：开局后仍留在列表、显示「已开始」、可点观战）：
+          //   `started` 让客户端把「加入」换成「已开始」，观战按钮保留；
+          //   `spectators`/`maxSpectators` 让「观战席满了」也能提前说明。
+          started: !!room.match,
+          spectators: room.spectators.length,
+          maxSpectators: room.spectatorLimit(),
           // 「深渊回响」（深潜）：列表里要能认出深潜房（维护者 2026-11-06 的「公开深潜」）
           ...(room.variant ? { variant: room.variant } : {}),
           experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
@@ -3094,6 +3107,9 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       if (!room.matchmaking || room.mode !== 'coop') continue;
       if ((room.variant === 'deepecho') !== (wantVariant === 'deepecho')) continue;
       if (!this.roomOpen(room)) continue;
+      // ★ 2026-11-28：roomOpen 现在也包含「已开局但还能观战」的房 —— 多人匹配**绝不能**把人配进去，
+      //   它只该匹配「还没开局、有空位」的房（否则 join 会拿 ROOM_STARTED）。
+      if (room.match) continue;
       if (asked && room.difficulty !== asked) continue;
       if (!fitsSeats(room) || !fitsRules(room)) continue;
       if (!best || room.activeHumans().length > best.activeHumans().length) best = room;

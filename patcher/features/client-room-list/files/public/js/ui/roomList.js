@@ -45,6 +45,7 @@ export function expSummary(exp) {
   if (e.disableDuckLord) bits.push(t('禁用鸭爵'));
   if (e.layerCapOff) bits.push(t('关闭层数上限'));
   if (e.hitLimitOff) bits.push(t('关闭命中上限'));
+  if (e.traitStackUnlimited) bits.push(t('取消叠层限制'));
   if (Number(e.enemyHp) > 1) bits.push(t('敌方生命 ×{n}', { n: e.enemyHp }));
   if (Number(e.enemyAtk) > 1) bits.push(t('敌方攻击 ×{n}', { n: e.enemyAtk }));
   if (Array.isArray(e.poolPlan) && e.poolPlan.length) bits.push(t('手动卡池'));
@@ -55,7 +56,12 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null, onSpectate = null })
   const bots = row.filled - row.humans;
   // 深潜房不是同盟：观战的提示里要说「每次深潜」（维护者 2026-11-08）
   const dive = row.variant === 'deepecho';
-  return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
+  // ★ 2026-11-28（维护者：开局后仍留在列表上、显示「已开始」、可点观战进去看）：
+  //   已开局的房不能再加入（服务器会回 ROOM_STARTED），所以「加入」按钮禁用、文案换成「已开始」；
+  //   观战按钮保留 —— 模拟/深潜进行中都能进去看。观战席满了则说明原因。
+  const started = row.started === true;
+  const specFull = started && Number.isFinite(row.maxSpectators) && Number(row.spectators) >= Number(row.maxSpectators);
+  return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code} data-started=${started ? '1' : null}>
     <span class="rlist__diff">${row.variant === 'deepecho' ? html`<${Icon} name="target" />${t('深渊回响')}` : html`<${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}`}</span>
     <span class="rlist__who"><b class="selectable">${row.host}</b><small title=${expSummary(row.experimental)}>${expSummary(row.experimental)}</small></span>
     ${/* 不显示房间在哪台节点上：编号对玩家没有意义，加入时客户端自己带 ?n= 跳过去。 */ null}
@@ -64,12 +70,17 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null, onSpectate = null })
     ${/* 观战（维护者 2026-11-07）：只想看的人不必占一个博士席位；跨节点的房间同样带 ?n= 跳过去。
          两个按钮包在一个格子里，行的 4 列网格不因「有没有观战」而错位。 */ null}
     <span class="rlist__actions">
-      ${onSpectate ? html`<${Button} size="sm" variant="secondary" class="rlist__spec" data-testid="room-spectate" disabled=${disabled}
-          title=${dive
-            ? t('以观战者身份进入：不占博士席位，只能观看（每次深潜最多 {MAX_SPECTATORS} 名，深潜进行中也可进入）', { MAX_SPECTATORS })
-            : t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}
+      ${onSpectate ? html`<${Button} size="sm" variant="secondary" class="rlist__spec" data-testid="room-spectate" disabled=${disabled || specFull}
+          title=${specFull
+            ? t('观战席已满（{max} 名）：等有人离开后再试', { max: row.maxSpectators })
+            : dive
+              ? t('以观战者身份进入：不占博士席位，只能观看（每次深潜最多 {MAX_SPECTATORS} 名，深潜进行中也可进入）', { MAX_SPECTATORS })
+              : t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}
           onClick=${() => onSpectate(row.code, row.node || 0)}>${t('观战')}<//>` : null}
-      <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${joinLabel || t('加入同盟')}<//>
+      ${/* 已开局：不能再加入（服务器会回「模拟已开始」），按钮显示成「已开始」并禁用 */ null}
+      <${Button} size="sm" variant="primary" class="rlist__join" data-testid="room-join" disabled=${disabled || started}
+          title=${started ? t('这一局已经开始，只能观战') : null}
+          onClick=${() => onJoin(row.code, row.node || 0)}>${started ? t('已开始') : (joinLabel || t('加入同盟'))}<//>
     </span>
   </li>`;
 }
