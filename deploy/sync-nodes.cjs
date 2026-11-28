@@ -9,6 +9,12 @@
 //   那些节点会一直跑建服当天（10-25）的 server 代码。鸭爵叠加上线时就踩到了：node-1 已更新，
 //   其余 29 个节点连 meta.js 都是旧版，重启也拿不到新东西。
 //   现在 server 也复制；重启仍需按重启纪律单独执行（复制 ≠ 生效）。
+// ★ 2026-11-28（维护者：「把 check-node1-drift 接进来」）：
+//   本脚本的参照物是 **node-1**，不是 repo-sync。于是「改了 repo-sync、忘了拷到 node-1」时
+//   它会照报「0 处差异」，而 30 台跑的全是旧代码 —— 这个坑已经踩过两次
+//   （echoPhase.js 的盟约投影修复、matchmaker/server.js 的 humans 口径）。
+//   现在 --apply 之前先跑 deploy/check-node1-drift.mjs：不一致就**拒绝分发**。
+//   确实要先分发再补 node-1 的特殊情况，用 --skip-drift 显式跳过（会在输出里留痕）。
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -17,6 +23,7 @@ const crypto = require('node:crypto');
 const ROOT = process.env.SP_ROOT || path.resolve(__dirname, '..');
 const DIRS = ['public', 'shared', 'server', 'plugins', 'packs', 'schemas'];
 const APPLY = process.argv.includes('--apply');
+const SKIP_DRIFT = process.argv.includes('--skip-drift');
 const sha = (p) => crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex');
 
 function walk(dir, base = '', out = new Map()) {
@@ -29,8 +36,39 @@ function walk(dir, base = '', out = new Map()) {
   return out;
 }
 
+/**
+ * 分发前的闸门：repo-sync 与 node-1 的运行时文件必须一致。
+ * 不一致说明「改了仓库却没拷到 node-1」，此时分发毫无意义（参照物本身就是旧的）。
+ * @returns {boolean} true = 可以继续分发
+ */
+function driftGate() {
+  const { execFileSync } = require("node:child_process");
+  const script = path.join(__dirname, "check-node1-drift.mjs");
+  if (!fs.existsSync(script)) { console.log("⚠ 找不到 deploy/check-node1-drift.mjs，跳过闸门"); return true; }
+  try {
+    const out = execFileSync(process.execPath, [script], { cwd: path.dirname(__dirname), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    if (out.trim()) console.log(out.trim());
+    return true;
+  } catch (e) {
+    const out = String((e && (e.stdout || e.stderr)) || e);
+    if (out.trim()) console.log(out.trim());
+    console.error("");
+    console.error("✗ repo-sync 与 node-1 不一致 —— 拒绝分发（否则 2–30 台会继续跑旧代码）。");
+    console.error("  修法：把上面列出的文件拷到 node-1，然后再跑本脚本。");
+    console.error("  确实要先分发（node-1 故意不同时）可加 --skip-drift，但请说明原因。");
+    return false;
+  }
+}
+
 const ref = {};
 for (const d of DIRS) ref[d] = walk(path.join(ROOT, 'node-1', d));
+// ★ 闸门：repo-sync → node-1 必须先一致（见文件头）。只读模式只提示不拦。
+if (APPLY && !SKIP_DRIFT) {
+  if (!driftGate()) {
+    console.error("已中止，没有复制任何文件。");
+    process.exit(1);
+  }
+}
 let totalCopied = 0, totalDiff = 0;
 for (let n = 2; n <= 30; n++) {
   const ND = path.join(ROOT, 'node-' + n);
